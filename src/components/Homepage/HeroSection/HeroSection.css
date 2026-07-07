@@ -1,0 +1,106 @@
+/* Custom Navigation Arrow Styles */
+.swiper-button-prev,
+.swiper-button-next {
+  width: 32px !important;
+  height: 32px !important;
+  margin-top: 0 !important;
+  background: rgba(255, 255, 255, 0.9) !important;
+  border-radius: 50% !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
+  transition: all 0.3s ease !important;
+  color: #1f2937 !important;
+}
+
+.swiper-button-prev:hover,
+.swiper-button-next:hover {
+  background: rgba(255, 255, 255, 1) !important;
+  transform: scale(1.1) !important;
+}
+
+.swiper-button-prev::after,
+.swiper-button-next::after {
+  font-size: 12px !important;
+  font-weight: 900 !important;
+  color: #1f2937 !important;
+}
+
+.swiper-button-prev {
+  left: 8px !important;
+}
+
+.swiper-button-next {
+  right: 8px !important;
+}
+
+@media (min-width: 640px) {
+  .swiper-button-prev,
+  .swiper-button-next {
+    width: 36px !important;
+    height: 36px !important;
+  }
+  
+  .swiper-button-prev::after,
+  .swiper-button-next::after {
+    font-size: 14px !important;
+  }
+  
+  .swiper-button-prev {
+    left: 16px !important;
+  }
+  
+  .swiper-button-next {
+    right: 16px !important;
+  }
+}
+
+/* Custom Pagination Styles */
+.swiper-pagination {
+  position: absolute;
+  bottom: 1rem !important;
+  left: 50% !important;
+  transform: translateX(-50%);
+  width: auto !important;
+  display: flex;
+  gap: 0.5rem;
+  z-index: 20;
+}
+
+.swiper-pagination-bullet {
+  width: 6px !important;
+  height: 6px !important;
+  background-color: rgba(255, 255, 255, 0.5) !important;
+  opacity: 1 !important;
+  border-radius: 50% !important;
+  transition: all 0.3s ease !important;
+  cursor: pointer;
+}
+
+.swiper-pagination-bullet:hover {
+  background-color: rgba(255, 255, 255, 0.8) !important;
+  transform: scale(1.2);
+}
+
+.swiper-pagination-bullet-active {
+  background-color: #ec4899 !important; /* pink-500 */
+  width: 16px !important;
+  height: 6px !important;
+  border-radius: 3px !important;
+}
+
+@media (min-width: 640px) {
+  .swiper-pagination {
+    bottom: 1.5rem !important;
+    gap: 0.5rem;
+  }
+  
+  .swiper-pagination-bullet {
+    width: 8px !important;
+    height: 8px !important;
+  }
+  
+  .swiper-pagination-bullet-active {
+    width: 20px !important;
+    height: 8px !important;
+  }
+}
+
