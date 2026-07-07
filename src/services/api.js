@@ -768,6 +768,36 @@ export const orderAPI = {
             },
         });
     },
+
+    // Admin: Get Steadfast tracking history
+    getSteadfastTrackingHistory: (invoiceId, token) => {
+        return apiCall(`/steadfast/tracking/${invoiceId}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+    },
+
+    // Admin: Get paginated notifications
+    getAdminNotifications: (page = 1, limit = 10, token) => {
+        return apiCall(`/order/admin/notifications?page=${page}&limit=${limit}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+    },
+
+    // Admin: Mark notification as read
+    markNotificationRead: (orderId, token) => {
+        return apiCall(`/order/admin/${orderId}/mark-read`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+    },
 };
 
 // Upload API functions

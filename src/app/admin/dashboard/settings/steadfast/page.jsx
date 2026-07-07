@@ -22,7 +22,8 @@ export default function SteadfastSettingsPage() {
   const { hasPermission, contextLoading } = useAppContext();
   const [settings, setSettings] = useState({
     apiKey: '',
-    apiSecret: ''
+    apiSecret: '',
+    webhookToken: ''
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -53,7 +54,8 @@ export default function SteadfastSettingsPage() {
       if (response.success) {
         setSettings({
           apiKey: response.data?.apiKey || '',
-          apiSecret: response.data?.apiSecret || ''
+          apiSecret: response.data?.apiSecret || '',
+          webhookToken: response.data?.webhookToken || ''
         });
       } else {
         toast.error(response.message || 'Failed to load Steadfast settings');
@@ -216,6 +218,62 @@ export default function SteadfastSettingsPage() {
             <p className="mt-1 text-xs text-gray-500">
               Your Steadfast Secret Key provided by Steadfast Courier Ltd.
             </p>
+          </div>
+        </div>
+
+        {/* Webhook Settings Card */}
+        <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6 mt-6 space-y-6">
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 mb-1">Webhook Configuration</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Configure these in your Steadfast Merchant Panel to receive automated delivery and tracking updates.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Callback URL</label>
+              <div className="flex">
+                <input
+                  type="text"
+                  readOnly
+                  value={`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/steadfast/webhook`}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-l-md bg-gray-50 text-gray-600 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/steadfast/webhook`);
+                    toast.success('Callback URL copied to clipboard');
+                  }}
+                  className="px-4 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-md text-gray-600 hover:bg-gray-200 transition-colors"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Auth Token (Bearer)</label>
+              <div className="flex">
+                <input
+                  type="text"
+                  readOnly
+                  value={settings.webhookToken || 'Loading...'}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-l-md bg-gray-50 text-gray-600 focus:outline-none font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(settings.webhookToken);
+                    toast.success('Auth Token copied to clipboard');
+                  }}
+                  className="px-4 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-md text-gray-600 hover:bg-gray-200 transition-colors"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 

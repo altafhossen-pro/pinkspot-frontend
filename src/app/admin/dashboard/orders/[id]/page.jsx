@@ -61,6 +61,7 @@ export default function OrderDetailsPage() {
     const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
     const [addingToSteadfast, setAddingToSteadfast] = useState(false);
     const [apiError, setApiError] = useState(null);
+    const [trackingHistory, setTrackingHistory] = useState([]);
 
     useEffect(() => {
         // Check permission first
@@ -113,6 +114,25 @@ export default function OrderDetailsPage() {
             if (data.success) {
                 setOrder(data.data);
                 setPermissionError(null);
+
+                // If order is unread, mark it as read and notify header
+                if (data.data && !data.data.isReadByAdmin) {
+                    orderAPI.markNotificationRead(orderId, token).catch(console.error);
+                    window.dispatchEvent(new CustomEvent('notificationRead', { detail: orderId }));
+                }
+                
+                // Fetch tracking history if added to Steadfast
+                if (data.data?.isAddedIntoSteadfast || data.data?.steadfastConsignmentId) {
+                    try {
+                        const invoice = data.data.orderId || data.data._id;
+                        const trackingRes = await orderAPI.getSteadfastTrackingHistory(invoice, token);
+                        if (trackingRes.success) {
+                            setTrackingHistory(trackingRes.data || []);
+                        }
+                    } catch (trackingError) {
+                        console.error('Error fetching tracking history:', trackingError);
+                    }
+                }
             } else {
                 // Check if it's a permission error
                 if (data.message && (
@@ -345,8 +365,14 @@ export default function OrderDetailsPage() {
             
             if (response.success) {
                 toast.success(newStatus === 'shipped' ? 'Order shipped and added to Steadfast successfully' : 'Order status updated successfully');
+                // Extract updated order (addOrderToSteadfast returns { order, steadfastResponse }, while updateOrderStatus returns the order directly)
+                let responseOrder = response.data;
+                if (newStatus === 'shipped' && response.data?.order) {
+                    responseOrder = response.data.order;
+                }
+                
                 // Update order with full response data (includes paymentStatus if updated)
-                const updatedOrder = response.data || { ...order, status: newStatus };
+                const updatedOrder = responseOrder || { ...order, status: newStatus };
                 setOrder({ ...order, ...updatedOrder });
                 closeStatusModal();
             } else {
@@ -379,7 +405,9 @@ export default function OrderDetailsPage() {
             
             if (response.success) {
                 toast.success('Order added to Steadfast successfully');
-                const updatedOrder = response.data || { ...order, status: 'shipped' };
+                // addOrderToSteadfast returns { order, steadfastResponse }
+                const responseOrder = response.data?.order || response.data;
+                const updatedOrder = responseOrder || { ...order, status: 'shipped' };
                 setOrder({ ...order, ...updatedOrder });
             } else {
                 setApiError({
@@ -1169,6 +1197,45 @@ export default function OrderDetailsPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Tracking History (Full Width) */}
+            {trackingHistory.length > 0 && (
+                <div className="mt-8 bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+                    <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center">
+                        <Truck className="h-6 w-6 mr-3 text-blue-600" />
+                        Tracking Updates
+                    </h2>
+                    <div className="space-y-4">
+                        {trackingHistory.map((track, idx) => (
+                            <div key={idx} className="relative pl-6 pb-4 border-l border-blue-200 last:border-0 last:pb-0">
+                                <div className="absolute -left-1.5 top-0 w-3 h-3 bg-blue-500 rounded-full border-2 border-white shadow-sm"></div>
+                                <p className="text-sm font-semibold text-slate-900 mb-1">
+                                    {track.tracking_message}
+                                </p>
+                                <div className="flex items-center text-xs text-slate-500 space-x-3">
+                                    <span className="flex items-center">
+                                        <Clock className="h-3 w-3 mr-1" />
+                                        {(() => {
+                                            const d = new Date(track.updated_at_steadfast);
+                                            if (isNaN(d.getTime())) return 'Invalid Date';
+                                            const day = d.getDate().toString().padStart(2, '0');
+                                            const month = d.toLocaleString('en-US', { month: 'short' });
+                                            const year = d.getFullYear();
+                                            const time = d.toLocaleString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                                            return `${day}-${month}-${year}, ${time}`;
+                                        })()}
+                                    </span>
+                                    {track.status && (
+                                        <span className={`px-2 py-0.5 rounded-full font-medium capitalize ${getStatusColor(track.status)}`}>
+                                            {track.status.replace('_', ' ')}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {/* Status Update Modal */}
             {isStatusModalOpen && (

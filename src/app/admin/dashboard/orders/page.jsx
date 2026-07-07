@@ -1181,8 +1181,13 @@ export default function AdminOrdersPage() {
                                         onContextMenu={(e) => handleContextMenu(e, order._id)}
                                     >
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm font-medium text-gray-900">
-                                                #{order.orderId || order._id.slice(-8).toUpperCase()}
+                                            <div className="flex items-center gap-2">
+                                                {!order.isReadByAdmin && (
+                                                    <span className="h-2 w-2 bg-pink-500 rounded-full" title="Unread Order"></span>
+                                                )}
+                                                <div className="text-sm font-medium text-gray-900">
+                                                    #{order.orderId || order._id.slice(-8).toUpperCase()}
+                                                </div>
                                             </div>
                                             {(order.status === 'shipped' || order.status === 'delivered') && order.isAddedIntoSteadfast && order.steadfastConsignmentId && (
                                                 <a
@@ -1713,6 +1718,12 @@ export default function AdminOrdersPage() {
                                 href={`/admin/dashboard/orders/${openDropdownId}`}
                                 onClick={(e) => {
                                     e.stopPropagation();
+                                    const order = orders.find(o => o._id === openDropdownId);
+                                    if (order && !order.isReadByAdmin) {
+                                        orderAPI.markNotificationRead(openDropdownId, getCookie('token')).catch(console.error);
+                                        setOrders(prev => prev.map(o => o._id === openDropdownId ? { ...o, isReadByAdmin: true } : o));
+                                        window.dispatchEvent(new CustomEvent('notificationRead', { detail: openDropdownId }));
+                                    }
                                     setOpenDropdownId(null);
                                 }}
                                 className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
@@ -1727,6 +1738,12 @@ export default function AdminOrdersPage() {
                                     href={`/admin/dashboard/orders/${openDropdownId}/edit`}
                                     onClick={(e) => {
                                         e.stopPropagation();
+                                        const order = orders.find(o => o._id === openDropdownId);
+                                        if (order && !order.isReadByAdmin) {
+                                            orderAPI.markNotificationRead(openDropdownId, getCookie('token')).catch(console.error);
+                                            setOrders(prev => prev.map(o => o._id === openDropdownId ? { ...o, isReadByAdmin: true } : o));
+                                            window.dispatchEvent(new CustomEvent('notificationRead', { detail: openDropdownId }));
+                                        }
                                         setOpenDropdownId(null);
                                     }}
                                     className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
@@ -1739,6 +1756,11 @@ export default function AdminOrdersPage() {
                                         e.stopPropagation();
                                         const order = orders.find(o => o._id === openDropdownId);
                                         if (order) {
+                                            if (!order.isReadByAdmin) {
+                                                orderAPI.markNotificationRead(openDropdownId, getCookie('token')).catch(console.error);
+                                                setOrders(prev => prev.map(o => o._id === openDropdownId ? { ...o, isReadByAdmin: true } : o));
+                                                window.dispatchEvent(new CustomEvent('notificationRead', { detail: openDropdownId }));
+                                            }
                                             setOpenDropdownId(null);
                                             openStatusModal(order);
                                         }
@@ -1809,7 +1831,15 @@ export default function AdminOrdersPage() {
                         {hasPermission('order', 'read') && (
                             <Link
                                 href={`/admin/dashboard/orders/${contextMenu.orderId}`}
-                                onClick={() => setContextMenu({ open: false, orderId: null, x: 0, y: 0, hasSelection: false })}
+                                onClick={() => {
+                                    const order = orders.find(o => o._id === contextMenu.orderId);
+                                    if (order && !order.isReadByAdmin) {
+                                        orderAPI.markNotificationRead(contextMenu.orderId, getCookie('token')).catch(console.error);
+                                        setOrders(prev => prev.map(o => o._id === contextMenu.orderId ? { ...o, isReadByAdmin: true } : o));
+                                        window.dispatchEvent(new CustomEvent('notificationRead', { detail: contextMenu.orderId }));
+                                    }
+                                    setContextMenu({ open: false, orderId: null, x: 0, y: 0, hasSelection: false });
+                                }}
                                 className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
                             >
                                 <Eye className="h-4 w-4 mr-2" />
@@ -1820,7 +1850,15 @@ export default function AdminOrdersPage() {
                             <>
                                 <Link
                                     href={`/admin/dashboard/orders/${contextMenu.orderId}/edit`}
-                                    onClick={() => setContextMenu({ open: false, orderId: null, x: 0, y: 0, hasSelection: false })}
+                                    onClick={() => {
+                                        const order = orders.find(o => o._id === contextMenu.orderId);
+                                        if (order && !order.isReadByAdmin) {
+                                            orderAPI.markNotificationRead(contextMenu.orderId, getCookie('token')).catch(console.error);
+                                            setOrders(prev => prev.map(o => o._id === contextMenu.orderId ? { ...o, isReadByAdmin: true } : o));
+                                            window.dispatchEvent(new CustomEvent('notificationRead', { detail: contextMenu.orderId }));
+                                        }
+                                        setContextMenu({ open: false, orderId: null, x: 0, y: 0, hasSelection: false });
+                                    }}
                                     className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer"
                                 >
                                     <Edit className="h-4 w-4 mr-2" />
@@ -1830,6 +1868,11 @@ export default function AdminOrdersPage() {
                                     onClick={() => {
                                         const order = orders.find(o => o._id === contextMenu.orderId);
                                         if (order) {
+                                            if (!order.isReadByAdmin) {
+                                                orderAPI.markNotificationRead(contextMenu.orderId, getCookie('token')).catch(console.error);
+                                                setOrders(prev => prev.map(o => o._id === contextMenu.orderId ? { ...o, isReadByAdmin: true } : o));
+                                                window.dispatchEvent(new CustomEvent('notificationRead', { detail: contextMenu.orderId }));
+                                            }
                                             setContextMenu({ open: false, orderId: null, x: 0, y: 0, hasSelection: false });
                                             openStatusModal(order);
                                         }
