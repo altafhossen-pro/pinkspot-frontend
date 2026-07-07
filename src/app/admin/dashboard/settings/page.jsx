@@ -76,6 +76,22 @@ export default function AdminSettingsPage() {
       icon: Truck,
       color: 'bg-orange-100 text-orange-600',
       href: '/admin/dashboard/settings/steadfast'
+    },
+    {
+      id: 'site-settings',
+      title: 'Site Settings',
+      description: 'Logo & branding',
+      icon: SettingsIcon,
+      color: 'bg-indigo-100 text-indigo-600',
+      href: '/admin/dashboard/settings/site-settings'
+    },
+    {
+      id: 'store-features',
+      title: 'Store Features',
+      description: 'Homepage feature banner',
+      icon: Truck,
+      color: 'bg-pink-100 text-pink-600',
+      href: '/admin/dashboard/settings/store-features'
     }
   ];
 

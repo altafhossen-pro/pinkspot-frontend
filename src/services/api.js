@@ -121,8 +121,8 @@ export const productAPI = {
     },
 
     // Get products with videos
-    getProductVideos: () => {
-        return apiCall('/product/product-videos');
+    getProductVideos: (page = 1, limit = 12) => {
+        return apiCall(`/product/product-videos?page=${page}&limit=${limit}`);
     },
 
     // Admin: Create product
@@ -1452,6 +1452,23 @@ export const settingsAPI = {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(steadfastData),
+        });
+    },
+
+    // Get site settings only
+    getSiteSettings: () => {
+        return apiCall('/settings/site-settings');
+    },
+
+    // Update site settings only (Admin only)
+    updateSiteSettings: (siteData, token) => {
+        return apiCall('/settings/site-settings', {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(siteData),
         });
     },
 };

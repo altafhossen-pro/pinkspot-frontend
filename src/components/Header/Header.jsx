@@ -8,9 +8,9 @@ import Image from 'next/image';
 import { useAppContext } from '@/context/AppContext';
 import CartModal from '@/components/Cart/CartModal';
 import WishlistModal from '@/components/Wishlist/WishlistModal';
-import SearchBar from './SearchBar';
-import { menuAPI, categoryAPI } from '@/services/api';
+import { menuAPI, categoryAPI, settingsAPI } from '@/services/api';
 import CategoryMegamenu from './CategoryMegamenu';
+import SearchBar from './SearchBar';
 
 // Fallback navigation menu
 const fallbackNavigationMenu = [
@@ -21,12 +21,13 @@ const fallbackNavigationMenu = [
   { id: 6, name: "Contact", href: "/contact-us", isActive: false },
 ];
 
-function Header({ isTrackingShow = true }) {
+function Header({ isTrackingShow = true, logoUrl }) {
   const { user, cartCount, cartLoading, wishlistCount, isCartOpen, setIsCartOpen } = useAppContext();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [videoMenuData, setVideoMenuData] = useState(null);
   const [isWishlistOpen, setIsWishlistOpen] = useState(false);
   const [navigationMenu, setNavigationMenu] = useState([]);
   const [utilityMenus, setUtilityMenus] = useState([]);
@@ -94,10 +95,15 @@ function Header({ isTrackingShow = true }) {
     const fetchHeaderData = async () => {
       try {
         setMenuLoading(true);
-        const [categoriesResponse, menusResponse] = await Promise.all([
-            categoryAPI.getHeaderCategories(),
-            menuAPI.getHeaderMenus()
+        const [categoriesResponse, menusResponse, settingsResponse] = await Promise.all([
+          categoryAPI.getHeaderCategories(),
+          menuAPI.getHeaderMenus(),
+          settingsAPI.getSiteSettings()
         ]);
+
+        if (settingsResponse.success && settingsResponse.data && settingsResponse.data.videoMenu) {
+          setVideoMenuData(settingsResponse.data.videoMenu);
+        }
 
         if (categoriesResponse.success && categoriesResponse.data) {
           const transformedCategories = categoriesResponse.data
@@ -112,16 +118,16 @@ function Header({ isTrackingShow = true }) {
         }
 
         if (menusResponse.success && menusResponse.data) {
-            const transformedMenus = menusResponse.data
-                .filter(menu => menu.isVisible && menu.isActive)
-                .sort((a, b) => a.order - b.order)
-                .map(menu => ({
-                    id: menu._id,
-                    name: menu.name,
-                    href: menu.href,
-                    target: menu.target || '_self'
-                }));
-            setUtilityMenus(transformedMenus);
+          const transformedMenus = menusResponse.data
+            .filter(menu => menu.isVisible && menu.isActive)
+            .sort((a, b) => a.order - b.order)
+            .map(menu => ({
+              id: menu._id,
+              name: menu.name,
+              href: menu.href,
+              target: menu.target || '_self'
+            }));
+          setUtilityMenus(transformedMenus);
         }
       } catch (error) {
         console.error('Error fetching header data:', error);
@@ -155,12 +161,13 @@ function Header({ isTrackingShow = true }) {
             <div className="flex items-center">
               <Link href="/">
                 <Image
-                  src="/images/logo.svg"
+                  src={logoUrl || ""}
                   alt="Logo"
                   width={170}
                   height={70}
                   className="w-32 sm:w-40 "
                   priority
+                  unoptimized={!!logoUrl}
                 />
               </Link>
             </div>
@@ -269,9 +276,6 @@ function Header({ isTrackingShow = true }) {
               <nav className="flex items-center justify-between">
                 {/* Left side - Categories Megamenu and Main menu */}
                 <div className="flex items-center space-x-8">
-                  {/* Categories Megamenu */}
-                  {/* <CategoryMegamenu /> */}
-
                   {/* Other navigation items */}
                   {menuLoading ? (
                     <div className="flex space-x-8">
@@ -280,44 +284,57 @@ function Header({ isTrackingShow = true }) {
                       ))}
                     </div>
                   ) : (
-                    navigationMenu.map((item) => {
-                      const isActive = isMenuItemActive(item.href);
-                      return (
+                    <>
+                      {navigationMenu.map((item) => (
+                        item.name === "Categories" ? (
+                          <CategoryMegamenu key={item.id} />
+                        ) : (
+                          <Link
+                            key={item.id}
+                            href={item.href}
+                            className={`text-sm font-medium transition-colors hover:text-pink-600 ${isMenuItemActive(item.href) ? 'text-pink-600' : 'text-gray-700'
+                              }`}
+                          >
+                            {item.name}
+                          </Link>
+                        )
+                      ))}
+
+                      {videoMenuData?.isEnabled && (
                         <Link
-                          key={item.id}
-                          href={item.href}
-                          target={item.target}
-                          className={`font-medium transition-colors ${isActive
-                            ? 'text-[#f18daa]'
-                            : 'text-gray-700 hover:text-[#f18daa]'
-                            }`}
+                          href={videoMenuData.url || '/videos'}
+                          className={`text-sm font-medium px-3 py-1 rounded-full transition-transform hover:scale-105 ml-2 ${videoMenuData.tailwindClasses || ''}`}
+                          style={{
+                            backgroundColor: videoMenuData.backgroundColor || '#FF0000',
+                            color: videoMenuData.textColor || '#FFFFFF'
+                          }}
                         >
-                          {item.name}
+                          {videoMenuData.name || 'Videos'}
                         </Link>
-                      );
-                    })
+                      )}
+                    </>
                   )}
                 </div>
 
                 {/* Right side - Utility Menus */}
                 <div className='flex items-center gap-x-6'>
                   {menuLoading ? (
-                      <div className="flex space-x-4">
-                          {[...Array(2)].map((_, index) => (
-                              <div key={index} className="h-4 bg-gray-200 rounded animate-pulse w-16"></div>
-                          ))}
-                      </div>
+                    <div className="flex space-x-4">
+                      {[...Array(2)].map((_, index) => (
+                        <div key={index} className="h-4 bg-gray-200 rounded animate-pulse w-16"></div>
+                      ))}
+                    </div>
                   ) : (
-                      utilityMenus.map(menu => (
-                          <Link 
-                              key={menu.id} 
-                              href={menu.href} 
-                              target={menu.target}
-                              className="flex items-center space-x-2 text-gray-700 hover:text-[#f18daa] transition-colors"
-                          >
-                              <span className="font-medium">{menu.name}</span>
-                          </Link>
-                      ))
+                    utilityMenus.map(menu => (
+                      <Link
+                        key={menu.id}
+                        href={menu.href}
+                        target={menu.target}
+                        className="flex items-center space-x-2 text-gray-700 hover:text-[#f18daa] transition-colors"
+                      >
+                        <span className="font-medium">{menu.name}</span>
+                      </Link>
+                    ))
                   )}
                 </div>
               </nav>
@@ -392,10 +409,10 @@ function Header({ isTrackingShow = true }) {
 }
 
 // Wrapper component with Suspense boundary
-export default function HeaderWithSuspense({ isTrackingShow = true }) {
+export default function HeaderWithSuspense({ isTrackingShow = true, logoUrl }) {
   return (
     <Suspense fallback={<div className="h-16 bg-white"></div>}>
-      <Header isTrackingShow={isTrackingShow} />
+      <Header isTrackingShow={isTrackingShow} logoUrl={logoUrl} />
     </Suspense>
   );
 }

@@ -100,6 +100,21 @@ export default function AdminCategoriesPage() {
                category.slug.toLowerCase().includes(searchTerm.toLowerCase())
     })
 
+    const handleToggleFeatured = async (categoryId, currentStatus) => {
+        try {
+            const data = await categoryAPI.updateCategory(categoryId, { isFeatured: !currentStatus })
+            if (data.success) {
+                toast.success(`Category ${!currentStatus ? 'added to' : 'removed from'} homepage`)
+                fetchCategories() // Refresh to get updated data
+            } else {
+                toast.error('Failed to update status: ' + data.message)
+            }
+        } catch (error) {
+            console.error('Error updating category status:', error)
+            toast.error('Error updating category status')
+        }
+    }
+
     const getParentCategoryName = (parent) => {
         if (!parent) return 'None'
         return parent.name
@@ -187,7 +202,7 @@ export default function AdminCategoriesPage() {
                                     Sub Categories
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                    Featured
+                                    Show on Homepage
                                 </th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Created
@@ -239,15 +254,19 @@ export default function AdminCategoriesPage() {
                                             {getChildrenCount(category.children)}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            {category.isFeatured ? (
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                    Featured
-                                                </span>
-                                            ) : (
-                                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                                    Regular
-                                                </span>
-                                            )}
+                                            <button
+                                                onClick={() => handleToggleFeatured(category._id, category.isFeatured)}
+                                                disabled={!hasPermission('category', 'update')}
+                                                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                                                    category.isFeatured ? 'bg-blue-600' : 'bg-gray-200'
+                                                } ${!hasPermission('category', 'update') ? 'opacity-50 cursor-not-allowed' : ''}`}
+                                            >
+                                                <span
+                                                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
+                                                        category.isFeatured ? 'translate-x-5' : 'translate-x-0'
+                                                    }`}
+                                                />
+                                            </button>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             {new Date(category.createdAt).toLocaleDateString()}

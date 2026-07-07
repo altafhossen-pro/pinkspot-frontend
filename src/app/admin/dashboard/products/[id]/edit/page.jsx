@@ -228,11 +228,16 @@ export default function EditProductPage() {
 
         switch(platform) {
             case 'youtube':
-                if (trimmedUrl.includes('youtube.com/watch?v=') || trimmedUrl.includes('youtu.be/')) {
+                if (trimmedUrl.includes('youtube.com/watch?v=') || trimmedUrl.includes('youtu.be/') || trimmedUrl.includes('youtube.com/shorts/')) {
                     isValid = true
-                    const videoId = trimmedUrl.includes('youtu.be/') 
-                        ? trimmedUrl.split('youtu.be/')[1].split('?')[0]
-                        : trimmedUrl.split('watch?v=')[1].split('&')[0]
+                    let videoId = ''
+                    if (trimmedUrl.includes('youtu.be/')) {
+                        videoId = trimmedUrl.split('youtu.be/')[1].split('?')[0]
+                    } else if (trimmedUrl.includes('youtube.com/shorts/')) {
+                        videoId = trimmedUrl.split('youtube.com/shorts/')[1].split('?')[0]
+                    } else {
+                        videoId = trimmedUrl.split('watch?v=')[1].split('&')[0]
+                    }
                     processedUrl = `https://www.youtube.com/embed/${videoId}`
                 } else if (trimmedUrl.includes('youtube.com/embed/')) {
                     isValid = true

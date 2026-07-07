@@ -22,7 +22,24 @@ const geistMono = Geist_Mono({
 export const metadata = generateStaticMetadata('home');
 export const viewport = generateViewport();
 
-export default function RootLayout({ children }) {
+async function getSiteSettings() {
+  try {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/settings/site-settings`, {
+      next: { revalidate: 60 } // Cache for 60 seconds
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data?.data || null;
+  } catch (error) {
+    console.error('Error fetching site settings:', error);
+    return null;
+  }
+}
+
+export default async function RootLayout({ children }) {
+  const siteSettings = await getSiteSettings();
+  const logoUrl = siteSettings?.logoUrl || '';
+
   return (
     <html lang="en">
       <head>
@@ -59,7 +76,7 @@ export default function RootLayout({ children }) {
           <Suspense fallback={null}>
             <AffiliateTracker />
           </Suspense>
-          <ConditionalHeader />
+          <ConditionalHeader logoUrl={logoUrl} />
           {children}
           <MobileBottomNavigation />
           <Toaster />

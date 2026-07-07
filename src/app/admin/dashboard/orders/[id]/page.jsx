@@ -59,6 +59,8 @@ export default function OrderDetailsPage() {
     const [selectedItems, setSelectedItems] = useState(new Set());
     const [hoveredImage, setHoveredImage] = useState(null);
     const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
+    const [addingToSteadfast, setAddingToSteadfast] = useState(false);
+    const [apiError, setApiError] = useState(null);
 
     useEffect(() => {
         // Check permission first
@@ -333,26 +335,67 @@ export default function OrderDetailsPage() {
         try {
             setUpdatingStatus(true);
             const token = getCookie('token');
-            const response = await orderAPI.updateOrderStatus(order._id, { status: newStatus }, token);
+            let response;
+            
+            if (newStatus === 'shipped') {
+                response = await orderAPI.addOrderToSteadfast(order._id, token);
+            } else {
+                response = await orderAPI.updateOrderStatus(order._id, { status: newStatus }, token);
+            }
             
             if (response.success) {
-                toast.success('Order status updated successfully');
+                toast.success(newStatus === 'shipped' ? 'Order shipped and added to Steadfast successfully' : 'Order status updated successfully');
                 // Update order with full response data (includes paymentStatus if updated)
                 const updatedOrder = response.data || { ...order, status: newStatus };
                 setOrder({ ...order, ...updatedOrder });
                 closeStatusModal();
             } else {
-                toast.error(response.message || 'Failed to update order status');
+                setApiError({
+                    title: 'Update Failed',
+                    message: response.message || 'Failed to update order status'
+                });
             }
         } catch (error) {
             console.error('Error updating order status:', error);
             if (error.status === 403 || error.response?.status === 403) {
                 toast.error("You don't have permission to update orders");
             } else {
-                toast.error('Error updating order status');
+                const errorMessage = error.response?.data?.message || error.message || 'Error updating order status';
+                setApiError({
+                    title: newStatus === 'shipped' ? 'Steadfast Integration Error' : 'Update Failed',
+                    message: errorMessage
+                });
             }
         } finally {
             setUpdatingStatus(false);
+        }
+    };
+
+    const handleAddToSteadfast = async () => {
+        try {
+            setAddingToSteadfast(true);
+            const token = getCookie('token');
+            const response = await orderAPI.addOrderToSteadfast(order._id, token);
+            
+            if (response.success) {
+                toast.success('Order added to Steadfast successfully');
+                const updatedOrder = response.data || { ...order, status: 'shipped' };
+                setOrder({ ...order, ...updatedOrder });
+            } else {
+                setApiError({
+                    title: 'Steadfast Integration Error',
+                    message: response.message || 'Failed to add order to Steadfast'
+                });
+            }
+        } catch (error) {
+            console.error('Error adding to Steadfast:', error);
+            const errorMessage = error.response?.data?.message || error.message || 'Error adding order to Steadfast';
+            setApiError({
+                title: 'Steadfast Integration Error',
+                message: errorMessage
+            });
+        } finally {
+            setAddingToSteadfast(false);
         }
     };
 
@@ -385,11 +428,18 @@ export default function OrderDetailsPage() {
                 setOrder({ ...order, status: 'returned' });
                 closeReturnModal();
             } else {
-                toast.error(response.message || 'Failed to return order');
+                setApiError({
+                    title: 'Return Failed',
+                    message: response.message || 'Failed to return order'
+                });
             }
         } catch (error) {
             console.error('Error returning order:', error);
-            toast.error('Error returning order');
+            const errorMessage = error.response?.data?.message || error.message || 'Error returning order';
+            setApiError({
+                title: 'Return Failed',
+                message: errorMessage
+            });
         } finally {
             setUpdatingStatus(false);
         }
@@ -474,6 +524,28 @@ export default function OrderDetailsPage() {
                                 <span className="ml-2">{order.status.charAt(0).toUpperCase() + order.status.slice(1)}</span>
                             </span>
                             <div className="flex items-center space-x-2">
+                                {order.status === 'processing' && !order.isAddedIntoSteadfast && hasPermission('order', 'update') && (
+                                    <button 
+                                        onClick={handleAddToSteadfast}
+                                        disabled={addingToSteadfast}
+                                        className="inline-flex items-center px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors text-sm font-medium disabled:opacity-50"
+                                    >
+                                        {addingToSteadfast ? (
+                                            <>
+                                                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                                Adding...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Truck className="h-4 w-4 mr-2" />
+                                                Add to Steadfast
+                                            </>
+                                        )}
+                                    </button>
+                                )}
                                 {hasPermission('order', 'update') && (
                                     <>
                                         {order.status !== 'returned' && order.status !== 'cancelled' ? (
@@ -1147,7 +1219,7 @@ export default function OrderDetailsPage() {
                                 </option>
                                 {getAvailableStatusOptions(order.status).map(status => (
                                     <option key={status} value={status}>
-                                        {status.charAt(0).toUpperCase() + status.slice(1)}
+                                        {status === 'shipped' ? 'Shipped (Add to Steadfast)' : status.charAt(0).toUpperCase() + status.slice(1)}
                                     </option>
                                 ))}
                             </select>
@@ -1390,6 +1462,37 @@ export default function OrderDetailsPage() {
                                     </button>
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Error Modal */}
+            {apiError && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+                        <div className="bg-red-50 p-6 flex flex-col items-center text-center border-b border-red-100">
+                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4 shadow-inner">
+                                <AlertCircle className="h-8 w-8 text-red-600" />
+                            </div>
+                            <h3 className="text-xl font-bold text-red-900 mb-2">
+                                {apiError.title}
+                            </h3>
+                            <p className="text-red-700 text-sm font-medium px-4">
+                                {apiError.message}
+                            </p>
+                        </div>
+                        
+                        <div className="p-6 bg-white flex flex-col space-y-4">
+                            <p className="text-sm text-gray-600 text-center">
+                                Please check your configuration or try again later. If the problem persists, contact support.
+                            </p>
+                            <button
+                                onClick={() => setApiError(null)}
+                                className="w-full py-3 px-4 bg-gray-900 hover:bg-gray-800 text-white rounded-xl font-medium transition-colors shadow-md shadow-gray-900/20 active:scale-[0.98]"
+                            >
+                                Close & Continue
+                            </button>
                         </div>
                     </div>
                 </div>

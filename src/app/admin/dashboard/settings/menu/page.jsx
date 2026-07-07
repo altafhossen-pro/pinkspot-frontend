@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, GripVertical, Save, X, Facebook, Twitter, Instagram, Linkedin, FolderOpen, Loader2 } from 'lucide-react';
-import { menuAPI, categoryAPI } from '@/services/api';
+import { Plus, Edit, Trash2, GripVertical, Save, X, Facebook, Twitter, Instagram, Linkedin, FolderOpen, Loader2, Video } from 'lucide-react';
+import { menuAPI, categoryAPI, settingsAPI } from '@/services/api';
 import toast from 'react-hot-toast';
 import { getCookie } from 'cookies-next';
 import DeleteConfirmationModal from '@/components/Common/DeleteConfirmationModal';
@@ -27,6 +27,31 @@ export default function MenuSettings() {
         instagram: { url: '', isActive: false, openInNewTab: true },
         linkedin: { url: '', isActive: false, openInNewTab: true }
     });
+
+    const handleVideoMenuChange = (e) => {
+        const { name, value, type, checked } = e.target;
+        setVideoMenu(prev => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value
+        }));
+    };
+
+    const handleSaveVideoMenu = async () => {
+        try {
+            setSavingVideoMenu(true);
+            const res = await settingsAPI.updateSiteSettings({ videoMenu }, getAdminToken());
+            if (res.success) {
+                toast.success('Video menu settings saved successfully');
+            } else {
+                toast.error(res.message || 'Failed to save video menu');
+            }
+        } catch (error) {
+            console.error('Error saving video menu:', error);
+            toast.error('An error occurred while saving video menu');
+        } finally {
+            setSavingVideoMenu(false);
+        }
+    };
     const [contactData, setContactData] = useState({
         address: '',
         phone: '',
@@ -50,6 +75,15 @@ export default function MenuSettings() {
     const [hasReadPermission, setHasReadPermission] = useState(false);
     const [permissionError, setPermissionError] = useState(null);
     const [hasUpdatePermission, setHasUpdatePermission] = useState(false);
+    const [videoMenu, setVideoMenu] = useState({
+        isEnabled: false,
+        name: 'Videos',
+        url: '/videos',
+        backgroundColor: '#FF1493',
+        textColor: '#FFFFFF',
+        tailwindClasses: ''
+    });
+    const [savingVideoMenu, setSavingVideoMenu] = useState(false);
 
     // Get admin token from localStorage
     const getAdminToken = () => {
@@ -60,11 +94,16 @@ export default function MenuSettings() {
     const fetchMenus = async () => {
         try {
             setLoading(true);
-            const [headerResponse, footerResponse, categoriesResponse] = await Promise.all([
+            const [headerResponse, footerResponse, categoriesResponse, settingsResponse] = await Promise.all([
                 menuAPI.getHeaderMenus(),
                 menuAPI.getFooterMenus(),
-                categoryAPI.getCategories()
+                categoryAPI.getCategories(),
+                settingsAPI.getSiteSettings()
             ]);
+
+            if (settingsResponse.success && settingsResponse.data && settingsResponse.data.videoMenu) {
+                setVideoMenu(settingsResponse.data.videoMenu);
+            }
 
             if (categoriesResponse.success) {
                 setCategories(categoriesResponse.data);
@@ -76,7 +115,7 @@ export default function MenuSettings() {
 
             if (footerResponse.success) {
                 setFooterMenus(footerResponse.data);
-                
+
                 // Process social media data
                 const socialData = footerResponse.data.socialMedia || [];
                 const processedSocialData = {
@@ -85,7 +124,7 @@ export default function MenuSettings() {
                     instagram: { url: '', isActive: false, openInNewTab: true },
                     linkedin: { url: '', isActive: false, openInNewTab: true }
                 };
-                
+
                 socialData.forEach(item => {
                     const platform = item.socialPlatform || item.name?.toLowerCase();
                     if (processedSocialData[platform]) {
@@ -96,9 +135,9 @@ export default function MenuSettings() {
                         };
                     }
                 });
-                
+
                 setSocialMediaData(processedSocialData);
-                
+
                 // Process contact data
                 const contactMenus = footerResponse.data.contact || [];
                 const processedContactData = {
@@ -107,7 +146,7 @@ export default function MenuSettings() {
                     email: '',
                     callToAction: ''
                 };
-                
+
                 contactMenus.forEach(item => {
                     switch (item.contactType) {
                         case 'address':
@@ -124,7 +163,7 @@ export default function MenuSettings() {
                             break;
                     }
                 });
-                
+
                 setContactData(processedContactData);
             }
         } catch (error) {
@@ -166,7 +205,7 @@ export default function MenuSettings() {
 
             // Clean the form data - remove empty strings for optional fields
             const menuData = { ...formData };
-            
+
             // Remove empty strings for optional fields that have enum validation
             if (!menuData.contactType || menuData.contactType === '') {
                 delete menuData.contactType;
@@ -180,14 +219,14 @@ export default function MenuSettings() {
             if (!menuData.description || menuData.description === '') {
                 delete menuData.description;
             }
-            
-            
+
+
             if (activeTab === 'header') {
                 if (editingMenu) {
                     const response = await menuAPI.updateHeaderMenu(editingMenu._id, menuData, token);
                     if (response.success) {
                         toast.success('Header menu updated successfully');
-                        setHeaderMenus(prev => prev.map(menu => 
+                        setHeaderMenus(prev => prev.map(menu =>
                             menu._id === editingMenu._id ? response.data : menu
                         ));
                     }
@@ -205,7 +244,7 @@ export default function MenuSettings() {
                         toast.success('Footer menu updated successfully');
                         setFooterMenus(prev => ({
                             ...prev,
-                            [menuData.section]: prev[menuData.section]?.map(menu => 
+                            [menuData.section]: prev[menuData.section]?.map(menu =>
                                 menu._id === editingMenu._id ? response.data : menu
                             ) || []
                         }));
@@ -289,7 +328,7 @@ export default function MenuSettings() {
                     toast.success('Footer menu deleted successfully');
                 }
             }
-            
+
             setShowDeleteModal(false);
             setMenuToDelete(null);
         } catch (error) {
@@ -373,17 +412,17 @@ export default function MenuSettings() {
             // Validate URLs before saving
             const socialPlatforms = ['facebook', 'twitter', 'instagram', 'linkedin'];
             const validUrls = [];
-            
+
             for (const platform of socialPlatforms) {
                 const data = socialMediaData[platform];
                 if (data.url.trim()) {
                     let validUrl = data.url.trim();
-                    
+
                     // Add https:// if no protocol is present
                     if (!validUrl.startsWith('http://') && !validUrl.startsWith('https://')) {
                         validUrl = `https://${validUrl}`;
                     }
-                    
+
                     // Basic URL validation
                     try {
                         new URL(validUrl);
@@ -450,12 +489,12 @@ export default function MenuSettings() {
     // Handle new menu for specific section
     const handleNewMenuForSection = (sectionKey) => {
         setEditingMenu(null);
-        
+
         // Get the highest order in this section and increment by 1
         const sectionMenus = footerMenus[sectionKey] || [];
         const maxOrder = sectionMenus.length > 0 ? Math.max(...sectionMenus.map(menu => menu.order || 0)) : 0;
         const nextOrder = maxOrder + 1;
-        
+
         setFormData({
             name: '',
             href: '',
@@ -495,12 +534,12 @@ export default function MenuSettings() {
                 toast.error("You don't have permission to update settings");
                 return;
             }
-            
+
             // Optimistic update
-            setCategories(prev => prev.map(cat => 
+            setCategories(prev => prev.map(cat =>
                 cat._id === id ? { ...cat, [field]: value } : cat
             ));
-            
+
             const response = await categoryAPI.updateCategory(id, { [field]: value });
             if (response.success) {
                 toast.success('Category updated successfully');
@@ -520,9 +559,9 @@ export default function MenuSettings() {
         const sections = ['quickLinks', 'utilities', 'about'];
         return sections.map(section => ({
             key: section,
-            name: section === 'quickLinks' ? 'Quick Links' : 
-                  section === 'utilities' ? 'Utilities' :
-                  section === 'about' ? 'About' : section,
+            name: section === 'quickLinks' ? 'Quick Links' :
+                section === 'utilities' ? 'Utilities' :
+                    section === 'about' ? 'About' : section,
             menus: footerMenus[section] || []
         }));
     };
@@ -559,31 +598,28 @@ export default function MenuSettings() {
                     <nav className="-mb-px flex space-x-8">
                         <button
                             onClick={() => setActiveTab('categories')}
-                            className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                                activeTab === 'categories'
-                                    ? 'border-pink-500 text-pink-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                            }`}
+                            className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'categories'
+                                ? 'border-pink-500 text-pink-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
                         >
                             Header Categories
                         </button>
                         <button
                             onClick={() => setActiveTab('header')}
-                            className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                                activeTab === 'header'
-                                    ? 'border-pink-500 text-pink-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                            }`}
+                            className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'header'
+                                ? 'border-pink-500 text-pink-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
                         >
                             Header Utilities Menus
                         </button>
                         <button
                             onClick={() => setActiveTab('footer')}
-                            className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                                activeTab === 'footer'
-                                    ? 'border-pink-500 text-pink-600'
-                                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                            }`}
+                            className={`py-2 px-1 border-b-2 font-medium text-sm ${activeTab === 'footer'
+                                ? 'border-pink-500 text-pink-600'
+                                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                                }`}
                         >
                             Footer Menu
                         </button>
@@ -632,52 +668,175 @@ export default function MenuSettings() {
                     <p className="mt-2 text-gray-600">Loading menus...</p>
                 </div>
             ) : activeTab === 'categories' ? (
-                <div className="bg-white shadow overflow-hidden sm:rounded-md">
-                    <ul className="divide-y divide-gray-200">
-                        {categories.map((category) => (
-                            <li key={category._id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50">
-                                <div className="flex items-center">
-                                    <div className="flex-shrink-0 h-10 w-10 mr-4">
-                                        {category.image ? (
-                                            <img className="h-10 w-10 rounded-lg object-cover" src={category.image} alt={category.name} />
-                                        ) : (
-                                            <div className="h-10 w-10 rounded-lg bg-gray-200 flex items-center justify-center">
-                                                <FolderOpen className="h-5 w-5 text-gray-400" />
-                                            </div>
-                                        )}
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium text-gray-900">{category.name}</p>
-                                        <p className="text-xs text-gray-500">Slug: {category.slug}</p>
-                                    </div>
+                <div className="space-y-6">
+                    {/* Video Menu Section */}
+                    {hasUpdatePermission && (
+                        <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-2">
+                                    <Video className="w-5 h-5 text-pink-500" />
+                                    <h3 className="text-lg font-medium text-gray-900">Dynamic Video Menu</h3>
                                 </div>
-                                <div className="flex items-center space-x-6">
-                                    <div className="flex flex-col items-center">
-                                        <label className="text-xs text-gray-500 mb-1">Header Sort Order</label>
-                                        <input 
-                                            type="number" 
-                                            value={category.headerSortOrder || 0}
-                                            onChange={(e) => handleCategoryUpdate(category._id, 'headerSortOrder', parseInt(e.target.value) || 0)}
-                                            className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-pink-500 focus:border-pink-500 text-center"
+                                <button
+                                    onClick={() => handleVideoMenuChange({ target: { name: 'isEnabled', type: 'checkbox', checked: !videoMenu.isEnabled } })}
+                                    className={`${videoMenu.isEnabled ? 'bg-pink-600' : 'bg-gray-200'
+                                        } relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2`}
+                                >
+                                    <span
+                                        className={`${videoMenu.isEnabled ? 'translate-x-5' : 'translate-x-0'
+                                            } pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}
+                                    />
+                                </button>
+                            </div>
+
+                            {videoMenu.isEnabled && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-4">
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Menu Name</label>
+                                        <input
+                                            type="text"
+                                            name="name"
+                                            value={videoMenu.name}
+                                            onChange={handleVideoMenuChange}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500"
                                         />
                                     </div>
-                                    <div className="flex flex-col items-center">
-                                        <label className="text-xs text-gray-500 mb-1">Show on Header</label>
-                                        <label className="relative inline-flex items-center cursor-pointer">
-                                            <input 
-                                                type="checkbox" 
-                                                className="sr-only peer"
-                                                checked={category.showOnHeader || false}
-                                                onChange={(e) => handleCategoryUpdate(category._id, 'showOnHeader', e.target.checked)}
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">URL (Default: /videos)</label>
+                                        <input
+                                            type="text"
+                                            name="url"
+                                            value={videoMenu.url}
+                                            onChange={handleVideoMenuChange}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Background Color</label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="color"
+                                                name="backgroundColor"
+                                                value={videoMenu.backgroundColor}
+                                                onChange={handleVideoMenuChange}
+                                                className="h-10 w-10 border border-gray-300 rounded-md cursor-pointer"
                                             />
-                                            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-pink-600"></div>
-                                        </label>
+                                            <input
+                                                type="text"
+                                                name="backgroundColor"
+                                                value={videoMenu.backgroundColor}
+                                                onChange={handleVideoMenuChange}
+                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 uppercase"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Text Color</label>
+                                        <div className="flex gap-2">
+                                            <input
+                                                type="color"
+                                                name="textColor"
+                                                value={videoMenu.textColor}
+                                                onChange={handleVideoMenuChange}
+                                                className="h-10 w-10 border border-gray-300 rounded-md cursor-pointer"
+                                            />
+                                            <input
+                                                type="text"
+                                                name="textColor"
+                                                value={videoMenu.textColor}
+                                                onChange={handleVideoMenuChange}
+                                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500 uppercase"
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="md:col-span-2 lg:col-span-4">
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">Tailwind CSS Classes (Optional)</label>
+                                        <input
+                                            type="text"
+                                            name="tailwindClasses"
+                                            value={videoMenu.tailwindClasses}
+                                            onChange={handleVideoMenuChange}
+                                            placeholder="e.g. animate-bounce shadow-xl hover:scale-110"
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-pink-500"
+                                        />
+                                        <p className="mt-1 text-xs text-gray-500">Custom tailwind classes will be added to the button.</p>
                                     </div>
                                 </div>
-                            </li>
-                        ))}
+                            )}
+
+                            <div className="mt-4 flex justify-end">
+                                <button
+                                    onClick={handleSaveVideoMenu}
+                                    disabled={savingVideoMenu}
+                                    className="flex items-center px-4 py-2 bg-pink-600 text-white rounded-md hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 disabled:opacity-50"
+                                >
+                                    {savingVideoMenu ? (
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    ) : (
+                                        <Save className="w-4 h-4 mr-2" />
+                                    )}
+                                    Save Video Menu
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                    
+                    <div className="bg-white shadow overflow-hidden sm:rounded-md">
+                        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                            <h3 className="text-lg font-medium text-gray-900">Header Categories</h3>
+                            <p className="text-sm text-gray-500">
+                                Toggle the categories you want to display on the frontend header, and set their ordering.
+                            </p>
+                        </div>
+                        <ul className="divide-y divide-gray-200">
+                        {categories.map((category) => {
+                            // console.log({ category })
+                            return (
+                                <li key={category._id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50">
+                                    <div className="flex items-center">
+                                        <div className="flex-shrink-0 h-10 w-10 mr-4">
+                                            {category.image ? (
+                                                <img className="h-10 w-10 rounded-lg object-cover" src={category.image} alt={category.name} />
+                                            ) : (
+                                                <div className="h-10 w-10 rounded-lg bg-gray-200 flex items-center justify-center">
+                                                    <FolderOpen className="h-5 w-5 text-gray-400" />
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium text-gray-900">{category.name}</p>
+                                            <p className="text-xs text-gray-500">Slug: {category.slug}</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center space-x-6">
+                                        <div className="flex flex-col items-center">
+                                            <label className="text-xs text-gray-500 mb-1">Header Sort Order</label>
+                                            <input
+                                                type="number"
+                                                value={category.headerSortOrder || 0}
+                                                onChange={(e) => handleCategoryUpdate(category._id, 'headerSortOrder', parseInt(e.target.value) || 0)}
+                                                className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-pink-500 focus:border-pink-500 text-center"
+                                            />
+                                        </div>
+                                        <div className="flex flex-col items-center">
+                                            <label className="text-xs text-gray-500 mb-1">Show on Header</label>
+                                            <label className="relative inline-flex items-center cursor-pointer">
+                                                <input
+                                                    type="checkbox"
+                                                    className="sr-only peer"
+                                                    checked={category.showOnHeader || false}
+                                                    onChange={(e) => handleCategoryUpdate(category._id, 'showOnHeader', e.target.checked)}
+                                                />
+                                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-pink-600"></div>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </li>
+                            )
+                        })}
                     </ul>
                 </div>
+            </div>
             ) : activeTab === 'header' ? (
                 <div className="bg-white shadow overflow-hidden sm:rounded-md">
                     <ul className="divide-y divide-gray-200">
@@ -690,14 +849,12 @@ export default function MenuSettings() {
                                             <p className="text-sm font-medium text-gray-900">{menu.name}</p>
                                             <p className="text-sm text-gray-500">{menu.href}</p>
                                             <div className="flex items-center space-x-2 mt-1">
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                                    menu.isVisible ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                                }`}>
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${menu.isVisible ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                                    }`}>
                                                     {menu.isVisible ? 'Visible' : 'Hidden'}
                                                 </span>
-                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                                    menu.isActive ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
-                                                }`}>
+                                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${menu.isActive ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                                                    }`}>
                                                     {menu.isActive ? 'Active' : 'Inactive'}
                                                 </span>
                                                 <span className="text-xs text-gray-500">Order: {menu.order}</span>
@@ -706,20 +863,20 @@ export default function MenuSettings() {
                                     </div>
                                     <div className="flex items-center space-x-2">
                                         {hasUpdatePermission && (
-                                        <button
-                                            onClick={() => handleEdit(menu)}
-                                            className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 border border-gray-300 hover:border-blue-300 rounded-full transition-all duration-200 cursor-pointer"
-                                        >
-                                            <Edit className="w-4 h-4" />
-                                        </button>
+                                            <button
+                                                onClick={() => handleEdit(menu)}
+                                                className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 border border-gray-300 hover:border-blue-300 rounded-full transition-all duration-200 cursor-pointer"
+                                            >
+                                                <Edit className="w-4 h-4" />
+                                            </button>
                                         )}
                                         {hasUpdatePermission && (
-                                        <button
-                                            onClick={() => handleDeleteClick(menu)}
-                                            className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 border border-gray-300 hover:border-red-300 rounded-full transition-all duration-200 cursor-pointer"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
+                                            <button
+                                                onClick={() => handleDeleteClick(menu)}
+                                                className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 border border-gray-300 hover:border-red-300 rounded-full transition-all duration-200 cursor-pointer"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
                                         )}
                                     </div>
                                 </div>
@@ -748,14 +905,12 @@ export default function MenuSettings() {
                                                         <p className="text-sm font-medium text-gray-900">{menu.name}</p>
                                                         <p className="text-sm text-gray-500">{menu.href}</p>
                                                         <div className="flex items-center space-x-2 mt-1">
-                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                                                menu.isVisible ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                                                            }`}>
+                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${menu.isVisible ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                                                                }`}>
                                                                 {menu.isVisible ? 'Visible' : 'Hidden'}
                                                             </span>
-                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                                                menu.isActive ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
-                                                            }`}>
+                                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${menu.isActive ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                                                                }`}>
                                                                 {menu.isActive ? 'Active' : 'Inactive'}
                                                             </span>
                                                             <span className="text-xs text-gray-500">Order: {menu.order}</span>
@@ -764,23 +919,23 @@ export default function MenuSettings() {
                                                 </div>
                                                 <div className="flex items-center space-x-2">
                                                     {hasUpdatePermission && (
-                                                    <button
-                                                        onClick={() => {
-                                                            setFormData(prev => ({ ...prev, section: section.key }));
-                                                            handleEdit(menu);
-                                                        }}
-                                                        className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 border border-gray-300 hover:border-blue-300 rounded-full transition-all duration-200 cursor-pointer"
-                                                    >
-                                                        <Edit className="w-4 h-4" />
-                                                    </button>
+                                                        <button
+                                                            onClick={() => {
+                                                                setFormData(prev => ({ ...prev, section: section.key }));
+                                                                handleEdit(menu);
+                                                            }}
+                                                            className="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 border border-gray-300 hover:border-blue-300 rounded-full transition-all duration-200 cursor-pointer"
+                                                        >
+                                                            <Edit className="w-4 h-4" />
+                                                        </button>
                                                     )}
                                                     {hasUpdatePermission && (
-                                                    <button
-                                                        onClick={() => handleDeleteClick(menu)}
-                                                        className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 border border-gray-300 hover:border-red-300 rounded-full transition-all duration-200 cursor-pointer"
-                                                    >
-                                                        <Trash2 className="w-4 h-4" />
-                                                    </button>
+                                                        <button
+                                                            onClick={() => handleDeleteClick(menu)}
+                                                            className="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 border border-gray-300 hover:border-red-300 rounded-full transition-all duration-200 cursor-pointer"
+                                                        >
+                                                            <Trash2 className="w-4 h-4" />
+                                                        </button>
                                                     )}
                                                 </div>
                                             </div>
@@ -791,12 +946,12 @@ export default function MenuSettings() {
                                 <div className="px-6 py-8 text-center text-gray-500">
                                     <p>No menu items in this section</p>
                                     {hasUpdatePermission && (
-                                    <button
-                                        onClick={() => handleNewMenuForSection(section.key)}
-                                        className="mt-2 text-pink-600 hover:text-pink-700 text-sm font-medium"
-                                    >
-                                        Add first menu item
-                                    </button>
+                                        <button
+                                            onClick={() => handleNewMenuForSection(section.key)}
+                                            className="mt-2 text-pink-600 hover:text-pink-700 text-sm font-medium"
+                                        >
+                                            Add first menu item
+                                        </button>
                                     )}
                                 </div>
                             )}
@@ -818,11 +973,11 @@ export default function MenuSettings() {
                                     {activeTab === 'footer' && (
                                         <p className="text-sm text-gray-600 mt-1">
                                             Adding to: <span className="font-medium text-pink-600">
-                                                {formData.section === 'quickLinks' ? 'Quick Links' : 
-                                                 formData.section === 'utilities' ? 'Utilities' :
-                                                 formData.section === 'about' ? 'About' :
-                                                 formData.section === 'contact' ? 'Contact' :
-                                                 formData.section === 'socialMedia' ? 'Social Media' : formData.section}
+                                                {formData.section === 'quickLinks' ? 'Quick Links' :
+                                                    formData.section === 'utilities' ? 'Utilities' :
+                                                        formData.section === 'about' ? 'About' :
+                                                            formData.section === 'contact' ? 'Contact' :
+                                                                formData.section === 'socialMedia' ? 'Social Media' : formData.section}
                                             </span>
                                         </p>
                                     )}
@@ -953,7 +1108,7 @@ export default function MenuSettings() {
                         <h3 className="text-lg font-medium text-gray-900">Contact Information</h3>
                         <p className="text-sm text-gray-500">Manage contact details for footer</p>
                     </div>
-                    
+
                     <div className="p-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-3">
@@ -972,7 +1127,7 @@ export default function MenuSettings() {
                                         rows={3}
                                     />
                                 </div>
-                                
+
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
                                         Phone
@@ -989,7 +1144,7 @@ export default function MenuSettings() {
                                     />
                                 </div>
                             </div>
-                            
+
                             <div className="space-y-3">
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1006,7 +1161,7 @@ export default function MenuSettings() {
                                         placeholder="forpink@gmail.com"
                                     />
                                 </div>
-                                
+
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-1">
                                         Call to Action
@@ -1024,7 +1179,7 @@ export default function MenuSettings() {
                                 </div>
                             </div>
                         </div>
-                        
+
                         {hasUpdatePermission && (
                             <div className="mt-6 flex justify-end">
                                 <button
@@ -1046,7 +1201,7 @@ export default function MenuSettings() {
                         <h3 className="text-lg font-medium text-gray-900">Social Media Links</h3>
                         <p className="text-sm text-gray-500">Manage social media links for footer</p>
                     </div>
-                    
+
                     <div className="p-6">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {Object.entries(socialMediaData).map(([platform, data]) => (
@@ -1060,60 +1215,60 @@ export default function MenuSettings() {
                                         </div>
                                         <h4 className="text-sm font-medium text-gray-900 capitalize">{platform}</h4>
                                     </div>
-                                    
+
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
                                             URL
                                         </label>
-                                    <input
-                                        type="text"
-                                        value={data.url}
-                                        onChange={(e) => {
-                                            setSocialMediaData(prev => ({
-                                                ...prev,
-                                                [platform]: { ...prev[platform], url: e.target.value }
-                                            }));
-                                        }}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500 sm:text-sm"
-                                        placeholder={`${platform}.com/your-page`}
-                                    />
-                                    </div>
-                                    
-                                <div className="space-y-2">
-                                    <div className="flex items-center">
                                         <input
-                                            type="checkbox"
-                                            checked={data.isActive}
-                                            onChange={(e) => setSocialMediaData(prev => ({
-                                                ...prev,
-                                                [platform]: { ...prev[platform], isActive: e.target.checked }
-                                            }))}
-                                            className="h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 rounded"
+                                            type="text"
+                                            value={data.url}
+                                            onChange={(e) => {
+                                                setSocialMediaData(prev => ({
+                                                    ...prev,
+                                                    [platform]: { ...prev[platform], url: e.target.value }
+                                                }));
+                                            }}
+                                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500 sm:text-sm"
+                                            placeholder={`${platform}.com/your-page`}
                                         />
-                                        <label className="ml-2 text-sm text-gray-700">
-                                            Show in footer
-                                        </label>
                                     </div>
-                                    
-                                    <div className="flex items-center">
-                                        <input
-                                            type="checkbox"
-                                            checked={data.openInNewTab}
-                                            onChange={(e) => setSocialMediaData(prev => ({
-                                                ...prev,
-                                                [platform]: { ...prev[platform], openInNewTab: e.target.checked }
-                                            }))}
-                                            className="h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 rounded"
-                                        />
-                                        <label className="ml-2 text-sm text-gray-700">
-                                            Open in new tab
-                                        </label>
+
+                                    <div className="space-y-2">
+                                        <div className="flex items-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={data.isActive}
+                                                onChange={(e) => setSocialMediaData(prev => ({
+                                                    ...prev,
+                                                    [platform]: { ...prev[platform], isActive: e.target.checked }
+                                                }))}
+                                                className="h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 rounded"
+                                            />
+                                            <label className="ml-2 text-sm text-gray-700">
+                                                Show in footer
+                                            </label>
+                                        </div>
+
+                                        <div className="flex items-center">
+                                            <input
+                                                type="checkbox"
+                                                checked={data.openInNewTab}
+                                                onChange={(e) => setSocialMediaData(prev => ({
+                                                    ...prev,
+                                                    [platform]: { ...prev[platform], openInNewTab: e.target.checked }
+                                                }))}
+                                                className="h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 rounded"
+                                            />
+                                            <label className="ml-2 text-sm text-gray-700">
+                                                Open in new tab
+                                            </label>
+                                        </div>
                                     </div>
-                                </div>
                                 </div>
                             ))}
                         </div>
-                        
+
                         {hasUpdatePermission && (
                             <div className="mt-6 flex justify-end">
                                 <button

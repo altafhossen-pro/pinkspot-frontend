@@ -9,11 +9,14 @@ import ProductForYou from "@/components/Homepage/ProductForYou/ProductForYou";
 import FactsSection from "@/components/Homepage/FactsSection/FactsSection";
 import CustomerTestimonial from "@/components/Homepage/CustomerTestimonial/CustomerTestimonial";
 import Footer from "@/components/Footer/Footer";
+import HeroBanner from "@/components/Homepage/HeroBanner/HeroBanner";
+import StoreFeatures from "@/components/Homepage/StoreFeatures/StoreFeatures";
 
 export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50">
-
+      <HeroBanner />
+      <StoreFeatures />
       <HeroSection />
       <CategorySlider />
       {/* <FeaturedProducts /> */}

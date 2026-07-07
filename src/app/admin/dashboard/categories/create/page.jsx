@@ -20,7 +20,8 @@ export default function CreateCategoryPage() {
         slug: '',
         image: '',
         parent: '',
-        isFeatured: false
+        isFeatured: false,
+        bgClass: ''
     })
     const [checkingPermission, setCheckingPermission] = useState(true)
     const [hasCreatePermission, setHasCreatePermission] = useState(false)
@@ -230,10 +231,37 @@ export default function CreateCategoryPage() {
                                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                             />
                             <label htmlFor="isFeatured" className="ml-2 block text-sm text-gray-900">
-                                <span className="font-medium">Featured Category</span>
-                                <span className="text-gray-500 ml-1">- Show this category in landing page filter options</span>
+                                <span className="font-medium text-gray-700">Show on Homepage</span>
+                                <span className="text-gray-500 ml-1">- Display this category on the main homepage grid</span>
                             </label>
                         </div>
+                        
+                        {formData.isFeatured && (
+                            <div className="mt-4 ml-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Background Gradient
+                                </label>
+                                <select
+                                    name="bgClass"
+                                    value={formData.bgClass || 'bg-gradient-to-b from-pink-50 to-purple-100'}
+                                    onChange={handleInputChange}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                >
+                                    <option value="bg-gradient-to-b from-pink-50 to-purple-100">Default (Light Pink to Purple)</option>
+                                    <option value="bg-gradient-to-b from-blue-50 to-cyan-100">Light Blue to Cyan</option>
+                                    <option value="bg-gradient-to-b from-green-50 to-emerald-100">Light Green to Emerald</option>
+                                    <option value="bg-gradient-to-b from-orange-50 to-rose-100">Light Orange to Rose</option>
+                                    <option value="bg-gradient-to-b from-purple-50 to-indigo-100">Light Purple to Indigo</option>
+                                    <option value="bg-gradient-to-br from-purple-300 to-pink-300">Vibrant Purple to Pink</option>
+                                    <option value="bg-gradient-to-br from-blue-300 to-cyan-300">Vibrant Blue to Cyan</option>
+                                    <option value="bg-gradient-to-br from-orange-300 to-red-300">Vibrant Orange to Red</option>
+                                    <option value="bg-gradient-to-br from-green-300 to-teal-300">Vibrant Green to Teal</option>
+                                </select>
+                                <p className="mt-1 text-xs text-gray-500">
+                                    Select a predefined background gradient for this category card.
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </div>
 

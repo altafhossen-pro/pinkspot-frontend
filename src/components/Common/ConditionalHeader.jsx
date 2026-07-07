@@ -3,7 +3,7 @@
 import { usePathname } from 'next/navigation';
 import HeaderWithSuspense from '@/components/Header/Header';
 
-export default function ConditionalHeader() {
+export default function ConditionalHeader({ logoUrl }) {
   const pathname = usePathname();
   
   // Routes that should not show header at all
@@ -32,5 +32,5 @@ export default function ConditionalHeader() {
   const shouldHideTracking = noTrackingRoutes.some(route => pathname.startsWith(route));
   
   // Render header with appropriate tracking setting
-  return <HeaderWithSuspense isTrackingShow={!shouldHideTracking} />;
+  return <HeaderWithSuspense isTrackingShow={!shouldHideTracking} logoUrl={logoUrl} />;
 }
