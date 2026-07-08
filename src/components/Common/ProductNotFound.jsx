@@ -130,7 +130,7 @@ export default function ProductNotFound() {
                             {categories.map((category) => (
                                 <Link
                                     key={category._id}
-                                    href={`/categories/${category.slug}`}
+                                    href={`/shop?category=${category.slug}`}
                                     className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition-all hover:border-pink-300 group text-center"
                                 >
                                     <div className="w-12 h-12 mx-auto mb-3 bg-gray-100 rounded-lg flex items-center justify-center group-hover:bg-pink-50 transition-colors">

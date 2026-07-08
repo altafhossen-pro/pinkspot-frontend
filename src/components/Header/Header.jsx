@@ -110,8 +110,8 @@ function Header({ isTrackingShow = true, logoUrl }) {
             .map((cat) => ({
               id: cat._id,
               name: cat.name,
-              href: `/categories/${cat.slug}`,
-              isActive: true,
+              href: `/shop?category=${cat.slug}`,
+              icon: cat.icon || 'diamond',
               target: '_self',
             }));
           setNavigationMenu(transformedCategories);
