@@ -317,6 +317,14 @@ export const categoryAPI = {
             method: 'DELETE',
         });
     },
+
+    // Admin: Reorder categories
+    reorderCategories: (categories) => {
+        return apiCall('/category/reorder', {
+            method: 'PUT',
+            body: JSON.stringify({ categories }),
+        });
+    },
 };
 
 // OTP API functions

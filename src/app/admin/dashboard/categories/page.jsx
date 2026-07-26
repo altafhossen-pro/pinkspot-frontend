@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Plus, Edit, Trash2, Eye, Search, FolderOpen } from 'lucide-react'
+import { Plus, Edit, Trash2, Eye, Search, FolderOpen, ArrowUp, ArrowDown } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { categoryAPI } from '@/services/api'
 import DeleteConfirmationModal from '@/components/Common/DeleteConfirmationModal'
@@ -36,7 +36,7 @@ export default function AdminCategoriesPage() {
     const fetchCategories = async () => {
         try {
             setLoading(true)
-            const data = await categoryAPI.getCategories()
+            const data = await categoryAPI.getCategories({ sort: 'sortOrder', limit: 1000 })
             
             if (data.success) {
                 setCategories(data.data)
@@ -125,6 +125,45 @@ export default function AdminCategoriesPage() {
         return children.length
     }
 
+    const saveOrder = async (updatedCategories) => {
+        try {
+            const orderData = updatedCategories.map((cat, i) => ({ id: cat._id, sortOrder: i }));
+            const response = await categoryAPI.reorderCategories(orderData);
+            if (!response.success) {
+                toast.error('Failed to reorder categories');
+                fetchCategories(); // revert
+            }
+        } catch (error) {
+            console.error('Error reordering:', error);
+            toast.error('Error reordering categories');
+            fetchCategories();
+        }
+    }
+
+    const handleMoveUp = (index) => {
+        if (index === 0) return;
+        const newCategories = [...categories];
+        const temp = newCategories[index];
+        newCategories[index] = newCategories[index - 1];
+        newCategories[index - 1] = temp;
+        
+        newCategories.forEach((cat, i) => cat.sortOrder = i);
+        setCategories(newCategories);
+        saveOrder(newCategories);
+    }
+
+    const handleMoveDown = (index) => {
+        if (index === categories.length - 1) return;
+        const newCategories = [...categories];
+        const temp = newCategories[index];
+        newCategories[index] = newCategories[index + 1];
+        newCategories[index + 1] = temp;
+
+        newCategories.forEach((cat, i) => cat.sortOrder = i);
+        setCategories(newCategories);
+        saveOrder(newCategories);
+    }
+
     if (checkingPermission || contextLoading || loading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -207,6 +246,9 @@ export default function AdminCategoriesPage() {
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Created
                                 </th>
+                                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                    Order
+                                </th>
                                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                                     Actions
                                 </th>
@@ -270,6 +312,28 @@ export default function AdminCategoriesPage() {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                             {new Date(category.createdAt).toLocaleDateString()}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
+                                            {searchTerm === '' ? (
+                                                <div className="flex items-center justify-center space-x-1">
+                                                    <button
+                                                        onClick={() => handleMoveUp(categories.findIndex(c => c._id === category._id))}
+                                                        disabled={categories.findIndex(c => c._id === category._id) === 0}
+                                                        className={`p-1 rounded-md ${categories.findIndex(c => c._id === category._id) === 0 ? 'text-gray-300' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'}`}
+                                                    >
+                                                        <ArrowUp className="h-4 w-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleMoveDown(categories.findIndex(c => c._id === category._id))}
+                                                        disabled={categories.findIndex(c => c._id === category._id) === categories.length - 1}
+                                                        className={`p-1 rounded-md ${categories.findIndex(c => c._id === category._id) === categories.length - 1 ? 'text-gray-300' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'}`}
+                                                    >
+                                                        <ArrowDown className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <span className="text-gray-400 text-xs">Clear search to reorder</span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <div className="flex items-center justify-end space-x-2">

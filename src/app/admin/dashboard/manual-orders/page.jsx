@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Minus, Search, User, UserPlus, ShoppingCart, Package, Trash2, Save, AlertTriangle, X } from 'lucide-react';
+import { Plus, Minus, Search, User, UserPlus, ShoppingCart, Package, Trash2, Save, AlertTriangle, X, RefreshCw } from 'lucide-react';
 import { userAPI, productAPI, orderAPI } from '@/services/api';
 import { toast } from 'react-hot-toast';
 import { getCookie } from 'cookies-next';
@@ -478,15 +478,29 @@ export default function ManualOrderCreation() {
             }
             
             // Update existing item quantity
-            setOrderItems(prev => prev.map((item, index) =>
-                index === existingItemIndex
-                    ? {
+            setOrderItems(prev => prev.map((item, index) => {
+                if (index === existingItemIndex) {
+                    const currentQ = item.quantity === '' ? 0 : item.quantity;
+                    const newQuantity = currentQ + quantity;
+                    const activeEditedPrice = item.editedPrice !== undefined ? (item.editedPrice === '' ? 0 : item.editedPrice) : item.price;
+                    const discountPerUnit = item.price - activeEditedPrice;
+                    
+                    const oldTotalDiscount = discountPerUnit * currentQ;
+                    const newTotalDiscount = discountPerUnit * newQuantity;
+                    const differenceInDiscount = newTotalDiscount - oldTotalDiscount;
+                    
+                    setDiscountAmount(d => Math.max(0, d + differenceInDiscount));
+
+                    const newOriginalTotal = selectedVariant.currentPrice * newQuantity;
+                    return {
                         ...item,
-                        quantity: item.quantity + quantity,
-                        total: selectedVariant.currentPrice * (item.quantity + quantity)
-                    }
-                    : item
-            ));
+                        quantity: newQuantity,
+                        total: newOriginalTotal,
+                        editedTotal: activeEditedPrice * newQuantity
+                    };
+                }
+                return item;
+            }));
             toast.success(`Quantity updated for "${currentProduct.title}"`);
         } else {
             // Add new item
@@ -502,7 +516,9 @@ export default function ManualOrderCreation() {
                 },
                 quantity: quantity,
                 price: selectedVariant.currentPrice,
-                total: selectedVariant.currentPrice * quantity
+                total: selectedVariant.currentPrice * quantity,
+                editedPrice: selectedVariant.currentPrice,
+                editedTotal: selectedVariant.currentPrice * quantity
             };
 
             setOrderItems(prev => [...prev, newItem]);
@@ -517,8 +533,114 @@ export default function ManualOrderCreation() {
         setProductSearchTerm('');
     };
 
+    // Add quantity and total update handlers
+    const handleUpdateQuantity = (index, newQuantityVal) => {
+        const item = orderItems[index];
+        let newQuantity = newQuantityVal;
+        
+        if (newQuantity !== '') {
+            newQuantity = parseInt(newQuantityVal);
+            if (isNaN(newQuantity) || newQuantity < 0) return;
+            
+            const stockQuantity = item.variant.stockQuantity || 0;
+            if (newQuantity > stockQuantity) {
+                toast.error(`Insufficient stock! Only ${stockQuantity} available.`);
+                return;
+            }
+        }
+
+        const activeQuantityForMath = newQuantity === '' ? 0 : newQuantity;
+        const oldQ = item.quantity === '' ? 0 : item.quantity;
+
+        const originalPrice = item.price;
+        const activeEditedPrice = item.editedPrice !== undefined ? (item.editedPrice === '' ? 0 : item.editedPrice) : originalPrice;
+        const discountPerUnit = originalPrice - activeEditedPrice;
+        
+        const oldTotalDiscount = discountPerUnit * oldQ;
+        const newTotalDiscount = discountPerUnit * activeQuantityForMath;
+        const differenceInDiscount = newTotalDiscount - oldTotalDiscount;
+
+        setDiscountAmount(prev => Math.max(0, prev + differenceInDiscount));
+
+        const newOriginalTotal = item.price * activeQuantityForMath;
+
+        setOrderItems(prev => prev.map((itm, i) => {
+            if (i === index) {
+                return {
+                    ...itm,
+                    quantity: newQuantity,
+                    total: newOriginalTotal,
+                    editedTotal: activeEditedPrice * activeQuantityForMath
+                };
+            }
+            return itm;
+        }));
+    };
+
+    const handleUpdateItemPrice = (index, newPriceStr) => {
+        const item = orderItems[index];
+        const originalPrice = item.price;
+        
+        let newPrice = newPriceStr === '' ? '' : parseInt(newPriceStr);
+        if (newPriceStr !== '' && isNaN(newPrice)) newPrice = 0;
+        
+        if (newPriceStr !== '' && newPrice > originalPrice) {
+            toast.error('Cannot set price higher than original price');
+            newPrice = originalPrice;
+        }
+        
+        const oldEditedPrice = item.editedPrice !== undefined ? (item.editedPrice === '' ? 0 : item.editedPrice) : originalPrice;
+        const activeNewPrice = newPrice === '' ? 0 : newPrice;
+        
+        const differencePerUnit = oldEditedPrice - activeNewPrice;
+        const totalDifference = differencePerUnit * item.quantity;
+        
+        setDiscountAmount(prev => Math.max(0, prev + totalDifference));
+
+        setOrderItems(prev => prev.map((itm, i) => {
+            if (i === index) {
+                return {
+                    ...itm,
+                    editedPrice: newPrice,
+                    editedTotal: activeNewPrice * itm.quantity
+                };
+            }
+            return itm;
+        }));
+    };
+
+    const handleResetItemPrice = (index) => {
+        const item = orderItems[index];
+        const activeEditedPrice = item.editedPrice !== undefined ? (item.editedPrice === '' ? 0 : item.editedPrice) : item.price;
+        
+        if (activeEditedPrice >= item.price) return;
+        
+        const discountPerUnit = item.price - activeEditedPrice;
+        const totalDifference = discountPerUnit * item.quantity;
+        
+        setDiscountAmount(prev => Math.max(0, prev - totalDifference));
+
+        setOrderItems(prev => prev.map((itm, i) => {
+            if (i === index) {
+                return {
+                    ...itm,
+                    editedPrice: itm.price,
+                    editedTotal: itm.price * itm.quantity
+                };
+            }
+            return itm;
+        }));
+    };
+
     // Remove item from order
     const removeItemFromOrder = (index) => {
+        const item = orderItems[index];
+        const activeEditedPrice = item.editedPrice !== undefined ? (item.editedPrice === '' ? 0 : item.editedPrice) : item.price;
+        const discountPerUnit = item.price - activeEditedPrice;
+        const itemTotalDiscount = discountPerUnit * item.quantity;
+        
+        setDiscountAmount(prev => Math.max(0, prev - itemTotalDiscount));
+        
         setOrderItems(prev => prev.filter((_, i) => i !== index));
         toast.success('Item removed from order');
     };
@@ -749,6 +871,11 @@ export default function ManualOrderCreation() {
                                     }
                                 }}
                                 onFocus={() => setShowProductDropdown(true)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                    }
+                                }}
                                 className="w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
                                 placeholder="Scan Barcode or Search by Name/SKU..."
                                 autoFocus
@@ -1008,27 +1135,82 @@ export default function ManualOrderCreation() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm text-gray-900">
-                                                ৳{item.price}
+                                            <div className="flex items-center space-x-1">
+                                                <span className="text-sm font-bold text-gray-900">৳</span>
+                                                <input
+                                                    type="text"
+                                                    value={item.editedPrice !== undefined ? item.editedPrice : item.price}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        if (val === '' || /^\d+$/.test(val)) {
+                                                            handleUpdateItemPrice(index, val);
+                                                        }
+                                                    }}
+                                                    onBlur={(e) => {
+                                                        if (e.target.value === '') {
+                                                            handleUpdateItemPrice(index, 0);
+                                                        }
+                                                    }}
+                                                    className="w-20 px-2 py-1 border border-gray-300 rounded focus:border-blue-500 focus:outline-none text-sm font-medium text-gray-900"
+                                                />
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm text-gray-900">
-                                                {item.quantity}
+                                            <div className="flex items-center space-x-2">
+                                                <button
+                                                    onClick={() => handleUpdateQuantity(index, (item.quantity === '' ? 0 : item.quantity) - 1)}
+                                                    className="p-1 rounded-md text-gray-500 hover:bg-gray-100 cursor-pointer"
+                                                >
+                                                    <Minus className="h-4 w-4" />
+                                                </button>
+                                                <input
+                                                    type="text"
+                                                    value={item.quantity}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        if (val === '' || /^\d+$/.test(val)) {
+                                                            handleUpdateQuantity(index, val);
+                                                        }
+                                                    }}
+                                                    onBlur={(e) => {
+                                                        if (e.target.value === '' || e.target.value === '0') {
+                                                            handleUpdateQuantity(index, 1);
+                                                        }
+                                                    }}
+                                                    className="w-16 text-center px-2 py-1 border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                                />
+                                                <button
+                                                    onClick={() => handleUpdateQuantity(index, (item.quantity === '' ? 0 : item.quantity) + 1)}
+                                                    className="p-1 rounded-md text-gray-500 hover:bg-gray-100 cursor-pointer"
+                                                >
+                                                    <Plus className="h-4 w-4" />
+                                                </button>
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="text-sm font-bold text-gray-900">
-                                                ৳{item.total}
+                                                ৳{item.editedTotal !== undefined ? item.editedTotal : item.total}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                            <button
-                                                onClick={() => removeItemFromOrder(index)}
-                                                className="text-red-600 hover:text-red-900 cursor-pointer"
-                                            >
-                                                <Trash2 className="h-4 w-4" />
-                                            </button>
+                                            <div className="flex items-center space-x-3">
+                                                {item.editedPrice !== undefined && item.editedPrice !== '' && item.editedPrice < item.price && (
+                                                    <button
+                                                        onClick={() => handleResetItemPrice(index)}
+                                                        className="text-blue-600 hover:text-blue-900 cursor-pointer flex items-center"
+                                                        title="Reset to original price"
+                                                    >
+                                                        <RefreshCw className="h-4 w-4" />
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => removeItemFromOrder(index)}
+                                                    className="text-red-600 hover:text-red-900 cursor-pointer"
+                                                    title="Remove item"
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}
