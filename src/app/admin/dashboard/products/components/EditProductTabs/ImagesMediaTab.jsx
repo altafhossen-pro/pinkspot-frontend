@@ -26,8 +26,9 @@ export default function ImagesMediaTab({
                             <br />Recommended size: 800x800px
                         </p>
                         <ImageUpload
-                            value={formData.featuredImage}
-                            onChange={(url) => setFormData(prev => ({ ...prev, featuredImage: url }))}
+                            currentImage={formData.featuredImage}
+                            onImageUpload={(url) => setFormData(prev => ({ ...prev, featuredImage: url }))}
+                            onImageRemove={() => setFormData(prev => ({ ...prev, featuredImage: '' }))}
                         />
                     </div>
 
@@ -39,8 +40,8 @@ export default function ImagesMediaTab({
                             <br />You can upload multiple images.
                         </p>
                         <GalleryImageUpload
-                            values={formData.gallery}
-                            onChange={(urls) => setFormData(prev => ({ ...prev, gallery: urls }))}
+                            currentImages={formData.gallery}
+                            onImagesChange={(urls) => setFormData(prev => ({ ...prev, gallery: urls }))}
                         />
                     </div>
                 </div>

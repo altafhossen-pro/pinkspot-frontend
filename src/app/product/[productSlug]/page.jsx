@@ -7,22 +7,22 @@ import React from 'react';
 export async function generateMetadata({ params }) {
     try {
         const { productSlug } = await params;
-        
+
         // Create a server-side API call
         const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
         const response = await fetch(`${API_BASE_URL}/product/slug/${productSlug}`, {
             next: { revalidate: 60 } // Cache for 60 seconds
         });
-        
+
         if (response.ok) {
             const data = await response.json();
-            
+
             if (data.success && data.data) {
                 const product = data.data;
-                
+
                 return generateDynamicMetadata('product', {
                     productName: product.title,
-                    productDescription: product.description || product.shortDescription || `Premium ${product.title} from Forpink`,
+                    productDescription: product.description || product.shortDescription || `Premium ${product.title} from Pinkspot`,
                     image: product.featuredImage || product.images?.[0] || '/images/logo.png',
                     path: `/product/${productSlug}`
                 });
@@ -31,7 +31,7 @@ export async function generateMetadata({ params }) {
     } catch (error) {
         console.error('Error generating product metadata:', error);
     }
-    
+
     // Fallback metadata if product not found
     return generateDynamicMetadata('product', {
         productName: 'Product Not Found',
@@ -45,7 +45,7 @@ export const viewport = generateViewport();
 
 const page = async ({ params }) => {
     const { productSlug } = await params;
-    
+
     return (
         <div>
             <ProductDetails productSlug={productSlug} />

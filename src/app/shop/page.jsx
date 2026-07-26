@@ -326,6 +326,30 @@ function ShopPageContent() {
                         </button>
                     </div>
 
+                    {/* Full Width Banner (Category Banner or Default OwnAds) */}
+                    {(() => {
+                        const currentCategory = categories.find(c => c.slug === categorySlug);
+                        const hasCategoryBanner = currentCategory && currentCategory.banner?.isActive && currentCategory.banner?.url;
+                        
+                        if (hasCategoryBanner) {
+                            return (
+                                <div className="mb-8 w-full rounded-xl overflow-hidden shadow-sm">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img 
+                                        src={currentCategory.banner.url} 
+                                        alt={currentCategory.name} 
+                                        className="w-full h-32 md:h-48 lg:h-56 object-cover" 
+                                    />
+                                </div>
+                            );
+                        }
+                        
+                        return (
+                            <div className="mb-8">
+                                <OwnAds position="shop-page" />
+                            </div>
+                        );
+                    })()}
 
                     <div className="flex flex-col lg:flex-row gap-8">
                         {/* Left Sidebar - Filters */}
@@ -475,9 +499,6 @@ function ShopPageContent() {
 
                         {/* Right Side - Product Grid */}
                         <div className="flex-1">
-                            {/* Own Ads Banner */}
-                            <OwnAds position="shop-page" />
-                            
                             {/* Sorting Bar */}
                             <div className="mb-6">
                                 <div className="bg-white rounded-lg shadow-sm border border-gray-300 p-4">

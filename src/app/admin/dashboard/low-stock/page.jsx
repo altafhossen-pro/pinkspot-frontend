@@ -2,36 +2,29 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
-import { Plus, Edit, Trash2, Eye, Search, Filter, ChevronLeft, ChevronRight, TrendingUp, Share2, Download } from 'lucide-react'
+import { Edit, Search, ChevronLeft, ChevronRight, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getCookie } from 'cookies-next'
 import { productAPI } from '@/services/api'
-import DeleteConfirmationModal from '@/components/Common/DeleteConfirmationModal'
-import ShareModal from '@/components/Common/ShareModal'
 import PermissionDenied from '@/components/Common/PermissionDenied'
 import { useAppContext } from '@/context/AppContext'
 
-export default function AdminProductsPage() {
+export default function LowStockProductsPage() {
     const { hasPermission } = useAppContext()
     const [products, setProducts] = useState([])
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState('')
-    const [filterStatus, setFilterStatus] = useState('all')
+    const [filterStatus, setFilterStatus] = useState('low_stock')
     const [currentPage, setCurrentPage] = useState(1)
     const [totalPages, setTotalPages] = useState(1)
     const [total, setTotal] = useState(0)
-    const [selectedProducts, setSelectedProducts] = useState([])
-    const [deleting, setDeleting] = useState(false)
-    const [showDeleteModal, setShowDeleteModal] = useState(false)
-    const [showBulkDeleteModal, setShowBulkDeleteModal] = useState(false)
-    const [productToDelete, setProductToDelete] = useState(null)
     const [permissionError, setPermissionError] = useState(null)
-    const [showShareModal, setShowShareModal] = useState(false)
-    const [productToShare, setProductToShare] = useState(null)
     const [limit, setLimit] = useState(10)
     const [isCustomLimit, setIsCustomLimit] = useState(false)
     const [customLimitVal, setCustomLimitVal] = useState('')
     const [exporting, setExporting] = useState(false)
+    const [sortBy, setSortBy] = useState('totalStock')
+    const [sortOrder, setSortOrder] = useState('asc')
 
     const fetchProducts = useCallback(async () => {
         try {
@@ -50,6 +43,8 @@ export default function AdminProductsPage() {
             if (filterStatus && filterStatus !== 'all') {
                 params.status = filterStatus
             }
+
+            params.sort = sortOrder === 'asc' ? sortBy : `-${sortBy}`
 
             const data = await productAPI.getAdminProducts(params, token)
 
@@ -99,13 +94,12 @@ export default function AdminProductsPage() {
         } finally {
             setLoading(false)
         }
-    }, [currentPage, searchTerm, filterStatus, limit])
+    }, [currentPage, searchTerm, filterStatus, limit, sortBy, sortOrder])
 
-    // Reset to page 1 and clear selection when search/filter changes
+    // Reset to page 1 when search changes
     useEffect(() => {
         setCurrentPage(1)
-        setSelectedProducts([])
-    }, [searchTerm, filterStatus])
+    }, [searchTerm])
 
     // Debounce search - fetch after user stops typing (500ms delay)
     useEffect(() => {
@@ -114,132 +108,16 @@ export default function AdminProductsPage() {
         }, 500)
 
         return () => clearTimeout(timer)
-    }, [searchTerm, filterStatus, currentPage, fetchProducts])
+    }, [searchTerm, filterStatus, currentPage, limit, sortBy, sortOrder, fetchProducts])
 
     const handlePageChange = (page) => {
         setCurrentPage(page)
-        setSelectedProducts([]) // Clear selection when page changes
         window.scrollTo({ top: 0, behavior: 'smooth' })
-    }
-
-    const handleDeleteProduct = (productId) => {
-        const product = products.find(p => p._id === productId)
-        setProductToDelete(product)
-        setShowDeleteModal(true)
-    }
-
-    const confirmDeleteProduct = async () => {
-        if (!productToDelete) return
-
-        try {
-            setDeleting(true)
-            const token = getCookie('token')
-            if (!token) {
-                toast.error('Authentication required. Please login again.')
-                return
-            }
-            const data = await productAPI.deleteProduct(productToDelete._id, token)
-
-            if (data.success) {
-                toast.success('Product deleted successfully!')
-                setShowDeleteModal(false)
-                setProductToDelete(null)
-                fetchProducts() // Refresh the list
-            } else {
-                toast.error('Failed to delete product: ' + data.message)
-            }
-        } catch (error) {
-            console.error('Error deleting product:', error)
-            toast.error('Error deleting product')
-        } finally {
-            setDeleting(false)
-        }
     }
 
     const handleStatusChange = (status) => {
         setFilterStatus(status)
         setCurrentPage(1) // Reset to first page on filter change
-    }
-
-    // Handle individual product selection
-    const handleSelectProduct = (productId) => {
-        setSelectedProducts(prev => {
-            if (prev.includes(productId)) {
-                return prev.filter(id => id !== productId)
-            } else {
-                return [...prev, productId]
-            }
-        })
-    }
-
-    // Handle select all products on current page
-    const handleSelectAll = (checked) => {
-        if (checked) {
-            const allIds = products.map(p => p._id)
-            setSelectedProducts(allIds)
-        } else {
-            setSelectedProducts([])
-        }
-    }
-
-    // Check if all products on current page are selected
-    const isAllSelected = products.length > 0 && products.every(p => selectedProducts.includes(p._id))
-
-    // Handle bulk delete
-    const handleBulkDelete = () => {
-        if (selectedProducts.length === 0) return
-        setShowBulkDeleteModal(true)
-    }
-
-    const confirmBulkDelete = async () => {
-        if (selectedProducts.length === 0) return
-
-        try {
-            setDeleting(true)
-            const token = getCookie('token')
-            if (!token) {
-                toast.error('Authentication required. Please login again.')
-                return
-            }
-            const deletePromises = selectedProducts.map(productId =>
-                productAPI.deleteProduct(productId, token)
-            )
-
-            const results = await Promise.allSettled(deletePromises)
-            const successful = results.filter(r => r.status === 'fulfilled' && r.value.success).length
-            const failed = results.length - successful
-
-            if (successful > 0) {
-                toast.success(`${successful} product(s) deleted successfully!`)
-            }
-            if (failed > 0) {
-                toast.error(`${failed} product(s) failed to delete`)
-            }
-
-            setSelectedProducts([])
-            setShowBulkDeleteModal(false)
-            fetchProducts() // Refresh the list
-        } catch (error) {
-            console.error('Error deleting products:', error)
-            toast.error('Error deleting products')
-        } finally {
-            setDeleting(false)
-        }
-    }
-
-    const getStatusBadge = (status) => {
-        const statusConfig = {
-            draft: { color: 'bg-gray-100 text-gray-800', label: 'Draft' },
-            published: { color: 'bg-green-100 text-green-800', label: 'Published' },
-            archived: { color: 'bg-yellow-100 text-yellow-800', label: 'Archived' },
-            out_of_stock: { color: 'bg-red-100 text-red-800', label: 'Out of Stock' }
-        }
-        const config = statusConfig[status] || statusConfig.draft
-        return (
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
-                {config.label}
-            </span>
-        )
     }
 
     const getPriceDisplay = (product) => {
@@ -271,8 +149,8 @@ export default function AdminProductsPage() {
             const token = getCookie('token');
             const toastId = toast.loading('Fetching products for export...');
 
-            // Fetch all products (limit high enough to get all)
-            const data = await productAPI.getAdminProducts({ page: 1, limit: 100000 }, token);
+            // Fetch all products matching low stock
+            const data = await productAPI.getAdminProducts({ page: 1, limit: 100000, status: 'low_stock' }, token);
 
             if (!data.success) {
                 toast.error('Failed to fetch products for export', { id: toastId });
@@ -284,7 +162,7 @@ export default function AdminProductsPage() {
             const allProducts = data.data || [];
 
             // CSV Headers
-            const headers = ['Product Name', 'Slug', 'Category', 'Status', 'Variant/SKU', 'Original Price', 'Current Price', 'Stock'];
+            const headers = ['Product Name', 'Variant/SKU', 'Stock'];
 
             // Convert product data to CSV rows
             const csvRows = [];
@@ -292,28 +170,19 @@ export default function AdminProductsPage() {
 
             allProducts.forEach(product => {
                 const baseName = `"${product.title?.replace(/"/g, '""') || ''}"`;
-                const slug = product.slug || '';
-                const category = typeof product.category === 'object' ? product.category?.name : (product.category || '');
-                const status = product.status || '';
 
                 // If product has variants, create a row for each variant
                 if (product.variants && product.variants.length > 0) {
                     product.variants.forEach(variant => {
+                        const stock = variant.stockQuantity || 0;
                         const variantAttrs = variant.attributes?.map(a => `${a.name}:${a.value}`).join(' | ') || '';
                         const sku = variant.sku || variantAttrs;
-                        const origPrice = variant.originalPrice || '';
-                        const currPrice = variant.currentPrice || '';
-                        const stock = variant.stockQuantity || 0;
-
-                        csvRows.push(`${baseName},${slug},${category},${status},"${sku}",${origPrice},${currPrice},${stock}`);
+                        csvRows.push(`${baseName},"${sku}",${stock}`);
                     });
                 } else {
                     // No variants, just base product
-                    const origPrice = product.originalPrice || '';
-                    const currPrice = product.basePrice || product.currentPrice || '';
                     const stock = product.calculatedTotalStock || product.totalStock || 0;
-
-                    csvRows.push(`${baseName},${slug},${category},${status},"",${origPrice},${currPrice},${stock}`);
+                    csvRows.push(`${baseName},"",${stock}`);
                 }
             });
 
@@ -343,9 +212,9 @@ export default function AdminProductsPage() {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Products</h1>
+                        <h1 className="text-2xl font-bold text-gray-900">Low Stock Products</h1>
                         <p className="mt-1 text-sm text-gray-500">
-                            Manage your product catalog
+                            Manage your low stock product catalog
                         </p>
                     </div>
                     <div className="flex items-center space-x-3">
@@ -355,17 +224,8 @@ export default function AdminProductsPage() {
                             className="inline-flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200 disabled:opacity-50 cursor-pointer"
                         >
                             <Download className="h-4 w-4 mr-2" />
-                            {exporting ? 'Exporting...' : 'Export Products'}
+                            {exporting ? 'Exporting...' : 'Export CSV'}
                         </button>
-                        {hasPermission('product', 'create') && (
-                            <Link
-                                href="/admin/dashboard/products/create"
-                                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200"
-                            >
-                                <Plus className="h-4 w-4 mr-2" />
-                                Create Product
-                            </Link>
-                        )}
                     </div>
                 </div>
             </div>
@@ -378,49 +238,33 @@ export default function AdminProductsPage() {
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                             <input
                                 type="text"
-                                placeholder="Search products..."
+                                placeholder="Search low stock products..."
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                             />
                         </div>
                     </div>
-                    <div className="sm:w-48">
+                    <div className="flex flex-col sm:flex-row gap-2">
                         <select
-                            value={filterStatus}
-                            onChange={(e) => handleStatusChange(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            value={sortBy}
+                            onChange={(e) => setSortBy(e.target.value)}
+                            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
                         >
-                            <option value="all">All Status</option>
-                            <option value="draft">Draft</option>
-                            <option value="published">Published</option>
-                            <option value="archived">Archived</option>
-                            <option value="out_of_stock">Out of Stock</option>
+                            <option value="totalStock">By Product Stock</option>
+                            <option value="variants.stockQuantity">By Variant Stock</option>
+                        </select>
+                        <select
+                            value={sortOrder}
+                            onChange={(e) => setSortOrder(e.target.value)}
+                            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        >
+                            <option value="asc">Low to High</option>
+                            <option value="desc">High to Low</option>
                         </select>
                     </div>
                 </div>
             </div>
-
-            {/* Bulk Delete Button */}
-            {selectedProducts.length > 1 && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium text-red-800">
-                                {selectedProducts.length} product(s) selected
-                            </span>
-                        </div>
-                        <button
-                            onClick={handleBulkDelete}
-                            disabled={deleting}
-                            className="inline-flex items-center px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            {deleting ? 'Deleting...' : 'Delete Selected Products'}
-                        </button>
-                    </div>
-                </div>
-            )}
 
             {/* Products Table */}
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -436,14 +280,6 @@ export default function AdminProductsPage() {
                         <table className="min-w-full divide-y divide-gray-200">
                             <thead className="bg-gray-50">
                                 <tr>
-                                    <th className="px-6 py-3 text-left">
-                                        <input
-                                            type="checkbox"
-                                            checked={isAllSelected}
-                                            onChange={(e) => handleSelectAll(e.target.checked)}
-                                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                        />
-                                    </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Product
                                     </th>
@@ -453,12 +289,6 @@ export default function AdminProductsPage() {
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Stock
                                     </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Status
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Created
-                                    </th>
                                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Actions
                                     </th>
@@ -467,21 +297,13 @@ export default function AdminProductsPage() {
                             <tbody className="bg-white divide-y divide-gray-200">
                                 {products.length === 0 ? (
                                     <tr>
-                                        <td colSpan="7" className="px-6 py-12 text-center text-gray-500">
-                                            {searchTerm || filterStatus !== 'all' ? 'No products found matching your criteria.' : 'No products found.'}
+                                        <td colSpan="4" className="px-6 py-12 text-center text-gray-500">
+                                            {searchTerm ? 'No products found matching your criteria.' : 'No low stock products found.'}
                                         </td>
                                     </tr>
                                 ) : (
                                     products.map((product) => (
                                         <tr key={product._id} className="hover:bg-gray-50">
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={selectedProducts.includes(product._id)}
-                                                    onChange={() => handleSelectProduct(product._id)}
-                                                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                                />
-                                            </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <div className="flex items-center">
                                                     <div className="flex-shrink-0 h-12 w-12">
@@ -498,7 +320,6 @@ export default function AdminProductsPage() {
                                                         <div className="text-sm text-gray-500">
                                                             {product.slug}
                                                         </div>
-                                                        {/* Jewelry Type Indicators */}
                                                         <div className="flex items-center space-x-2 mt-1">
                                                             {product.isBracelet && (
                                                                 <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
@@ -518,44 +339,24 @@ export default function AdminProductsPage() {
                                                 {getPriceDisplay(product)}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {product.calculatedTotalStock || product.totalStock || 0}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                {getStatusBadge(product.status)}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {new Date(product.createdAt).toLocaleDateString()}
+                                                <div className="font-medium text-gray-900 mb-1">Total Stock: {product.calculatedTotalStock || product.totalStock || 0}</div>
+                                                {product.variants && product.variants.length > 0 && (
+                                                    <div className="mt-2 flex flex-col gap-1 max-h-32 overflow-y-auto pr-1">
+                                                        {product.variants.map((v, i) => {
+                                                            const attrs = v.attributes?.map(a => a.value).join(', ') || '';
+                                                            const name = v.sku || attrs || `Variant ${i+1}`;
+                                                            return (
+                                                                <div key={i} className="text-xs flex items-center justify-between bg-gray-50 px-2 py-1.5 rounded border border-gray-100 mb-1">
+                                                                    <span className="font-medium text-gray-700 whitespace-normal break-words" title={name}>{name}</span>
+                                                                    <span className={`font-bold ml-3 flex-shrink-0 ${v.stockQuantity <= 10 ? 'text-red-600' : 'text-gray-900'}`}>{v.stockQuantity} left</span>
+                                                                </div>
+                                                            )
+                                                        })}
+                                                    </div>
+                                                )}
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                 <div className="flex items-center justify-end space-x-2">
-                                                    <button
-                                                        onClick={() => {
-                                                            setProductToShare(product)
-                                                            setShowShareModal(true)
-                                                        }}
-                                                        className="text-pink-600 hover:text-pink-900 p-1 cursor-pointer"
-                                                        title="Share"
-                                                    >
-                                                        <Share2 className="h-4 w-4" />
-                                                    </button>
-                                                    {hasPermission('product', 'read') && (
-                                                        <Link
-                                                            href={`/admin/dashboard/products/${product._id}`}
-                                                            className="text-blue-600 hover:text-blue-900 p-1"
-                                                            title="View"
-                                                        >
-                                                            <Eye className="h-4 w-4" />
-                                                        </Link>
-                                                    )}
-                                                    {hasPermission('inventory', 'read') && (
-                                                        <Link
-                                                            href={`/admin/dashboard/products/${product._id}/stock-history`}
-                                                            className="text-green-600 hover:text-green-900 p-1"
-                                                            title="Stock History"
-                                                        >
-                                                            <TrendingUp className="h-4 w-4" />
-                                                        </Link>
-                                                    )}
                                                     {hasPermission('product', 'update') && (
                                                         <Link
                                                             href={`/admin/dashboard/products/${product._id}/edit`}
@@ -564,16 +365,6 @@ export default function AdminProductsPage() {
                                                         >
                                                             <Edit className="h-4 w-4" />
                                                         </Link>
-                                                    )}
-
-                                                    {hasPermission('product', 'delete') && (
-                                                        <button
-                                                            onClick={() => handleDeleteProduct(product._id)}
-                                                            className="text-red-600 hover:text-red-900 p-1"
-                                                            title="Delete"
-                                                        >
-                                                            <Trash2 className="h-4 w-4" />
-                                                        </button>
                                                     )}
                                                 </div>
                                             </td>
@@ -707,51 +498,6 @@ export default function AdminProductsPage() {
                 </div>
             </div>
 
-            {/* Single Delete Confirmation Modal */}
-            <DeleteConfirmationModal
-                isOpen={showDeleteModal}
-                onClose={() => {
-                    setShowDeleteModal(false)
-                    setProductToDelete(null)
-                }}
-                onConfirm={confirmDeleteProduct}
-                title="Delete Product"
-                message="Are you sure you want to delete this product? This action cannot be undone."
-                itemName={productToDelete?.title}
-                itemType="product"
-                isLoading={deleting}
-                confirmText="Delete Product"
-                cancelText="Cancel"
-                dangerLevel="high"
-            />
-
-            {/* Bulk Delete Confirmation Modal */}
-            <DeleteConfirmationModal
-                isOpen={showBulkDeleteModal}
-                onClose={() => setShowBulkDeleteModal(false)}
-                onConfirm={confirmBulkDelete}
-                title="Delete Selected Products"
-                message={`Are you sure you want to delete ${selectedProducts.length} product(s)? This action cannot be undone.`}
-                itemName=""
-                itemType="products"
-                isLoading={deleting}
-                confirmText={`Delete ${selectedProducts.length} Product(s)`}
-                cancelText="Cancel"
-                dangerLevel="high"
-            />
-
-            {/* Share Modal */}
-            {productToShare && (
-                <ShareModal
-                    isOpen={showShareModal}
-                    onClose={() => {
-                        setShowShareModal(false)
-                        setProductToShare(null)
-                    }}
-                    url={`/product/${productToShare.slug}`}
-                    title="Share Product"
-                />
-            )}
         </div>
     )
 }

@@ -18,9 +18,12 @@ import {
     Activity,
     Edit,
     Mail,
-    Calendar
+    Calendar,
+    Settings as SettingsIcon,
+    X,
+    Save
 } from 'lucide-react'
-import { analyticsAPI } from '@/services/api'
+import { analyticsAPI, settingsAPI } from '@/services/api'
 import { useAppContext } from '@/context/AppContext'
 import PermissionDenied from '@/components/Common/PermissionDenied'
 import toast from 'react-hot-toast'
@@ -67,6 +70,9 @@ export default function DashboardPage() {
     const [checkingPermission, setCheckingPermission] = useState(true)
     const [hasReadPermission, setHasReadPermission] = useState(false)
     const [permissionError, setPermissionError] = useState(null)
+    const [showThresholdModal, setShowThresholdModal] = useState(false)
+    const [thresholdValue, setThresholdValue] = useState(10)
+    const [savingThreshold, setSavingThreshold] = useState(false)
 
     // Fetch dashboard data
     const fetchDashboardData = async (period = selectedPeriod) => {
@@ -76,6 +82,9 @@ export default function DashboardPage() {
 
             if (response.success) {
                 setDashboardData(response.data)
+                if (response.data.products?.lowStockThreshold !== undefined) {
+                    setThresholdValue(response.data.products.lowStockThreshold)
+                }
             } else {
                 toast.error(response.message || 'Failed to fetch dashboard data')
             }
@@ -112,6 +121,25 @@ export default function DashboardPage() {
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [token, contextLoading])
+
+    const handleUpdateThreshold = async () => {
+        try {
+            setSavingThreshold(true)
+            const res = await settingsAPI.updateSiteSettings({ lowStockThreshold: parseInt(thresholdValue) }, token)
+            if (res.success) {
+                toast.success('Low stock threshold updated successfully')
+                setShowThresholdModal(false)
+                fetchDashboardData() // refresh data to get new low stock products
+            } else {
+                toast.error(res.message || 'Failed to update threshold')
+            }
+        } catch (error) {
+            console.error(error)
+            toast.error('An error occurred')
+        } finally {
+            setSavingThreshold(false)
+        }
+    }
 
     // Format currency
     const formatCurrency = (amount) => {
@@ -719,12 +747,24 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                <div className="bg-white rounded-xl border border-gray-200 p-6 card-hover">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                        <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
-                        Low Stock Alert
-                    </h3>
-                    <div className="space-y-3">
+                <div className="bg-white rounded-xl border border-gray-200 p-6 card-hover relative">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                            <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
+                            Low Stock Alert
+                            <span className="ml-2 text-xs font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+                                &le; {dashboardData?.products?.lowStockThreshold || 10}
+                            </span>
+                        </h3>
+                        <button 
+                            onClick={() => setShowThresholdModal(true)}
+                            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                            title="Edit Threshold"
+                        >
+                            <SettingsIcon className="h-4 w-4" />
+                        </button>
+                    </div>
+                    <div className="space-y-3 mb-3">
                         {products.lowStock && products.lowStock.length > 0 ? (
                             products.lowStock.map((product, index) => (
                                 <div key={index} className="flex justify-between items-center p-2 bg-red-50 rounded-lg hover:bg-red-100 transition-colors">
@@ -749,6 +789,14 @@ export default function DashboardPage() {
                             </div>
                         )}
                     </div>
+                    <div className="pt-3 border-t border-gray-100 mt-2">
+                        <Link 
+                            href="/admin/dashboard/low-stock"
+                            className="text-sm font-medium text-blue-600 hover:text-blue-700 flex items-center justify-center"
+                        >
+                            See more
+                        </Link>
+                    </div>
                 </div>
 
                 <div className="bg-white rounded-xl border border-gray-200 p-6 card-hover">
@@ -771,6 +819,56 @@ export default function DashboardPage() {
                     </div>
                 </div>
             </div>
+
+            {/* Threshold Edit Modal */}
+            {showThresholdModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-xl max-w-sm w-full p-6">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-bold text-gray-900">Edit Low Stock Threshold</h3>
+                            <button onClick={() => setShowThresholdModal(false)} className="text-gray-400 hover:text-gray-600">
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <div className="mb-4">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Threshold Value
+                            </label>
+                            <input 
+                                type="number" 
+                                min="1"
+                                value={thresholdValue} 
+                                onChange={(e) => setThresholdValue(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
+                                placeholder="e.g. 10"
+                            />
+                            <p className="text-xs text-gray-500 mt-2">
+                                Products with stock quantity less than or equal to this value will be shown in the Low Stock Alert.
+                            </p>
+                        </div>
+                        <div className="flex justify-end gap-3">
+                            <button 
+                                onClick={() => setShowThresholdModal(false)}
+                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                            >
+                                Cancel
+                            </button>
+                            <button 
+                                onClick={handleUpdateThreshold}
+                                disabled={savingThreshold}
+                                className="flex items-center px-4 py-2 text-sm font-medium text-white bg-pink-600 hover:bg-pink-700 rounded-lg transition-colors disabled:opacity-50"
+                            >
+                                {savingThreshold ? 'Saving...' : (
+                                    <>
+                                        <Save className="h-4 w-4 mr-2" />
+                                        Save Changes
+                                    </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

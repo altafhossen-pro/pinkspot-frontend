@@ -74,7 +74,7 @@ export default function PrivacyPolicy() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-pink-50 via-white to-purple-50">
-      
+
       {/* Main Content */}
       <div className="max-w-4xl mx-auto px-4 py-12">
         {/* Header Section */}
@@ -129,7 +129,7 @@ export default function PrivacyPolicy() {
             <div className="text-sm">
               <div className="flex items-center justify-center space-x-2 text-gray-700 mb-2">
                 <Mail className="w-4 h-4 text-pink-500" />
-                <span className="font-medium">Email: support@forpink.com</span>
+                <span className="font-medium">Email: support@pinkspot.bd</span>
               </div>
             </div>
           </div>

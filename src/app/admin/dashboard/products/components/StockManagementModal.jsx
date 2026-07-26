@@ -85,7 +85,7 @@ export default function StockManagementModal({
     return (
         <div className="fixed inset-0 z-50 overflow-y-auto">
             <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:p-0">
-                <div className="fixed inset-0 transition-opacity bg-gray-500 bg-opacity-75" onClick={onClose}></div>
+                <div className="fixed inset-0 transition-opacity bg-black/50 backdrop-blur-sm" onClick={onClose}></div>
 
                 <div className="relative inline-block w-full max-w-lg overflow-hidden text-left align-middle transition-all transform bg-white rounded-xl shadow-xl sm:my-8">
                     <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">

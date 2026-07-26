@@ -21,7 +21,11 @@ export default function CreateCategoryPage() {
         image: '',
         parent: '',
         isFeatured: false,
-        bgClass: ''
+        bgClass: '',
+        banner: {
+            url: '',
+            isActive: false
+        }
     })
     const [checkingPermission, setCheckingPermission] = useState(true)
     const [hasCreatePermission, setHasCreatePermission] = useState(false)
@@ -51,6 +55,18 @@ export default function CreateCategoryPage() {
 
     const handleInputChange = (e) => {
         const { name, value, type, checked } = e.target
+        
+        if (name === 'banner.isActive') {
+            setFormData(prev => ({
+                ...prev,
+                banner: {
+                    ...prev.banner,
+                    isActive: checked
+                }
+            }))
+            return
+        }
+
         setFormData(prev => ({
             ...prev,
             [name]: type === 'checkbox' ? checked : value
@@ -259,6 +275,38 @@ export default function CreateCategoryPage() {
                                 </select>
                                 <p className="mt-1 text-xs text-gray-500">
                                     Select a predefined background gradient for this category card.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                    {/* Category Banner Section */}
+                    <div className="mt-8 pt-6 border-t border-gray-200">
+                        <h3 className="text-md font-medium text-gray-900 mb-4">Shop Page Banner</h3>
+                        <div className="flex items-center mb-4">
+                            <input
+                                type="checkbox"
+                                id="bannerActive"
+                                name="banner.isActive"
+                                checked={formData.banner?.isActive || false}
+                                onChange={handleInputChange}
+                                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                            />
+                            <label htmlFor="bannerActive" className="ml-2 block text-sm text-gray-900">
+                                <span className="font-medium text-gray-700">Enable Category Banner</span>
+                                <span className="text-gray-500 ml-1">- Display a banner at the top of the shop page for this category</span>
+                            </label>
+                        </div>
+                        
+                        {formData.banner?.isActive && (
+                            <div className="mt-4 ml-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                                <ImageUpload
+                                    onImageUpload={(url) => setFormData(prev => ({ ...prev, banner: { ...prev.banner, url } }))}
+                                    onImageRemove={() => setFormData(prev => ({ ...prev, banner: { ...prev.banner, url: '' } }))}
+                                    currentImage={formData.banner?.url || ''}
+                                    label="Banner Image (URL or Upload)"
+                                />
+                                <p className="mt-2 text-xs text-gray-500">
+                                    Recommended size: 1200x300 pixels. This banner will span the full width of the product grid on the shop page.
                                 </p>
                             </div>
                         )}

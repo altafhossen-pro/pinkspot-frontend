@@ -57,32 +57,32 @@ export default function ReturnRefundPolicy() {
             <div
               key={section.id}
               className={`rounded-lg p-6 shadow-sm border ${section.highlight
-                  ? 'bg-red-50 border-red-200'
-                  : 'bg-white border-gray-100'
+                ? 'bg-red-50 border-red-200'
+                : 'bg-white border-gray-100'
                 }`}
             >
               <div className="flex items-start space-x-4">
                 <div className="flex-shrink-0">
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${section.highlight
-                      ? 'bg-red-100'
-                      : 'bg-pink-100'
+                    ? 'bg-red-100'
+                    : 'bg-pink-100'
                     }`}>
                     <section.icon className={`w-5 h-5 ${section.highlight
-                        ? 'text-red-500'
-                        : 'text-pink-500'
+                      ? 'text-red-500'
+                      : 'text-pink-500'
                       }`} />
                   </div>
                 </div>
                 <div className="flex-1">
                   <h2 className={`text-xl font-semibold mb-3 ${section.highlight
-                      ? 'text-red-700'
-                      : 'text-gray-900'
+                    ? 'text-red-700'
+                    : 'text-gray-900'
                     }`}>
                     {section.title}
                   </h2>
                   <div className={`leading-relaxed ${section.highlight
-                      ? 'text-red-800'
-                      : 'text-gray-600'
+                    ? 'text-red-800'
+                    : 'text-gray-600'
                     }`}>
                     {section.content.split('\n').map((paragraph, pIndex) => (
                       paragraph.trim() ? (
@@ -108,7 +108,7 @@ export default function ReturnRefundPolicy() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div className="flex items-center justify-center space-x-2 text-gray-600">
                 <Mail className="w-4 h-4 text-pink-500" />
-                <span>support@forpink.com</span>
+                <span>support@pinkspot.bd</span>
               </div>
               <div className="flex items-center justify-center space-x-2 text-gray-600">
                 <Phone className="w-4 h-4 text-pink-500" />

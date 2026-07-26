@@ -241,9 +241,12 @@ export default function ProductDetails({ productSlug }) {
 
     const handleQuantityChange = (type) => {
         if (type === 'increase') {
-            setQuantity(prev => prev + 1);
-        } else if (type === 'decrease' && quantity > 1) {
-            setQuantity(prev => prev - 1);
+            setQuantity(prev => (prev === '' ? 0 : parseInt(prev)) + 1);
+        } else if (type === 'decrease') {
+            setQuantity(prev => {
+                const current = prev === '' ? 0 : parseInt(prev);
+                return current > 1 ? current - 1 : 1;
+            });
         }
     };
 
@@ -344,7 +347,8 @@ export default function ProductDetails({ productSlug }) {
         } : null;
 
         // Add to cart using context
-        addToCart(product, selectedVariantData, quantity);
+        const q = quantity === '' || quantity < 1 ? 1 : quantity;
+        addToCart(product, selectedVariantData, q);
     };
 
     const handleBuyNow = () => {
@@ -366,7 +370,8 @@ export default function ProductDetails({ productSlug }) {
         } : null;
 
         // Add to cart using context
-        addToCart(product, selectedVariantData, quantity);
+        const q = quantity === '' || quantity < 1 ? 1 : quantity;
+        addToCart(product, selectedVariantData, q);
 
         // Navigate to checkout page
         router.push('/checkout');
@@ -696,7 +701,22 @@ export default function ProductDetails({ productSlug }) {
                                     >
                                         <Minus className="w-4 h-4" />
                                     </button>
-                                    <span className="px-4 py-2 font-semibold">{quantity}</span>
+                                    <input
+                                        type="text"
+                                        value={quantity}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (val === '' || /^\d+$/.test(val)) {
+                                                setQuantity(val === '' ? '' : parseInt(val));
+                                            }
+                                        }}
+                                        onBlur={(e) => {
+                                            if (e.target.value === '' || parseInt(e.target.value) < 1) {
+                                                setQuantity(1);
+                                            }
+                                        }}
+                                        className="w-16 text-center py-2 font-semibold focus:outline-none"
+                                    />
                                     <button
                                         onClick={() => handleQuantityChange('increase')}
                                         className="p-3 cursor-pointer transition-colors"
@@ -1027,7 +1047,7 @@ export default function ProductDetails({ productSlug }) {
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Brand</p>
-                                                        <p className="text-sm font-semibold text-gray-900 truncate">{product.brand || 'ForPink'}</p>
+                                                        <p className="text-sm font-semibold text-gray-900 truncate">{product.brand || 'Pinkspot'}</p>
                                                     </div>
                                                 </div>
                                             </div>

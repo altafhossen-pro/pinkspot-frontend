@@ -57,8 +57,8 @@ export default function OrderInvoicePage() {
         }
     };
 
-     // Transform order data for display
-     const getStatusInfo = (status) => {
+    // Transform order data for display
+    const getStatusInfo = (status) => {
         const statusMap = {
             'pending': { label: 'Pending', color: 'text-pink-600', bg: 'bg-pink-100', icon: Clock },
             'confirmed': { label: 'Confirmed', color: 'text-blue-600', bg: 'bg-blue-100', icon: Clock },
@@ -291,7 +291,7 @@ export default function OrderInvoicePage() {
             `}</style>
 
                 <div className="min-h-screen bg-gray-50 mt-5">
-                    
+
 
                     {/* Invoice Container */}
                     <div className="max-w-4xl mx-auto px-6 pb-6">
@@ -301,7 +301,7 @@ export default function OrderInvoicePage() {
                                 <div className="flex justify-between items-start">
                                     <div>
                                         <h1 className="text-2xl font-bold">INVOICE</h1>
-                                        <p className="text-pink-100 mt-1 text-sm">Forpink.com</p>
+                                        <p className="text-pink-100 mt-1 text-sm">Pinkspot.com</p>
                                         <p className="text-pink-100 text-sm">Premium Gold Jewelry & Accessories</p>
                                     </div>
                                     <div className="text-right">
@@ -342,7 +342,7 @@ export default function OrderInvoicePage() {
                                     <div>
                                         <h3 className="text-sm font-semibold text-gray-900 mb-1">From:</h3>
                                         <div className="text-gray-700 text-sm">
-                                            <div className="font-semibold">Forpink.com</div>
+                                            <div className="font-semibold">Pinkspot.com</div>
                                             <div>123 Jewelry Street, Dhaka 1000</div>
                                             <div className="flex items-center mt-1">
                                                 <Phone className="h-3 w-3 mr-1" />

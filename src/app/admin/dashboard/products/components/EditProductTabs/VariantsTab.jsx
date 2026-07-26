@@ -1,6 +1,8 @@
-import React from 'react';
-import { Plus, Trash2, Edit } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus, Trash2, Edit, Upload, Loader2 } from 'lucide-react';
 import ImageUpload from '@/components/Common/ImageUpload';
+import { uploadAPI } from '@/services/api';
+import toast from 'react-hot-toast';
 
 export default function VariantsTab({ 
     formData, 
@@ -16,6 +18,38 @@ export default function VariantsTab({
     setVariantForm,
     onManageStock
 }) {
+    const [uploadingVariantIndex, setUploadingVariantIndex] = useState(null);
+
+    const handleVariantImageUpload = async (file, vIndex) => {
+        if (!file) return;
+        
+        if (!file.type.startsWith('image/')) {
+            toast.error('Please select an image file');
+            return;
+        }
+
+        setUploadingVariantIndex(vIndex);
+        const loadingToast = toast.loading('Uploading image...');
+
+        try {
+            const formDataToUpload = new FormData();
+            formDataToUpload.append('image', file);
+            const data = await uploadAPI.uploadSingle(formDataToUpload);
+
+            if (data.success) {
+                updateVariant(vIndex, 'images', [{ url: data.data.url, altText: 'Variant' }]);
+                toast.success('Variant image updated successfully!', { id: loadingToast });
+            } else {
+                toast.error(data.message || 'Upload failed', { id: loadingToast });
+            }
+        } catch (error) {
+            console.error('Upload error:', error);
+            toast.error('Upload failed. Please try again.', { id: loadingToast });
+        } finally {
+            setUploadingVariantIndex(null);
+        }
+    };
+
     return (
         <div className="space-y-6">
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -188,17 +222,39 @@ export default function VariantsTab({
                                 {formData.variants.map((variant, vIndex) => (
                                     <tr key={vIndex} className="hover:bg-gray-50 transition-colors">
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            {variant.images && variant.images[0]?.url ? (
-                                                <img 
-                                                    src={variant.images[0].url} 
-                                                    alt="Variant" 
-                                                    className="h-12 w-12 object-cover rounded-md border border-gray-200"
-                                                />
-                                            ) : (
-                                                <div className="h-12 w-12 bg-gray-100 rounded-md flex items-center justify-center text-gray-400 border border-gray-200 text-xs">
-                                                    No Img
-                                                </div>
-                                            )}
+                                            <div className="relative group inline-block">
+                                                {variant.images && variant.images[0]?.url ? (
+                                                    <img 
+                                                        src={variant.images[0].url} 
+                                                        alt="Variant" 
+                                                        className={`h-12 w-12 object-cover rounded-md border border-gray-200 ${uploadingVariantIndex === vIndex ? 'opacity-50' : ''}`}
+                                                    />
+                                                ) : (
+                                                    <div className="h-12 w-12 bg-gray-100 rounded-md flex items-center justify-center text-gray-400 border border-gray-200 text-xs">
+                                                        No Img
+                                                    </div>
+                                                )}
+                                                
+                                                {uploadingVariantIndex === vIndex ? (
+                                                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-md">
+                                                        <Loader2 className="w-4 h-4 text-white animate-spin" />
+                                                    </div>
+                                                ) : (
+                                                    <label className="absolute inset-0 flex items-center justify-center bg-black/50 text-white opacity-0 group-hover:opacity-100 transition-opacity rounded-md cursor-pointer" title="Change Image">
+                                                        <Upload className="w-4 h-4" />
+                                                        <input 
+                                                            type="file" 
+                                                            className="hidden" 
+                                                            accept="image/*"
+                                                            onChange={(e) => {
+                                                                if (e.target.files && e.target.files[0]) {
+                                                                    handleVariantImageUpload(e.target.files[0], vIndex);
+                                                                }
+                                                            }}
+                                                        />
+                                                    </label>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="space-y-2">
