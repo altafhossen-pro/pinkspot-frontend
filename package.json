@@ -9,7 +9,6 @@
     "lint": "next lint"
   },
   "dependencies": {
-    "@react-pdf/renderer": "^4.5.1",
     "cookies-next": "^6.1.0",
     "es-toolkit": "^1.41.0",
     "lucide-react": "^0.541.0",
