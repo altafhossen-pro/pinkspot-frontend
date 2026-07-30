@@ -118,6 +118,8 @@ function ProductCard({ product, onWishlistToggle, onAddToCart, showWishlistOnHov
 
     // Check if product is out of stock
     const isOutOfStock = () => {
+        if (product.isForceOutOfStock) return true;
+        
         // Use stock data if available
         if (stockData !== null) {
             return !stockData.isAvailable;

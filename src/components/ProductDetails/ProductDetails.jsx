@@ -240,8 +240,17 @@ export default function ProductDetails({ productSlug }) {
     const availableColors = getAvailableColorsForSize(selectedSize);
 
     const handleQuantityChange = (type) => {
+        const availableStock = product?.isForceOutOfStock ? 0 : (selectedVariant ? selectedVariant.stockQuantity : (product?.totalStock || 0));
+
         if (type === 'increase') {
-            setQuantity(prev => (prev === '' ? 0 : parseInt(prev)) + 1);
+            setQuantity(prev => {
+                const current = prev === '' ? 0 : parseInt(prev);
+                if (current >= availableStock) {
+                    import('react-hot-toast').then(({ default: toast }) => toast.error(`Only ${availableStock} items available`));
+                    return current;
+                }
+                return current + 1;
+            });
         } else if (type === 'decrease') {
             setQuantity(prev => {
                 const current = prev === '' ? 0 : parseInt(prev);
@@ -707,7 +716,14 @@ export default function ProductDetails({ productSlug }) {
                                         onChange={(e) => {
                                             const val = e.target.value;
                                             if (val === '' || /^\d+$/.test(val)) {
-                                                setQuantity(val === '' ? '' : parseInt(val));
+                                                const parsed = parseInt(val);
+                                                const availableStock = product?.isForceOutOfStock ? 0 : (selectedVariant ? selectedVariant.stockQuantity : (product?.totalStock || 0));
+                                                if (parsed > availableStock) {
+                                                    import('react-hot-toast').then(({ default: toast }) => toast.error(`Only ${availableStock} items available`));
+                                                    setQuantity(availableStock);
+                                                } else {
+                                                    setQuantity(val === '' ? '' : parsed);
+                                                }
                                             }
                                         }}
                                         onBlur={(e) => {
@@ -876,7 +892,7 @@ export default function ProductDetails({ productSlug }) {
                             {/* Action Buttons */}
                             <div className="flex gap-3 flex-col">
                                 {/* Check if variant is out of stock */}
-                                {selectedVariant && selectedVariant.stockQuantity <= 0 ? (
+                                {product?.isForceOutOfStock || (selectedVariant && selectedVariant.stockQuantity <= 0) || (!selectedVariant && product?.totalStock <= 0) ? (
                                     <button
                                         disabled
                                         className="flex-1 bg-gray-300 text-gray-500 py-3 px-1 lg:px-6 rounded-lg cursor-not-allowed font-semibold border-[1.5px] border-gray-300 flex items-center justify-center gap-2"
@@ -896,7 +912,7 @@ export default function ProductDetails({ productSlug }) {
                                 )}
 
                                 {/* Check if variant is out of stock for Buy Now */}
-                                {selectedVariant && selectedVariant.stockQuantity <= 0 ? (
+                                {product?.isForceOutOfStock || (selectedVariant && selectedVariant.stockQuantity <= 0) || (!selectedVariant && product?.totalStock <= 0) ? (
                                     <button
                                         disabled
                                         className="flex-1 rounded-lg bg-gray-300 text-gray-500 py-3 px-1 lg:px-6 cursor-not-allowed font-semibold"
@@ -1085,15 +1101,15 @@ export default function ProductDetails({ productSlug }) {
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Stock Status</p>
-                                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${selectedVariant?.stockStatus === 'in_stock' ? 'bg-green-100 text-green-800' :
+                                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${product?.isForceOutOfStock ? 'bg-red-100 text-red-800' : (selectedVariant?.stockStatus === 'in_stock' ? 'bg-green-100 text-green-800' :
                                                             selectedVariant?.stockStatus === 'out_of_stock' ? 'bg-red-100 text-red-800' :
                                                                 selectedVariant?.stockStatus === 'low_stock' ? 'bg-yellow-100 text-yellow-800' :
-                                                                    'bg-blue-100 text-blue-800'
+                                                                    'bg-blue-100 text-blue-800')
                                                             }`}>
-                                                            {selectedVariant?.stockStatus === 'in_stock' ? 'In Stock' :
+                                                            {product?.isForceOutOfStock ? 'Out of Stock' : (selectedVariant?.stockStatus === 'in_stock' ? 'In Stock' :
                                                                 selectedVariant?.stockStatus === 'out_of_stock' ? 'Out of Stock' :
                                                                     selectedVariant?.stockStatus === 'low_stock' ? 'Low Stock' :
-                                                                        selectedVariant?.stockStatus === 'pre_order' ? 'Pre Order' : 'In Stock'}
+                                                                        selectedVariant?.stockStatus === 'pre_order' ? 'Pre Order' : 'In Stock')}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -1107,7 +1123,7 @@ export default function ProductDetails({ productSlug }) {
                                                     </div>
                                                     <div className="flex-1 min-w-0">
                                                         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Stock Quantity</p>
-                                                        <p className="text-sm font-semibold text-gray-900">{selectedVariant?.stockQuantity || product.totalStock || 0} units</p>
+                                                        <p className="text-sm font-semibold text-gray-900">{product?.isForceOutOfStock ? 0 : (selectedVariant?.stockQuantity || product.totalStock || 0)} units</p>
                                                     </div>
                                                 </div>
                                             </div>

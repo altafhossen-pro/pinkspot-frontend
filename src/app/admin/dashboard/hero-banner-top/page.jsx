@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Save, Loader2 } from 'lucide-react';
+import { Save, Loader2, Plus, Trash2 } from 'lucide-react';
 import { settingsAPI } from '@/services/api';
 import toast from 'react-hot-toast';
 import { getCookie } from 'cookies-next';
@@ -18,13 +18,10 @@ export default function TopHeroBannerManagement() {
     const [hasUpdatePermission, setHasUpdatePermission] = useState(false);
 
     const [formData, setFormData] = useState({
-        type: 'image',
+        type: 'single',
         image: '',
-        videoUrl: '',
-        title: '',
-        subtitle: '',
-        buttonText: '',
         link: '',
+        slides: [],
         isActive: true
     });
 
@@ -48,14 +45,14 @@ export default function TopHeroBannerManagement() {
             setLoading(true);
             const response = await settingsAPI.getSiteSettings();
             if (response.success && response.data?.topHeroBanner) {
+                const fetchedType = response.data.topHeroBanner.type;
+                const mappedType = fetchedType === 'image' ? 'single' : (fetchedType || 'single');
+                
                 setFormData({
-                    type: response.data.topHeroBanner.type || 'image',
+                    type: mappedType,
                     image: response.data.topHeroBanner.image || '',
-                    videoUrl: response.data.topHeroBanner.videoUrl || '',
-                    title: response.data.topHeroBanner.title || '',
-                    subtitle: response.data.topHeroBanner.subtitle || '',
-                    buttonText: response.data.topHeroBanner.buttonText || '',
                     link: response.data.topHeroBanner.link || '',
+                    slides: response.data.topHeroBanner.slides || [],
                     isActive: response.data.topHeroBanner.isActive ?? true
                 });
             }
@@ -101,6 +98,29 @@ export default function TopHeroBannerManagement() {
         }));
     };
 
+    const handleAddSlide = () => {
+        setFormData(prev => ({
+            ...prev,
+            slides: [...prev.slides, { image: '', link: '' }]
+        }));
+    };
+
+    const handleRemoveSlide = (index) => {
+        setFormData(prev => {
+            const newSlides = [...prev.slides];
+            newSlides.splice(index, 1);
+            return { ...prev, slides: newSlides };
+        });
+    };
+
+    const handleSlideChange = (index, field, value) => {
+        setFormData(prev => {
+            const newSlides = [...prev.slides];
+            newSlides[index] = { ...newSlides[index], [field]: value };
+            return { ...prev, slides: newSlides };
+        });
+    };
+
     if (checkingPermission || contextLoading || loading) {
         return (
             <div className="flex items-center justify-center h-64">
@@ -126,7 +146,7 @@ export default function TopHeroBannerManagement() {
             <div className="flex justify-between items-center">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Hero Banner Top</h1>
-                    <p className="text-gray-600">Manage the static banner displayed at the very top of the homepage</p>
+                    <p className="text-gray-600">Manage the banner displayed at the very top of the homepage</p>
                 </div>
             </div>
 
@@ -141,15 +161,15 @@ export default function TopHeroBannerManagement() {
                                 name="type"
                                 value={formData.type}
                                 onChange={handleInputChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500 cursor-pointer"
                             >
-                                <option value="image">Image Banner</option>
-                                <option value="video">Video Banner</option>
+                                <option value="single">Single Image</option>
+                                <option value="slider">Multiple Images (Slider)</option>
                             </select>
                         </div>
 
-                        {formData.type === 'image' ? (
-                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                        {formData.type === 'single' ? (
+                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4">
                                 <ImageUpload
                                     onImageUpload={(url) => setFormData(prev => ({ ...prev, image: url }))}
                                     onImageRemove={() => setFormData(prev => ({ ...prev, image: '' }))}
@@ -174,92 +194,101 @@ export default function TopHeroBannerManagement() {
                                         placeholder="https://example.com/image.jpg"
                                     />
                                 </div>
-                                <p className="mt-4 text-sm text-gray-500">
-                                    Recommended aspect ratio: 5:1 (Desktop) / 5:2 (Mobile).
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4">
+                                
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Video Embed URL / Direct URL
+                                    <label className="block text-sm font-medium text-gray-700 mb-2 mt-4">
+                                        Link (Optional)
                                     </label>
                                     <input
                                         type="text"
-                                        name="videoUrl"
-                                        value={formData.videoUrl}
+                                        name="link"
+                                        value={formData.link}
                                         onChange={handleInputChange}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500"
-                                        placeholder="e.g. https://www.youtube.com/embed/..."
+                                        placeholder="e.g., /shop or https://example.com"
                                     />
                                     <p className="mt-1 text-xs text-gray-500">
-                                        Paste an embed URL (e.g. YouTube, Vimeo) or a direct video URL.
+                                        URL to navigate when the banner is clicked.
                                     </p>
                                 </div>
-                                
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Title Text (Optional)
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="title"
-                                            value={formData.title}
-                                            onChange={handleInputChange}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500"
-                                            placeholder="Hero Title"
-                                        />
+                                <div className="mt-4 p-3 bg-blue-50 text-blue-800 rounded-md border border-blue-200">
+                                    <p className="text-sm font-semibold mb-1">Recommended Image Size:</p>
+                                    <p className="text-sm">Desktop: <strong>1920 x 384 pixels</strong> (5:1 ratio)<br />
+                                    Mobile: <strong>1000 x 400 pixels</strong> (5:2 ratio)</p>
+                                    <p className="text-xs mt-2 opacity-80">
+                                    * To use 1 image for both, upload a 1920x384 image and keep all important text/content in the <strong>absolute center</strong>. The sides will be automatically cropped on mobile devices.
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-4">
+                                {formData.slides.map((slide, index) => (
+                                    <div key={index} className="bg-gray-50 p-4 rounded-lg border border-gray-200 relative">
+                                        <button
+                                            type="button"
+                                            onClick={() => handleRemoveSlide(index)}
+                                            className="absolute top-4 right-4 text-red-500 hover:text-red-700 focus:outline-none bg-white rounded-full p-1 shadow-sm cursor-pointer"
+                                        >
+                                            <Trash2 className="w-5 h-5" />
+                                        </button>
+                                        
+                                        <h4 className="font-medium text-gray-700 mb-4">Slide {index + 1}</h4>
+                                        
+                                        <div className="space-y-4">
+                                            <ImageUpload
+                                                onImageUpload={(url) => handleSlideChange(index, 'image', url)}
+                                                onImageRemove={() => handleSlideChange(index, 'image', '')}
+                                                currentImage={slide.image}
+                                                label="Slide Image"
+                                            />
+                                            
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Image URL (Or paste directly)
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={slide.image}
+                                                    onChange={(e) => handleSlideChange(index, 'image', e.target.value)}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500"
+                                                    placeholder="https://example.com/image.jpg"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Link (Optional)
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={slide.link}
+                                                    onChange={(e) => handleSlideChange(index, 'link', e.target.value)}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500"
+                                                    placeholder="e.g., /shop or https://example.com"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Subtitle Text (Optional)
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="subtitle"
-                                            value={formData.subtitle}
-                                            onChange={handleInputChange}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500"
-                                            placeholder="Hero Subtitle"
-                                        />
-                                    </div>
-                                    <div className="md:col-span-2">
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Button Text (Optional)
-                                        </label>
-                                        <input
-                                            type="text"
-                                            name="buttonText"
-                                            value={formData.buttonText}
-                                            onChange={handleInputChange}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500"
-                                            placeholder="e.g. Shop Now"
-                                        />
-                                        <p className="mt-1 text-xs text-gray-500">
-                                            A button will appear on the banner if you provide text and a Link below.
-                                        </p>
-                                    </div>
+                                ))}
+
+                                <button
+                                    type="button"
+                                    onClick={handleAddSlide}
+                                    className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-pink-500 hover:text-pink-500 transition-colors flex items-center justify-center cursor-pointer font-medium"
+                                >
+                                    <Plus className="w-5 h-5 mr-2" />
+                                    Add Slide
+                                </button>
+                                <div className="mt-4 p-3 bg-blue-50 text-blue-800 rounded-md border border-blue-200">
+                                    <p className="text-sm font-semibold mb-1">Recommended Image Size:</p>
+                                    <p className="text-sm">Desktop: <strong>1920 x 384 pixels</strong> (5:1 ratio)<br />
+                                    Mobile: <strong>1000 x 400 pixels</strong> (5:2 ratio)</p>
+                                    <p className="text-xs mt-2 opacity-80">
+                                    * To use 1 image for both, upload a 1920x384 image and keep all important text/content in the <strong>absolute center</strong>. The sides will be automatically cropped on mobile devices.
+                                    </p>
                                 </div>
                             </div>
                         )}
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Link (Optional)
-                            </label>
-                            <input
-                                type="text"
-                                name="link"
-                                value={formData.link}
-                                onChange={handleInputChange}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500"
-                                placeholder="e.g., /shop or https://example.com"
-                            />
-                            <p className="mt-1 text-xs text-gray-500">
-                                URL to navigate when the banner is clicked.
-                            </p>
-                        </div>
 
                         <div>
                             <div className="flex items-center">
@@ -268,7 +297,7 @@ export default function TopHeroBannerManagement() {
                                     name="isActive"
                                     checked={formData.isActive}
                                     onChange={handleInputChange}
-                                    className="h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 rounded"
+                                    className="h-4 w-4 text-pink-600 focus:ring-pink-500 border-gray-300 rounded cursor-pointer"
                                 />
                                 <label className="ml-2 text-sm text-gray-700">
                                     Active (visible on website)
@@ -285,7 +314,7 @@ export default function TopHeroBannerManagement() {
                             <button
                                 type="submit"
                                 disabled={saving}
-                                className="px-6 py-2 text-sm font-medium text-white bg-pink-500 border border-transparent rounded-md hover:bg-pink-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 disabled:opacity-50 flex items-center"
+                                className="px-6 py-2 text-sm font-medium text-white bg-pink-500 border border-transparent rounded-md hover:bg-pink-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 disabled:opacity-50 flex items-center cursor-pointer"
                             >
                                 {saving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                                 <Save className="w-4 h-4 mr-2" />

@@ -21,31 +21,29 @@ export default function ManualOrderCreation() {
     const [searchingProducts, setSearchingProducts] = useState(false);
 
     // Form states
-    const [orderType, setOrderType] = useState('guest'); // 'existing' or 'guest' - default guest
+    const [orderType, setOrderType] = useState('guest'); // 'existing' or 'guest'
     const [orderSource, setOrderSource] = useState(''); // no default, user must select
-    const [selectedUser, setSelectedUser] = useState(null);
-    const [guestInfo, setGuestInfo] = useState({
+    
+    // Unified Customer State
+    const [customerIdentifier, setCustomerIdentifier] = useState('');
+    const [customerStatus, setCustomerStatus] = useState('idle'); // idle | searching | found_existing | found_guest | not_found
+    const [customerInfo, setCustomerInfo] = useState({
         name: '',
         phone: '',
-        address: ''
+        email: '',
+        address: '',
+        userId: null
     });
-    const [existingUserInfo, setExistingUserInfo] = useState({
-        name: '',
-        phone: '',
-        address: ''
-    });
+
     const [orderItems, setOrderItems] = useState([]);
     const [orderNotes, setOrderNotes] = useState('');
     const [discountAmount, setDiscountAmount] = useState(0);
-    const [deliveryCharge, setDeliveryCharge] = useState(150); // Default outsideDhaka from settings
+    const [deliveryCharge, setDeliveryCharge] = useState(150);
     const [deliveryAddress, setDeliveryAddress] = useState('');
 
     // Search states
-    const [userSearchTerm, setUserSearchTerm] = useState('');
     const [productSearchTerm, setProductSearchTerm] = useState('');
-    const [searchResults, setSearchResults] = useState([]);
     const [productResults, setProductResults] = useState([]);
-    const [showUserDropdown, setShowUserDropdown] = useState(false);
     const [showProductDropdown, setShowProductDropdown] = useState(false);
 
     // Current product selection
@@ -67,77 +65,105 @@ export default function ManualOrderCreation() {
         return () => clearTimeout(timeoutId);
     }, [productSearchTerm]);
 
-    // Auto-fill guest info when phone number is 11 digits
+    // Unified Debounce search for customer
     useEffect(() => {
-        const phoneNumber = guestInfo.phone.trim();
-        if (phoneNumber.length === 11 && /^\d+$/.test(phoneNumber)) {
-            autoFillGuestInfo(phoneNumber);
-        }
-    }, [guestInfo.phone]);
+        const timeoutId = setTimeout(() => {
+            const query = customerIdentifier.trim();
+            const isPhone = /^\d{11}$/.test(query);
+            const isEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(query);
 
-    // Auto-fill existing user address when phone number is 11 digits
-    useEffect(() => {
-        if (orderType === 'existing' && selectedUser) {
-            const phoneNumber = existingUserInfo.phone.trim();
-            if (phoneNumber.length === 11 && /^\d+$/.test(phoneNumber)) {
-                autoFillAddressFromOrder(phoneNumber, 'existing');
+            if (isPhone || isEmail) {
+                checkCustomer(query, isPhone);
+            } else if (query.length === 0) {
+                setCustomerStatus('idle');
+                setCustomerInfo({ name: '', phone: '', email: '', address: '', userId: null });
+                setOrderType('guest');
+            } else {
+                setCustomerStatus('idle');
             }
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [existingUserInfo.phone, orderType, selectedUser]);
+        }, 500);
 
-    // Auto-fill guest info from phone number (address from last order only)
-    const autoFillGuestInfo = async (phoneNumber) => {
+        return () => clearTimeout(timeoutId);
+    }, [customerIdentifier]);
+
+    const checkCustomer = async (query, isPhone) => {
         try {
+            setCustomerStatus('searching');
             const token = getCookie('token');
-            const response = await orderAPI.getCustomerInfoByPhone(phoneNumber, token);
+            let foundExisting = false;
 
-            if (response.success && response.data) {
-                const { name, address } = response.data;
+            // 1. Check if registered user exists
+            const searchResponse = await userAPI.searchUsers(query, token);
+            if (searchResponse.success && searchResponse.data && searchResponse.data.length > 0) {
+                // Exact match check
+                const exactMatch = searchResponse.data.find(u => 
+                    (isPhone && u.phone === query) || (!isPhone && u.email === query)
+                );
 
-                // Only update if we found some data
-                if (name || address) {
-                    setGuestInfo(prev => ({
+                if (exactMatch) {
+                    foundExisting = true;
+                    setOrderType('existing');
+                    
+                    // Update state with user info
+                    setCustomerInfo(prev => ({
                         ...prev,
-                        name: name || prev.name,
-                        address: address || prev.address
+                        name: exactMatch.name || '',
+                        phone: exactMatch.phone || query,
+                        email: exactMatch.email || (!isPhone ? query : ''),
+                        userId: exactMatch._id
                     }));
 
-                    if (name && address) {
-                        toast.success('Customer info auto-filled from last order');
-                    } else if (name) {
-                        toast.success('Customer name auto-filled');
-                    } else if (address) {
-                        toast.success('Address auto-filled from last order');
+                    // Fetch their latest address from past orders
+                    if (exactMatch.phone) {
+                        const orderResponse = await orderAPI.getCustomerInfoByPhone(exactMatch.phone, token);
+                        if (orderResponse.success && orderResponse.data && orderResponse.data.address) {
+                            setCustomerInfo(prev => ({ ...prev, address: orderResponse.data.address }));
+                        }
                     }
+
+                    setCustomerStatus('found_existing');
+                    toast.success('Existing user found and details auto-filled');
+                    return;
                 }
             }
-        } catch (error) {
-            console.error('Error auto-filling guest info:', error);
-            // Silent fail - don't show error to user
-        }
-    };
 
-    // Search users
-    const searchUsers = async (query) => {
-        if (!query.trim()) {
-            setSearchResults([]);
-            return;
-        }
-
-        try {
-            setSearchingUsers(true);
-            const token = getCookie('token');
-            const response = await userAPI.searchUsers(query, token);
-
-            if (response.success) {
-                setSearchResults(response.data || []);
+            // 2. If not registered, check if they are a guest with past orders (using phone)
+            if (!foundExisting && isPhone) {
+                const orderResponse = await orderAPI.getCustomerInfoByPhone(query, token);
+                if (orderResponse.success && orderResponse.data && (orderResponse.data.name || orderResponse.data.address)) {
+                    setOrderType('guest');
+                    setCustomerInfo(prev => ({
+                        ...prev,
+                        name: orderResponse.data.name || '',
+                        phone: query,
+                        email: '',
+                        address: orderResponse.data.address || '',
+                        userId: null
+                    }));
+                    setCustomerStatus('found_guest');
+                    toast.success('Guest details auto-filled from past order');
+                    return;
+                }
             }
+
+            // 3. Not found anywhere
+            setOrderType('guest');
+            setCustomerInfo(prev => ({
+                ...prev,
+                name: '',
+                phone: isPhone ? query : '',
+                email: !isPhone ? query : '',
+                address: '',
+                userId: null
+            }));
+            setCustomerStatus('not_found');
+            toast('No existing record found. Please enter details.', {
+                icon: 'ℹ️',
+            });
+
         } catch (error) {
-            console.error('Error searching users:', error);
-            toast.error('Error searching users');
-        } finally {
-            setSearchingUsers(false);
+            console.error('Error checking customer:', error);
+            setCustomerStatus('not_found');
         }
     };
 
@@ -245,51 +271,7 @@ export default function ManualOrderCreation() {
         }
     };
 
-    // Handle user selection
-    const handleUserSelect = async (user) => {
-        setSelectedUser(user);
-        setUserSearchTerm(`${user.name} (${user.email})`);
-        setShowUserDropdown(false);
-        
-        // Set name and phone from user
-        setExistingUserInfo({
-            name: user.name || '',
-            phone: user.phone || '',
-            address: '' // Address will be filled from last order
-        });
-
-        // Auto-fill address from last order's shippingAddress (not from user table)
-        if (user.phone) {
-            await autoFillAddressFromOrder(user.phone);
-        }
-    };
-
-    // Auto-fill address from last order's shippingAddress
-    const autoFillAddressFromOrder = async (phoneNumber, type = orderType) => {
-        try {
-            const token = getCookie('token');
-            const response = await orderAPI.getCustomerInfoByPhone(phoneNumber, token);
-
-            if (response.success && response.data && response.data.address) {
-                if (type === 'existing') {
-                    setExistingUserInfo(prev => ({
-                        ...prev,
-                        address: response.data.address
-                    }));
-                    toast.success('Address auto-filled from last order');
-                } else {
-                    setGuestInfo(prev => ({
-                        ...prev,
-                        address: response.data.address
-                    }));
-                    toast.success('Address auto-filled from last order');
-                }
-            }
-        } catch (error) {
-            console.error('Error auto-filling address from order:', error);
-            // Silent fail - don't show error to user
-        }
-    };
+    // Render removed functions properly so no unused definitions remain
 
     // Handle product selection
     const handleProductSelect = (product) => {
@@ -672,18 +654,8 @@ export default function ManualOrderCreation() {
             return;
         }
 
-        if (orderType === 'existing' && !selectedUser) {
-            toast.error('Please select a user');
-            return;
-        }
-
-        if (orderType === 'existing' && (!existingUserInfo.name || !existingUserInfo.phone || !existingUserInfo.address)) {
-            toast.error('Please provide customer name, phone number, and address');
-            return;
-        }
-
-        if (orderType === 'guest' && (!guestInfo.name || !guestInfo.phone || !guestInfo.address)) {
-            toast.error('Please provide guest name, phone number, and address');
+        if (!customerInfo.name || !customerIdentifier || !customerInfo.address) {
+            toast.error('Please provide customer name, identifier (phone/email), and address');
             return;
         }
 
@@ -723,21 +695,21 @@ export default function ManualOrderCreation() {
                 totalAmount: calculateTotal(), // Total with delivery charge and discount
                 status: 'confirmed', // Manual orders are confirmed by default
                 notes: orderNotes,
-                deliveryAddress: orderType === 'guest' ? guestInfo.address : existingUserInfo.address,
-                ...(orderType === 'existing'
+                deliveryAddress: customerInfo.address,
+                ...(orderType === 'existing' && customerInfo.userId
                     ? { 
-                        userId: selectedUser._id,
+                        userId: customerInfo.userId,
                         guestInfo: {
-                            name: existingUserInfo.name,
-                            phone: existingUserInfo.phone,
-                            address: existingUserInfo.address
+                            name: customerInfo.name,
+                            phone: customerInfo.phone || customerIdentifier,
+                            address: customerInfo.address
                         }
                     }
                     : {
                         guestInfo: {
-                            name: guestInfo.name,
-                            phone: guestInfo.phone,
-                            address: guestInfo.address
+                            name: customerInfo.name,
+                            phone: customerInfo.phone || customerIdentifier,
+                            address: customerInfo.address
                         }
                     }
                 )
@@ -749,19 +721,22 @@ export default function ManualOrderCreation() {
                 toast.success('Manual order created successfully!');
                 // Reset form
                 setOrderItems([]);
-                setSelectedUser(null);
-                setGuestInfo({ name: '', phone: '', address: '' });
-                setExistingUserInfo({ name: '', phone: '', address: '' });
+                setCustomerIdentifier('');
+                setCustomerStatus('idle');
+                setCustomerInfo({ name: '', phone: '', email: '', address: '', userId: null });
                 setOrderNotes('');
                 setDiscountAmount(0);
                 setDeliveryCharge(deliveryChargeSettings?.outsideDhaka || 150);
                 setDeliveryAddress('');
-                setUserSearchTerm('');
                 setProductSearchTerm('');
                 setShowConfirmModal(false);
 
-                // Navigate to orders page immediately
-                router.push('/admin/dashboard/orders');
+                // Navigate to order details page immediately
+                if (response.data && response.data._id) {
+                    router.push(`/admin/dashboard/orders/${response.data._id}`);
+                } else {
+                    router.push('/admin/dashboard/orders');
+                }
             } else {
                 toast.error(response.message || 'Failed to create order');
             }
@@ -787,18 +762,6 @@ export default function ManualOrderCreation() {
     }, [contextLoading, hasPermission]);
 
     // Debounced search
-    useEffect(() => {
-        const timeoutId = setTimeout(() => {
-            if (userSearchTerm.trim()) {
-                searchUsers(userSearchTerm);
-            } else {
-                setSearchResults([]);
-            }
-        }, 500);
-
-        return () => clearTimeout(timeoutId);
-    }, [userSearchTerm]);
-
     useEffect(() => {
         const timeoutId = setTimeout(() => {
             if (productSearchTerm.trim()) {
@@ -1232,242 +1195,93 @@ export default function ManualOrderCreation() {
                     <h2 className="text-lg font-semibold">Customer Info</h2>
                 </div>
 
-                {/* Order Type Selection */}
-                <div className="flex space-x-2 mb-5">
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setOrderType('guest');
-                            // Clear existing user info when switching to guest
-                            setSelectedUser(null);
-                            setExistingUserInfo({ name: '', phone: '', address: '' });
-                            setUserSearchTerm('');
-                        }}
-                        className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer ${orderType === 'guest'
-                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                            : 'bg-gray-50 text-gray-600 border border-gray-200'
-                            }`}
+                {/* Order Source */}
+                <div className="mb-5">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Order Source <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                        value={orderSource}
+                        onChange={(e) => setOrderSource(e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                        required
                     >
-                        Guest Order
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => {
-                            setOrderType('existing');
-                            // Clear guest info when switching to existing
-                            setGuestInfo({ name: '', phone: '', address: '' });
-                        }}
-                        className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors cursor-pointer ${orderType === 'existing'
-                            ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                            : 'bg-gray-50 text-gray-600 border border-gray-200'
-                            }`}
-                    >
-                        Existing User
-                    </button>
+                        <option value="">Select order source</option>
+                        <option value="website">Website</option>
+                        <option value="facebook">Facebook</option>
+                        <option value="whatsapp">WhatsApp</option>
+                        <option value="phone">Phone Call</option>
+                        <option value="email">Email</option>
+                        <option value="walk-in">Walk-in</option>
+                        <option value="instagram">Instagram</option>
+                        <option value="manual">Manual</option>
+                        <option value="other">Other</option>
+                    </select>
                 </div>
 
-                {/* Order Source, Phone, Name (Guest) or Order Source, Select User (Existing) */}
-                <div className={`mb-6 grid grid-cols-1 ${orderType === 'guest' ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-4`}>
-                    {/* Order Source Selection */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Order Source
-                        </label>
-                        <select
-                            value={orderSource}
-                            onChange={(e) => setOrderSource(e.target.value)}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                {/* Unified Customer Search */}
+                <div className="mb-6">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Customer Phone / Email <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                        {customerStatus === 'searching' ? (
+                            <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                            </div>
+                        ) : (
+                            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                        )}
+                        <input
+                            type="text"
+                            value={customerIdentifier}
+                            onChange={(e) => setCustomerIdentifier(e.target.value)}
+                            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                            placeholder="Enter 11 digit phone or valid email..."
                             required
-                        >
-                            <option value="">Select order source</option>
-                            <option value="website">Website</option>
-                            <option value="facebook">Facebook</option>
-                            <option value="whatsapp">WhatsApp</option>
-                            <option value="phone">Phone Call</option>
-                            <option value="email">Email</option>
-                            <option value="walk-in">Walk-in</option>
-                            <option value="instagram">Instagram</option>
-                            <option value="manual">Manual</option>
-                            <option value="other">Other</option>
-                        </select>
+                        />
                     </div>
-
-                    {/* Guest Order: Phone Field */}
-                    {orderType === 'guest' && (
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Phone <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                                type="tel"
-                                value={guestInfo.phone}
-                                onChange={(e) => setGuestInfo(prev => ({ ...prev, phone: e.target.value }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                                placeholder="Enter phone number"
-                                required
-                            />
-                        </div>
+                    {/* Status badge */}
+                    {customerStatus === 'found_existing' && (
+                        <span className="inline-block mt-2 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-md">Existing Registered Customer</span>
                     )}
+                    {customerStatus === 'found_guest' && (
+                        <span className="inline-block mt-2 px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-md">Returning Guest</span>
+                    )}
+                    {customerStatus === 'not_found' && customerIdentifier.length > 0 && (
+                        <span className="inline-block mt-2 px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-md">New Guest</span>
+                    )}
+                </div>
 
-                    {/* Guest Order: Name Field */}
-                    {orderType === 'guest' && (
+                {/* Name and Address Fields (Shown if searching found something, or if not found) */}
+                {(customerStatus === 'found_existing' || customerStatus === 'found_guest' || customerStatus === 'not_found') && (
+                    <div className="space-y-4 mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Customer Name <span className="text-red-500">*</span>
                             </label>
                             <input
                                 type="text"
-                                value={guestInfo.name}
-                                onChange={(e) => setGuestInfo(prev => ({ ...prev, name: e.target.value }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                value={customerInfo.name}
+                                onChange={(e) => setCustomerInfo(prev => ({ ...prev, name: e.target.value }))}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
                                 placeholder="Enter customer name"
                                 required
                             />
                         </div>
-                    )}
-
-                    {/* User Selection - Only shows for existing user */}
-                    {orderType === 'existing' && (
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Select User
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Delivery Address <span className="text-red-500">*</span>
                             </label>
-                            <div className="relative">
-                                <div className="relative">
-                                    {searchingUsers ? (
-                                        <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                                        </div>
-                                    ) : (
-                                        <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                                    )}
-                                    <input
-                                        type="text"
-                                        value={userSearchTerm}
-                                        onChange={(e) => setUserSearchTerm(e.target.value)}
-                                        onFocus={() => setShowUserDropdown(true)}
-                                        className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                                        placeholder="Search users by name or email..."
-                                    />
-                                </div>
-
-                                {showUserDropdown && searchResults.length > 0 && (
-                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                                        {searchResults.map((user) => (
-                                            <div
-                                                key={user._id}
-                                                onClick={() => handleUserSelect(user)}
-                                                className="px-4 py-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                                            >
-                                                <div className="flex items-center space-x-3">
-                                                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                                        <User className="w-4 h-4 text-blue-600" />
-                                                    </div>
-                                                    <div className="flex-1">
-                                                        <h4 className="text-sm font-medium text-gray-900">{user.name}</h4>
-                                                        <p className="text-xs text-gray-500">{user.email}</p>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
+                            <textarea
+                                value={customerInfo.address}
+                                onChange={(e) => setCustomerInfo(prev => ({ ...prev, address: e.target.value }))}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
+                                rows={3}
+                                placeholder="Enter delivery address"
+                                required
+                            />
                         </div>
-                    )}
-                </div>
-
-                {/* Selected User Display */}
-                {orderType === 'existing' && selectedUser && (
-                    <div className="mb-6">
-                        <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center space-x-3">
-                                        <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                            <User className="w-4 h-4 text-blue-600" />
-                                        </div>
-                                        <div>
-                                            <h4 className="text-sm font-medium text-gray-900">{selectedUser.name}</h4>
-                                            <p className="text-xs text-gray-500">{selectedUser.email}</p>
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={() => {
-                                            setSelectedUser(null);
-                                            setUserSearchTerm('');
-                                            setExistingUserInfo({ name: '', phone: '', address: '' });
-                                        }}
-                                        className="text-gray-400 hover:text-gray-600 cursor-pointer"
-                                    >
-                                        <X className="w-4 h-4" />
-                                    </button>
-                                </div>
-                            </div>
-
-                        {/* Existing User Info Form (similar to guest form) */}
-                        {selectedUser && (
-                            <div className="mt-4">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Phone <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="tel"
-                                            value={existingUserInfo.phone}
-                                            onChange={(e) => setExistingUserInfo(prev => ({ ...prev, phone: e.target.value }))}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                                            placeholder="Enter phone number"
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Customer Name <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={existingUserInfo.name}
-                                            onChange={(e) => setExistingUserInfo(prev => ({ ...prev, name: e.target.value }))}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                                            placeholder="Enter customer name"
-                                            required
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="mt-4">
-                                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Address <span className="text-red-500">*</span>
-                                    </label>
-                                    <textarea
-                                        value={existingUserInfo.address}
-                                        onChange={(e) => setExistingUserInfo(prev => ({ ...prev, address: e.target.value }))}
-                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                                        rows={3}
-                                        placeholder="Enter delivery address"
-                                        required
-                                    />
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Guest User Form - Only Address (Phone and Name are in the row above) */}
-                {orderType === 'guest' && (
-                    <div className="mb-6">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Address <span className="text-red-500">*</span>
-                        </label>
-                        <textarea
-                            value={guestInfo.address}
-                            onChange={(e) => setGuestInfo(prev => ({ ...prev, address: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                            rows={3}
-                            placeholder="Enter delivery address"
-                            required
-                        />
                     </div>
                 )}
 

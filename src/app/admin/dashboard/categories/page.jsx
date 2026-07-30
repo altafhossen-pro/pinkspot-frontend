@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Plus, Edit, Trash2, Eye, Search, FolderOpen, ArrowUp, ArrowDown } from 'lucide-react'
+import { Plus, Edit, Trash2, Eye, Search, FolderOpen, ArrowUp, ArrowDown, Package } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { categoryAPI } from '@/services/api'
 import DeleteConfirmationModal from '@/components/Common/DeleteConfirmationModal'
@@ -344,6 +344,15 @@ export default function AdminCategoriesPage() {
                                                         title="View"
                                                     >
                                                         <Eye className="h-4 w-4" />
+                                                    </Link>
+                                                )}
+                                                {hasPermission('category','read') && (
+                                                    <Link
+                                                        href={`/admin/dashboard/categories/products/${category.slug}`}
+                                                        className="text-teal-600 hover:text-teal-900 p-1 cursor-pointer"
+                                                        title="View Products"
+                                                    >
+                                                        <Package className="h-4 w-4" />
                                                     </Link>
                                                 )}
                                                 {hasPermission('category','update') && (

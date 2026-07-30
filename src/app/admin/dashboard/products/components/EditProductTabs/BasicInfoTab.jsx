@@ -1,5 +1,7 @@
-import React from 'react';
-import { X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Search, Loader2 } from 'lucide-react';
+import { productAPI } from '@/services/api';
+import { getCookie } from 'cookies-next';
 
 export default function BasicInfoTab({ 
     formData, 
@@ -12,6 +14,69 @@ export default function BasicInfoTab({
     removeTag, 
     generateSlug 
 }) {
+    const [descSearchQuery, setDescSearchQuery] = useState('');
+    const [descSearchResults, setDescSearchResults] = useState([]);
+    const [isSearchingDesc, setIsSearchingDesc] = useState(false);
+    const [showDescSuggestions, setShowDescSuggestions] = useState(false);
+    const searchRef = useRef(null);
+
+    // Handle outside click to close suggestions
+    useEffect(() => {
+        function handleClickOutside(event) {
+            if (searchRef.current && !searchRef.current.contains(event.target)) {
+                setShowDescSuggestions(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => document.removeEventListener("mousedown", handleClickOutside);
+    }, []);
+
+    useEffect(() => {
+        const searchProducts = async () => {
+            if (!descSearchQuery.trim()) {
+                setDescSearchResults([]);
+                return;
+            }
+            
+            setIsSearchingDesc(true);
+            try {
+                const token = getCookie('token');
+                const response = await productAPI.getAdminProducts({ 
+                    search: descSearchQuery, 
+                    limit: 5,
+                    sort: 'createdAt',
+                    order: 'desc'
+                }, token);
+                
+                if (response.success) {
+                    const products = Array.isArray(response.data) ? response.data : (response.data?.products || []);
+                    setDescSearchResults(products);
+                }
+            } catch (error) {
+                console.error('Error searching products:', error);
+            } finally {
+                setIsSearchingDesc(false);
+            }
+        };
+
+        const timeoutId = setTimeout(() => {
+            searchProducts();
+        }, 500);
+
+        return () => clearTimeout(timeoutId);
+    }, [descSearchQuery]);
+
+    const handleSelectDescription = (product) => {
+        handleInputChange({
+            target: {
+                name: 'description',
+                value: product.description || ''
+            }
+        });
+        setDescSearchQuery('');
+        setShowDescSuggestions(false);
+    };
+
     return (
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-6">Basic Information</h2>
@@ -161,10 +226,61 @@ export default function BasicInfoTab({
                 />
             </div>
 
-            <div className="mt-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Full Description (Optional)
-                </label>
+            <div className="mt-6 border-t border-gray-100 pt-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                        Full Description (Optional)
+                    </label>
+                    
+                    <div className="relative" ref={searchRef}>
+                        <div className="flex items-center">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search description from existing products..."
+                                    value={descSearchQuery}
+                                    onChange={(e) => {
+                                        setDescSearchQuery(e.target.value);
+                                        setShowDescSuggestions(true);
+                                    }}
+                                    onFocus={() => setShowDescSuggestions(true)}
+                                    className="pl-9 pr-8 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full sm:w-64 md:w-80"
+                                />
+                                {isSearchingDesc && (
+                                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />
+                                )}
+                            </div>
+                        </div>
+
+                        {showDescSuggestions && descSearchQuery.trim() !== '' && (
+                            <div className="absolute right-0 mt-1 w-full sm:w-96 bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto">
+                                {descSearchResults.length > 0 ? (
+                                    <div className="py-1">
+                                        {descSearchResults.map(prod => (
+                                            <div 
+                                                key={prod._id}
+                                                onClick={() => handleSelectDescription(prod)}
+                                                className="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0 transition-colors"
+                                            >
+                                                <p className="text-sm font-medium text-gray-900 truncate">{prod.title}</p>
+                                                <p className="text-xs text-gray-500 truncate mt-0.5">
+                                                    {prod.description ? prod.description.substring(0, 80) + '...' : 'No description available'}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    !isSearchingDesc && (
+                                        <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                                            No products found matching "{descSearchQuery}"
+                                        </div>
+                                    )
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
                 <textarea
                     name="description"
                     value={formData.description}

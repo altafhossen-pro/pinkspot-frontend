@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, GripVertical, Save, X, Facebook, Twitter, Instagram, Linkedin, FolderOpen, Loader2, Video } from 'lucide-react';
+import { Plus, Edit, Trash2, GripVertical, Save, X, Facebook, Twitter, Instagram, Linkedin, FolderOpen, Loader2, Video, ArrowUp, ArrowDown } from 'lucide-react';
 import { menuAPI, categoryAPI, settingsAPI } from '@/services/api';
 import toast from 'react-hot-toast';
 import { getCookie } from 'cookies-next';
@@ -554,6 +554,48 @@ export default function MenuSettings() {
         }
     };
 
+    const saveCategoryOrder = async (updatedCategories) => {
+        try {
+            const orderData = updatedCategories.map((cat, i) => ({ id: cat._id, sortOrder: i }));
+            // Using existing reorder API or updating them one by one.
+            // Since categoryAPI.reorderCategories uses 'sortOrder', but we are modifying 'headerSortOrder', we might need to modify the backend or just call updateCategory in a loop.
+            // Actually, we can use a Promise.all to update headerSortOrder for all changed categories.
+            const promises = updatedCategories.map((cat, i) => 
+                categoryAPI.updateCategory(cat._id, { headerSortOrder: i })
+            );
+            await Promise.all(promises);
+            toast.success('Categories reordered successfully');
+        } catch (error) {
+            console.error('Error reordering:', error);
+            toast.error('Error reordering categories');
+            fetchMenus();
+        }
+    }
+
+    const handleCategoryMoveUp = (index) => {
+        if (index === 0) return;
+        const sortedCats = [...categories].sort((a, b) => (a.headerSortOrder || 0) - (b.headerSortOrder || 0));
+        const temp = sortedCats[index];
+        sortedCats[index] = sortedCats[index - 1];
+        sortedCats[index - 1] = temp;
+        
+        sortedCats.forEach((cat, i) => cat.headerSortOrder = i);
+        setCategories(sortedCats);
+        saveCategoryOrder(sortedCats);
+    }
+
+    const handleCategoryMoveDown = (index) => {
+        const sortedCats = [...categories].sort((a, b) => (a.headerSortOrder || 0) - (b.headerSortOrder || 0));
+        if (index === sortedCats.length - 1) return;
+        const temp = sortedCats[index];
+        sortedCats[index] = sortedCats[index + 1];
+        sortedCats[index + 1] = temp;
+
+        sortedCats.forEach((cat, i) => cat.headerSortOrder = i);
+        setCategories(sortedCats);
+        saveCategoryOrder(sortedCats);
+    }
+
     // Get all footer sections for display (excluding social media and contact)
     const getFooterSections = () => {
         const sections = ['quickLinks', 'utilities', 'about'];
@@ -789,8 +831,19 @@ export default function MenuSettings() {
                             </p>
                         </div>
                         <ul className="divide-y divide-gray-200">
-                        {categories.map((category) => {
-                            // console.log({ category })
+                        {[...categories].sort((a, b) => (a.headerSortOrder || 0) - (b.headerSortOrder || 0)).map((category, index) => {
+                            const isChild = !!category.parent;
+                            let parentName = '';
+                            if (isChild) {
+                                // parent might be populated object or just ID
+                                if (category.parent.name) {
+                                    parentName = category.parent.name;
+                                } else {
+                                    const parentDoc = categories.find(c => c._id === category.parent);
+                                    if (parentDoc) parentName = parentDoc.name;
+                                }
+                            }
+                            
                             return (
                                 <li key={category._id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50">
                                     <div className="flex items-center">
@@ -804,19 +857,50 @@ export default function MenuSettings() {
                                             )}
                                         </div>
                                         <div>
-                                            <p className="text-sm font-medium text-gray-900">{category.name}</p>
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-sm font-medium text-gray-900">{category.name}</p>
+                                                <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${isChild ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}`}>
+                                                    {isChild ? `Child of ${parentName || 'Unknown'}` : 'Parent'}
+                                                </span>
+                                            </div>
                                             <p className="text-xs text-gray-500">Slug: {category.slug}</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center space-x-6">
+                                        {!isChild && (
+                                            <div className="flex flex-col items-center">
+                                                <label className="text-xs text-gray-500 mb-1">Show Sub Menu</label>
+                                                <label className="relative inline-flex items-center cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        className="sr-only peer"
+                                                        checked={category.showChildAsSubMenu || false}
+                                                        onChange={(e) => handleCategoryUpdate(category._id, 'showChildAsSubMenu', e.target.checked)}
+                                                    />
+                                                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-pink-600"></div>
+                                                </label>
+                                            </div>
+                                        )}
                                         <div className="flex flex-col items-center">
                                             <label className="text-xs text-gray-500 mb-1">Header Sort Order</label>
-                                            <input
-                                                type="number"
-                                                value={category.headerSortOrder || 0}
-                                                onChange={(e) => handleCategoryUpdate(category._id, 'headerSortOrder', parseInt(e.target.value) || 0)}
-                                                className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-pink-500 focus:border-pink-500 text-center"
-                                            />
+                                            <div className="flex items-center space-x-1">
+                                                <button
+                                                    onClick={() => handleCategoryMoveUp(index)}
+                                                    className={`p-1 rounded-md ${index === 0 ? 'text-gray-300' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'}`}
+                                                    title="Move Up"
+                                                    disabled={index === 0}
+                                                >
+                                                    <ArrowUp className="h-4 w-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleCategoryMoveDown(index)}
+                                                    className={`p-1 rounded-md ${index === categories.length - 1 ? 'text-gray-300' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'}`}
+                                                    title="Move Down"
+                                                    disabled={index === categories.length - 1}
+                                                >
+                                                    <ArrowDown className="h-4 w-4" />
+                                                </button>
+                                            </div>
                                         </div>
                                         <div className="flex flex-col items-center">
                                             <label className="text-xs text-gray-500 mb-1">Show on Header</label>

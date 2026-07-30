@@ -2,19 +2,21 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Barcode from 'react-barcode';
+import { useReactToPrint } from 'react-to-print';
 import Link from 'next/link';
-import { 
-    ArrowLeft, 
-    Package, 
-    Calendar, 
-    User, 
-    MapPin, 
-    CreditCard, 
-    Phone, 
-    Mail, 
-    Truck, 
+import {
+    ArrowLeft,
+    Package,
+    Calendar,
+    User,
+    MapPin,
+    CreditCard,
+    Phone,
+    Mail,
+    Truck,
     Clock,
     CheckCircle,
     AlertCircle,
@@ -59,9 +61,17 @@ export default function OrderDetailsPage() {
     const [selectedItems, setSelectedItems] = useState(new Set());
     const [hoveredImage, setHoveredImage] = useState(null);
     const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
+    const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+    const printRef = useRef();
+
+    const handlePrint = useReactToPrint({
+        contentRef: printRef,
+        documentTitle: `Label_${order?.orderId || order?._id}`,
+    });
     const [addingToSteadfast, setAddingToSteadfast] = useState(false);
     const [apiError, setApiError] = useState(null);
     const [trackingHistory, setTrackingHistory] = useState([]);
+    const [isNextStatusModalOpen, setIsNextStatusModalOpen] = useState(false);
 
     useEffect(() => {
         // Check permission first
@@ -120,7 +130,7 @@ export default function OrderDetailsPage() {
                     orderAPI.markNotificationRead(orderId, token).catch(console.error);
                     window.dispatchEvent(new CustomEvent('notificationRead', { detail: orderId }));
                 }
-                
+
                 // Fetch tracking history if added to Steadfast
                 if (data.data?.isAddedIntoSteadfast || data.data?.steadfastConsignmentId) {
                     try {
@@ -304,7 +314,7 @@ export default function OrderDetailsPage() {
             'cancelled': [], // Final status
             'returned': [] // Final status
         };
-        
+
         return statusFlow[currentStatus] || [];
     };
 
@@ -316,6 +326,35 @@ export default function OrderDetailsPage() {
     const closeStatusModal = () => {
         setIsStatusModalOpen(false);
         setNewStatus('');
+    };
+
+    const getNextStatus = (currentStatus) => {
+        const flow = {
+            'pending': 'confirmed',
+            'confirmed': 'processing',
+            'processing': 'shipped',
+            'shipped': 'delivered'
+        };
+        return flow[currentStatus] || null;
+    };
+
+    const openNextStatusModal = () => {
+        setIsNextStatusModalOpen(true);
+    };
+
+    const closeNextStatusModal = () => {
+        setIsNextStatusModalOpen(false);
+    };
+
+    const handleNextStatusConfirm = async () => {
+        const next = getNextStatus(order.status);
+        if (next) {
+            setNewStatus(next);
+            // We can directly call the existing handleStatusUpdate with the newStatus set,
+            // but we need to ensure state updates first or pass it directly.
+            // Let's create a dedicated function or use the existing one after setting state.
+            // Actually, handleStatusUpdate uses the newStatus state, which might not be updated in time if we call it synchronously.
+        }
     };
 
     const openReturnModal = () => {
@@ -336,7 +375,7 @@ export default function OrderDetailsPage() {
     const handleReturnQuantityChange = (itemIndex, quantity) => {
         const maxQuantity = order.items[itemIndex].quantity;
         const validQuantity = Math.max(0, Math.min(quantity, maxQuantity));
-        
+
         setReturnQuantities(prev => ({
             ...prev,
             [itemIndex]: validQuantity
@@ -356,13 +395,13 @@ export default function OrderDetailsPage() {
             setUpdatingStatus(true);
             const token = getCookie('token');
             let response;
-            
+
             if (newStatus === 'shipped') {
                 response = await orderAPI.addOrderToSteadfast(order._id, token);
             } else {
                 response = await orderAPI.updateOrderStatus(order._id, { status: newStatus }, token);
             }
-            
+
             if (response.success) {
                 toast.success(newStatus === 'shipped' ? 'Order shipped and added to Steadfast successfully' : 'Order status updated successfully');
                 // Extract updated order (addOrderToSteadfast returns { order, steadfastResponse }, while updateOrderStatus returns the order directly)
@@ -370,7 +409,7 @@ export default function OrderDetailsPage() {
                 if (newStatus === 'shipped' && response.data?.order) {
                     responseOrder = response.data.order;
                 }
-                
+
                 // Update order with full response data (includes paymentStatus if updated)
                 const updatedOrder = responseOrder || { ...order, status: newStatus };
                 setOrder({ ...order, ...updatedOrder });
@@ -397,12 +436,65 @@ export default function OrderDetailsPage() {
         }
     };
 
+    const handleNextStatusConfirmAction = async () => {
+        const nextStatus = getNextStatus(order.status);
+        if (!nextStatus) return;
+
+        if (!hasPermission('order', 'update')) {
+            toast.error("You don't have permission to update orders");
+            closeNextStatusModal();
+            return;
+        }
+
+        try {
+            setUpdatingStatus(true);
+            const token = getCookie('token');
+            let response;
+
+            if (nextStatus === 'shipped') {
+                response = await orderAPI.addOrderToSteadfast(order._id, token);
+            } else {
+                response = await orderAPI.updateOrderStatus(order._id, { status: nextStatus }, token);
+            }
+
+            if (response.success) {
+                toast.success(nextStatus === 'shipped' ? 'Order shipped and added to Steadfast successfully' : 'Order status updated successfully');
+                let responseOrder = response.data;
+                if (nextStatus === 'shipped' && response.data?.order) {
+                    responseOrder = response.data.order;
+                }
+
+                const updatedOrder = responseOrder || { ...order, status: nextStatus };
+                setOrder({ ...order, ...updatedOrder });
+                closeNextStatusModal();
+            } else {
+                setApiError({
+                    title: 'Update Failed',
+                    message: response.message || 'Failed to update order status'
+                });
+            }
+        } catch (error) {
+            console.error('Error updating order status:', error);
+            if (error.status === 403 || error.response?.status === 403) {
+                toast.error("You don't have permission to update orders");
+            } else {
+                const errorMessage = error.response?.data?.message || error.message || 'Error updating order status';
+                setApiError({
+                    title: nextStatus === 'shipped' ? 'Steadfast Integration Error' : 'Update Failed',
+                    message: errorMessage
+                });
+            }
+        } finally {
+            setUpdatingStatus(false);
+        }
+    };
+
     const handleAddToSteadfast = async () => {
         try {
             setAddingToSteadfast(true);
             const token = getCookie('token');
             const response = await orderAPI.addOrderToSteadfast(order._id, token);
-            
+
             if (response.success) {
                 toast.success('Order added to Steadfast successfully');
                 // addOrderToSteadfast returns { order, steadfastResponse }
@@ -437,7 +529,7 @@ export default function OrderDetailsPage() {
 
         try {
             setUpdatingStatus(true);
-            
+
             // Prepare return data
             const returnData = {
                 status: 'returned',
@@ -450,7 +542,7 @@ export default function OrderDetailsPage() {
             };
 
             const response = await orderAPI.updateOrderStatus(order._id, returnData);
-            
+
             if (response.success) {
                 toast.success('Order returned successfully');
                 setOrder({ ...order, status: 'returned' });
@@ -532,9 +624,9 @@ export default function OrderDetailsPage() {
                             <div>
                                 <h1 className="text-xl font-bold text-slate-900 flex items-center">
                                     Order #{order?.orderId || "Order ID not found"}
-                                    <button 
+                                    <button
                                         onClick={copyOrderId}
-                                        className="ml-2 p-1 hover:bg-slate-100 rounded transition-colors"
+                                        className="ml-2 p-1 hover:bg-slate-100 rounded transition-colors cursor-pointer"
                                         title="Copy Order ID"
                                     >
                                         <Copy className="h-4 w-4 text-slate-500" />
@@ -545,7 +637,7 @@ export default function OrderDetailsPage() {
                                 </p>
                             </div>
                         </div>
-                        
+
                         <div className="flex items-center space-x-3">
                             <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold ${getStatusColor(order.status)}`}>
                                 {getStatusIcon(order.status)}
@@ -553,10 +645,10 @@ export default function OrderDetailsPage() {
                             </span>
                             <div className="flex items-center space-x-2">
                                 {order.status === 'processing' && !order.isAddedIntoSteadfast && hasPermission('order', 'update') && (
-                                    <button 
+                                    <button
                                         onClick={handleAddToSteadfast}
                                         disabled={addingToSteadfast}
-                                        className="inline-flex items-center px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors text-sm font-medium disabled:opacity-50"
+                                        className="inline-flex items-center px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors text-sm font-medium disabled:opacity-50 cursor-pointer"
                                     >
                                         {addingToSteadfast ? (
                                             <>
@@ -594,7 +686,7 @@ export default function OrderDetailsPage() {
                                                 Edit Order
                                             </button>
                                         )}
-                                        <button 
+                                        <button
                                             onClick={openStatusModal}
                                             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
                                         >
@@ -683,17 +775,16 @@ export default function OrderDetailsPage() {
                                 <h2 className="text-xl font-bold text-slate-900">Order Progress</h2>
                                 <span className="text-sm text-slate-500">Track your order status</span>
                             </div>
-                            
+
                             <div className="relative">
                                 <div className="absolute left-5 top-8 bottom-8 w-0.5 bg-slate-200"></div>
                                 <div className="space-y-8">
                                     {getStatusTimeline(order.status).map((step, index) => (
                                         <div key={step.step} className="relative flex items-start">
-                                            <div className={`relative z-10 flex items-center justify-center w-10 h-10 rounded-full border-4 ${
-                                                step.completed 
-                                                    ? 'bg-emerald-500 border-emerald-500' 
+                                            <div className={`relative z-10 flex items-center justify-center w-10 h-10 rounded-full border-4 ${step.completed
+                                                    ? 'bg-emerald-500 border-emerald-500'
                                                     : 'bg-white border-slate-300'
-                                            }`}>
+                                                }`}>
                                                 {step.completed ? (
                                                     <CheckCircle className="h-5 w-5 text-white" />
                                                 ) : (
@@ -701,9 +792,8 @@ export default function OrderDetailsPage() {
                                                 )}
                                             </div>
                                             <div className="ml-6">
-                                                <div className={`text-lg font-semibold ${
-                                                    step.completed ? 'text-slate-900' : 'text-slate-500'
-                                                }`}>
+                                                <div className={`text-lg font-semibold ${step.completed ? 'text-slate-900' : 'text-slate-500'
+                                                    }`}>
                                                     {step.label}
                                                 </div>
                                                 {step.completed && (
@@ -763,51 +853,47 @@ export default function OrderDetailsPage() {
                                     <div className="flex-1 bg-white rounded-lg px-3 py-2 border border-blue-200">
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs font-medium text-slate-600">Packed Items:</span>
-                                            <span className={`text-sm font-bold ${
-                                                selectedItems.size === order.items.length 
-                                                    ? 'text-emerald-600' 
-                                                    : selectedItems.size > 0 
-                                                        ? 'text-blue-600' 
+                                            <span className={`text-sm font-bold ${selectedItems.size === order.items.length
+                                                    ? 'text-emerald-600'
+                                                    : selectedItems.size > 0
+                                                        ? 'text-blue-600'
                                                         : 'text-slate-400'
-                                            }`}>
+                                                }`}>
                                                 {selectedItems.size} / {order.items.length}
                                             </span>
                                         </div>
                                         <div className="mt-1 w-full bg-slate-200 rounded-full h-2">
-                                            <div 
-                                                className={`h-2 rounded-full transition-all duration-300 ${
-                                                    selectedItems.size === order.items.length 
-                                                        ? 'bg-emerald-500' 
+                                            <div
+                                                className={`h-2 rounded-full transition-all duration-300 ${selectedItems.size === order.items.length
+                                                        ? 'bg-emerald-500'
                                                         : 'bg-blue-500'
-                                                }`}
+                                                    }`}
                                                 style={{ width: `${(selectedItems.size / order.items.length) * 100}%` }}
                                             ></div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div className="space-y-6">
                                 {order.items.map((item, index) => {
                                     const isSelected = selectedItems.has(index);
                                     return (
-                                        <div 
-                                            key={index} 
+                                        <div
+                                            key={index}
                                             onClick={() => toggleItemSelection(index)}
-                                            className={`group relative rounded-2xl p-6 transition-all duration-300 border-2 cursor-pointer ${
-                                                isSelected 
-                                                    ? 'bg-emerald-50 border-emerald-300 hover:bg-emerald-100' 
+                                            className={`group relative rounded-2xl p-6 transition-all duration-300 border-2 cursor-pointer ${isSelected
+                                                    ? 'bg-emerald-50 border-emerald-300 hover:bg-emerald-100'
                                                     : 'bg-slate-50 border-slate-100 hover:bg-slate-100'
-                                            }`}
+                                                }`}
                                         >
                                             <div className="flex items-center space-x-6">
                                                 {/* Selection Checkbox */}
                                                 <div className="flex-shrink-0">
-                                                    <div className={`w-8 h-8 rounded-lg border-2 flex items-center justify-center transition-all ${
-                                                        isSelected 
-                                                            ? 'bg-emerald-500 border-emerald-600' 
+                                                    <div className={`w-8 h-8 rounded-lg border-2 flex items-center justify-center transition-all ${isSelected
+                                                            ? 'bg-emerald-500 border-emerald-600'
                                                             : 'bg-white border-slate-300 group-hover:border-blue-400'
-                                                    }`}>
+                                                        }`}>
                                                         {isSelected ? (
                                                             <CheckSquare className="h-5 w-5 text-white" />
                                                         ) : (
@@ -816,7 +902,7 @@ export default function OrderDetailsPage() {
                                                     </div>
                                                 </div>
 
-                                                <div 
+                                                <div
                                                     className="relative"
                                                     onMouseEnter={(e) => handleImageMouseEnter(e, item.image)}
                                                     onMouseMove={handleImageMouseMove}
@@ -827,14 +913,13 @@ export default function OrderDetailsPage() {
                                                         alt={item.name}
                                                         className="h-24 w-24 rounded-xl object-cover border-2 border-white shadow-lg cursor-zoom-in"
                                                     />
-                                                    <div className={`absolute -top-2 -right-2 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center z-10 ${
-                                                        isSelected ? 'bg-emerald-600' : 'bg-blue-600'
-                                                    }`}>
+                                                    <div className={`absolute -top-2 -right-2 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center z-10 ${isSelected ? 'bg-emerald-600' : 'bg-blue-600'
+                                                        }`}>
                                                         {item.quantity}
                                                     </div>
                                                     {/* Zoom Popup */}
                                                     {hoveredImage === item.image && (
-                                                        <div 
+                                                        <div
                                                             className="fixed z-[9999] bg-white border-2 border-gray-300 rounded-lg shadow-2xl overflow-hidden pointer-events-none"
                                                             style={{
                                                                 width: '400px',
@@ -853,7 +938,7 @@ export default function OrderDetailsPage() {
                                                         </div>
                                                     )}
                                                 </div>
-                                                
+
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center space-x-2 mb-2">
                                                         <h3 className="text-lg font-bold text-slate-900">
@@ -865,48 +950,48 @@ export default function OrderDetailsPage() {
                                                             </span>
                                                         )}
                                                     </div>
-                                                    
+
                                                     <div className="flex flex-wrap gap-3 mb-4">
-                                                        <div className="flex items-center bg-blue-100 px-3 py-1.5 rounded-lg">
-                                                            <span className="text-xs font-bold text-blue-800 mr-1">QTY:</span>
-                                                            <span className="text-xs font-semibold text-blue-700">{item.quantity}</span>
+                                                        <div className="flex items-center bg-blue-100 px-4 py-2 rounded-lg">
+                                                            <span className="text-sm font-bold text-blue-800 mr-2">QTY:</span>
+                                                            <span className="text-sm font-semibold text-blue-700">{item.quantity}</span>
                                                         </div>
-                                                        <div className="flex items-center bg-emerald-100 px-3 py-1.5 rounded-lg">
-                                                            <span className="text-xs font-bold text-emerald-800 mr-1">PRICE:</span>
-                                                            <span className="text-xs font-semibold text-emerald-700">৳{item.price}</span>
+                                                        <div className="flex items-center bg-emerald-100 px-4 py-2 rounded-lg">
+                                                            <span className="text-sm font-bold text-emerald-800 mr-2">PRICE:</span>
+                                                            <span className="text-sm font-semibold text-emerald-700">৳{item.price}</span>
                                                         </div>
                                                     </div>
 
                                                     {item.variant && (
                                                         <div className="flex flex-wrap gap-3">
                                                             {item.variant.size && (
-                                                                <div className="flex items-center bg-purple-100 px-3 py-1.5 rounded-lg">
-                                                                    <span className="text-xs font-bold text-purple-800 mr-2">SIZE:</span>
-                                                                    <span className="text-xs font-semibold text-purple-700">{item.variant.size}</span>
+                                                                <div className="flex items-center bg-purple-100 px-4 py-2 rounded-lg">
+                                                                    <span className="text-sm font-bold text-purple-800 mr-2">SIZE:</span>
+                                                                    <span className="text-sm font-semibold text-purple-700">{item.variant.size}</span>
                                                                 </div>
                                                             )}
                                                             {item.variant.color && (
-                                                                <div className="flex items-center bg-rose-100 px-3 py-1.5 rounded-lg">
-                                                                    <span className="text-xs font-bold text-rose-800 mr-2">COLOR:</span>
+                                                                <div className="flex items-center bg-rose-100 px-4 py-2 rounded-lg">
+                                                                    <span className="text-sm font-bold text-rose-800 mr-2">COLOR:</span>
                                                                     <div
-                                                                        className="w-4 h-4 rounded-full border-2 border-white shadow-sm mr-1"
+                                                                        className="w-5 h-5 rounded-full border-2 border-white shadow-sm mr-2"
                                                                         style={{
                                                                             backgroundColor: item.variant.colorHexCode,
                                                                         }}
                                                                     ></div>
-                                                                    <span className="text-xs font-semibold text-rose-700">{item.variant.color}</span>
+                                                                    <span className="text-sm font-semibold text-rose-700">{item.variant.color}</span>
                                                                 </div>
                                                             )}
                                                             {item.variant.sku && (
-                                                                <div className="flex items-center bg-slate-100 px-3 py-1.5 rounded-lg">
-                                                                    <span className="text-xs font-bold text-slate-800 mr-2">SKU:</span>
-                                                                    <span className="text-xs font-mono font-semibold text-slate-700">{item.variant.sku}</span>
+                                                                <div className="flex items-center bg-slate-100 px-4 py-2 rounded-lg">
+                                                                    <span className="text-sm font-bold text-slate-800 mr-2">SKU:</span>
+                                                                    <span className="text-sm font-mono font-semibold text-slate-700">{item.variant.sku}</span>
                                                                 </div>
                                                             )}
                                                         </div>
                                                     )}
                                                 </div>
-                                                
+
                                                 <div className="text-right">
                                                     <p className="text-2xl font-bold text-slate-900">
                                                         ৳{item.subtotal}
@@ -1022,16 +1107,16 @@ export default function OrderDetailsPage() {
                                     </div>
                                     <div className="ml-4">
                                         <p className="font-semibold text-slate-900">
-                                            {order.isGuestOrder && order.guestInfo?.name 
-                                                ? order.guestInfo.name 
+                                            {order.isGuestOrder && order.guestInfo?.name
+                                                ? order.guestInfo.name
                                                 : order.orderType === 'manual' && order.manualOrderInfo?.name
-                                                ? order.manualOrderInfo.name
-                                                : order.user ? (order.user.name || 'Registered User') : 'Guest User'}
+                                                    ? order.manualOrderInfo.name
+                                                    : order.user ? (order.user.name || 'Registered User') : 'Guest User'}
                                         </p>
                                         <p className="text-xs text-slate-500 font-medium">Customer Name</p>
                                     </div>
                                 </div>
-                                
+
                                 {(order.isGuestOrder && order.guestInfo?.email) || order.user?.email ? (
                                     <div className="flex items-center p-4 bg-slate-50 rounded-xl">
                                         <div className="p-2 bg-blue-100 rounded-lg">
@@ -1039,15 +1124,15 @@ export default function OrderDetailsPage() {
                                         </div>
                                         <div className="ml-4">
                                             <p className="font-semibold text-slate-900">
-                                                {order.isGuestOrder && order.guestInfo?.email 
-                                                    ? order.guestInfo.email 
+                                                {order.isGuestOrder && order.guestInfo?.email
+                                                    ? order.guestInfo.email
                                                     : order.user?.email}
                                             </p>
                                             <p className="text-xs text-slate-500 font-medium">Email Address</p>
                                         </div>
                                     </div>
                                 ) : null}
-                                
+
                                 {(order.isGuestOrder && order.guestInfo?.phone) || order.user?.phone || (order.orderType === 'manual' && order.manualOrderInfo?.phone) ? (
                                     <div className="flex items-center p-4 bg-slate-50 rounded-xl">
                                         <div className="p-2 bg-emerald-100 rounded-lg">
@@ -1055,11 +1140,11 @@ export default function OrderDetailsPage() {
                                         </div>
                                         <div className="ml-4">
                                             <p className="font-semibold text-slate-900">
-                                                {order.isGuestOrder && order.guestInfo?.phone 
-                                                    ? order.guestInfo.phone 
+                                                {order.isGuestOrder && order.guestInfo?.phone
+                                                    ? order.guestInfo.phone
                                                     : order.orderType === 'manual' && order.manualOrderInfo?.phone
-                                                    ? order.manualOrderInfo.phone
-                                                    : order.user?.phone}
+                                                        ? order.manualOrderInfo.phone
+                                                        : order.user?.phone}
                                             </p>
                                             <p className="text-xs text-slate-500 font-medium">Phone Number</p>
                                         </div>
@@ -1086,7 +1171,7 @@ export default function OrderDetailsPage() {
                                         <p className="text-xs text-slate-500 font-medium">Payment Method</p>
                                     </div>
                                 </div>
-                                
+
                                 {!!order.loyaltyPointsUsed && order.loyaltyPointsUsed > 0 && (
                                     <div className="flex items-center p-4 bg-pink-50 rounded-xl border border-pink-200">
                                         <div className="p-2 bg-pink-100 rounded-lg">
@@ -1100,7 +1185,7 @@ export default function OrderDetailsPage() {
                                         </div>
                                     </div>
                                 )}
-                                
+
                                 <div className="flex items-center p-4 bg-slate-50 rounded-xl">
                                     <span className={`inline-flex items-center px-3 py-2 rounded-full text-sm font-bold ${getPaymentStatusColor(order.paymentStatus)}`}>
                                         <DollarSign className="h-4 w-4 mr-1" />
@@ -1150,15 +1235,24 @@ export default function OrderDetailsPage() {
                                                 <p className="text-xs text-slate-500 font-medium mt-1">Steadfast Tracking</p>
                                             </div>
                                         </div>
-                                        <a
-                                            href={`https://steadfast.com.bd/user/consignment/${order.steadfastConsignmentId}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors text-sm font-medium flex items-center"
-                                        >
-                                            <Truck className="h-4 w-4 mr-2" />
-                                            Track Order
-                                        </a>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => setIsPrintModalOpen(true)}
+                                                className="px-4 py-2 bg-slate-800 text-white rounded-lg hover:bg-slate-900 transition-colors text-sm font-medium flex items-center"
+                                            >
+                                                <Printer className="h-4 w-4 mr-2" />
+                                                Print Label
+                                            </button>
+                                            <a
+                                                href={`https://steadfast.com.bd/user/consignment/${order.steadfastConsignmentId}`}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="px-4 py-2 bg-pink-600 text-white rounded-lg hover:bg-pink-700 transition-colors text-sm font-medium flex items-center"
+                                            >
+                                                <Truck className="h-4 w-4 mr-2" />
+                                                Track Order
+                                            </a>
+                                        </div>
                                     </div>
                                     {order.steadfastTrackingCode && (
                                         <div className="mt-4 pt-4 border-t border-pink-200">
@@ -1183,14 +1277,21 @@ export default function OrderDetailsPage() {
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
                             <h2 className="text-xl font-bold text-slate-900 mb-6">Quick Actions</h2>
                             <div className="grid grid-cols-1 gap-4">
-                                {hasPermission('order', 'update') && (
-                                    <button 
-                                        onClick={openStatusModal}
-                                        className="group flex items-center justify-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg hover:shadow-xl"
+                                {hasPermission('order', 'update') && getNextStatus(order.status) && (
+                                    <button
+                                        onClick={openNextStatusModal}
+                                        className="group flex items-center justify-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg hover:shadow-xl cursor-pointer"
                                     >
-                                        <Edit3 className="h-5 w-5 mr-3 group-hover:scale-110 transition-transform" />
-                                        <span className="font-semibold">Update Order Status</span>
+                                        <CheckCircle className="h-5 w-5 mr-3 group-hover:scale-110 transition-transform" />
+                                        <span className="font-semibold">
+                                            Move to Next Status ({getNextStatus(order.status).charAt(0).toUpperCase() + getNextStatus(order.status).slice(1)})
+                                        </span>
                                     </button>
+                                )}
+                                {hasPermission('order', 'update') && !getNextStatus(order.status) && (
+                                    <div className="text-center p-4 bg-gray-50 rounded-xl border border-gray-200 text-gray-500 text-sm">
+                                        No further status progression available.
+                                    </div>
                                 )}
                             </div>
                         </div>
@@ -1245,7 +1346,7 @@ export default function OrderDetailsPage() {
                             <h3 className="text-lg font-medium text-gray-900">Update Order Status</h3>
                             <button
                                 onClick={closeStatusModal}
-                                className="text-gray-400 hover:text-gray-600"
+                                className="text-gray-400 hover:text-gray-600 cursor-pointer"
                             >
                                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -1259,14 +1360,14 @@ export default function OrderDetailsPage() {
                             </p>
                             <p className="text-sm text-gray-600 mb-4">
                                 Customer: <span className="font-medium">
-                                    {order.isGuestOrder && order.guestInfo?.phone 
-                                        ? order.guestInfo.phone 
+                                    {order.isGuestOrder && order.guestInfo?.phone
+                                        ? order.guestInfo.phone
                                         : order.orderType === 'manual' && order.manualOrderInfo?.phone
-                                        ? order.manualOrderInfo.phone
-                                        : order.user?.email || 'N/A'}
+                                            ? order.manualOrderInfo.phone
+                                            : order.user?.email || 'N/A'}
                                 </span>
                             </p>
-                            
+
                             <label className="block text-sm font-medium text-gray-700 mb-2">
                                 Current Status: <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                                     {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
@@ -1295,7 +1396,7 @@ export default function OrderDetailsPage() {
                         <div className="flex justify-end space-x-3">
                             <button
                                 onClick={closeStatusModal}
-                                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 cursor-pointer"
                             >
                                 Cancel
                             </button>
@@ -1309,13 +1410,62 @@ export default function OrderDetailsPage() {
                                     }
                                 }}
                                 disabled={updatingStatus || newStatus === order.status}
-                                className={`px-4 py-2 rounded-md text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-                                    updatingStatus || newStatus === order.status
+                                className={`px-4 py-2 rounded-md text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${updatingStatus || newStatus === order.status
                                         ? 'bg-gray-400 cursor-not-allowed'
                                         : 'bg-blue-600 hover:bg-blue-700'
-                                }`}
+                                    }`}
                             >
                                 {updatingStatus ? 'Updating...' : 'Update Status'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Next Status Confirmation Modal */}
+            {isNextStatusModalOpen && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-medium text-gray-900 flex items-center">
+                                <CheckCircle className="h-5 w-5 text-blue-600 mr-2" />
+                                Confirm Status Update
+                            </h3>
+                            <button
+                                onClick={closeNextStatusModal}
+                                className="text-gray-400 hover:text-gray-600 cursor-pointer"
+                            >
+                                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="mb-6">
+                            <p className="text-gray-600">
+                                Are you sure you want to move this order from <span className="font-semibold text-gray-900">{order.status}</span> to <span className="font-semibold text-blue-600">{getNextStatus(order.status)}</span>?
+                            </p>
+                            {getNextStatus(order.status) === 'shipped' && (
+                                <p className="text-sm text-pink-600 mt-2 p-2 bg-pink-50 rounded border border-pink-100">
+                                    This will also add the order to Steadfast Courier.
+                                </p>
+                            )}
+                        </div>
+
+                        <div className="flex justify-end space-x-3">
+                            <button
+                                onClick={closeNextStatusModal}
+                                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleNextStatusConfirmAction}
+                                disabled={updatingStatus}
+                                className={`px-4 py-2 rounded-md text-sm font-medium text-white cursor-pointer ${updatingStatus ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+                                    }`}
+                            >
+                                {updatingStatus ? 'Updating...' : 'Confirm'}
                             </button>
                         </div>
                     </div>
@@ -1364,11 +1514,11 @@ export default function OrderDetailsPage() {
                                         <div>
                                             <p className="text-xs text-gray-500 mb-1">Customer</p>
                                             <p className="font-semibold text-gray-900 text-sm break-all">
-                                                {order.isGuestOrder && order.guestInfo?.phone 
-                                                    ? order.guestInfo.phone 
+                                                {order.isGuestOrder && order.guestInfo?.phone
+                                                    ? order.guestInfo.phone
                                                     : order.orderType === 'manual' && order.manualOrderInfo?.phone
-                                                    ? order.manualOrderInfo.phone
-                                                    : order.user?.email || 'N/A'}
+                                                        ? order.manualOrderInfo.phone
+                                                        : order.user?.email || 'N/A'}
                                             </p>
                                         </div>
                                     </div>
@@ -1389,101 +1539,101 @@ export default function OrderDetailsPage() {
                                     </div>
                                 </div>
 
-                        <div className="space-y-2 mb-3">
-                            {order.items.map((item, index) => (
-                                <div key={index} className="border border-gray-200 rounded-md p-3 bg-gray-50 hover:bg-gray-100 transition-colors">
-                                    <div className="flex items-start justify-between mb-2">
-                                        <div className="flex items-start space-x-3 flex-1">
-                                            <div 
-                                                className="relative flex-shrink-0"
-                                                onMouseEnter={(e) => handleImageMouseEnter(e, item.featuredImage || item.image || '/images/placeholder.png')}
-                                                onMouseMove={handleImageMouseMove}
-                                                onMouseLeave={handleImageMouseLeave}
-                                            >
-                                                <img
-                                                    src={item.featuredImage || item.image || '/images/placeholder.png'}
-                                                    alt={item.name}
-                                                    className="h-10 w-10 rounded-md object-cover border border-white shadow-sm cursor-zoom-in"
-                                                    onError={(e) => {
-                                                        e.target.src = '/images/placeholder.png';
-                                                    }}
-                                                />
-                                                <div className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium z-10">
-                                                    {item.quantity}
-                                                </div>
-                                                {/* Zoom Popup */}
-                                                {hoveredImage === (item.featuredImage || item.image || '/images/placeholder.png') && (
-                                                    <div 
-                                                        className="fixed z-[9999] bg-white border-2 border-gray-300 rounded-lg shadow-2xl overflow-hidden pointer-events-none"
-                                                        style={{
-                                                            width: '350px',
-                                                            height: '350px',
-                                                            left: `${imagePosition.x + 20}px`,
-                                                            top: `${imagePosition.y - 175}px`,
-                                                            maxWidth: 'calc(100vw - 40px)',
-                                                            maxHeight: 'calc(100vh - 40px)'
-                                                        }}
+                                <div className="space-y-2 mb-3">
+                                    {order.items.map((item, index) => (
+                                        <div key={index} className="border border-gray-200 rounded-md p-3 bg-gray-50 hover:bg-gray-100 transition-colors">
+                                            <div className="flex items-start justify-between mb-2">
+                                                <div className="flex items-start space-x-3 flex-1">
+                                                    <div
+                                                        className="relative flex-shrink-0"
+                                                        onMouseEnter={(e) => handleImageMouseEnter(e, item.featuredImage || item.image || '/images/placeholder.png')}
+                                                        onMouseMove={handleImageMouseMove}
+                                                        onMouseLeave={handleImageMouseLeave}
                                                     >
                                                         <img
                                                             src={item.featuredImage || item.image || '/images/placeholder.png'}
                                                             alt={item.name}
-                                                            className="w-full h-full object-contain"
+                                                            className="h-10 w-10 rounded-md object-cover border border-white shadow-sm cursor-zoom-in"
+                                                            onError={(e) => {
+                                                                e.target.src = '/images/placeholder.png';
+                                                            }}
                                                         />
+                                                        <div className="absolute -top-1 -right-1 bg-blue-500 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center font-medium z-10">
+                                                            {item.quantity}
+                                                        </div>
+                                                        {/* Zoom Popup */}
+                                                        {hoveredImage === (item.featuredImage || item.image || '/images/placeholder.png') && (
+                                                            <div
+                                                                className="fixed z-[9999] bg-white border-2 border-gray-300 rounded-lg shadow-2xl overflow-hidden pointer-events-none"
+                                                                style={{
+                                                                    width: '350px',
+                                                                    height: '350px',
+                                                                    left: `${imagePosition.x + 20}px`,
+                                                                    top: `${imagePosition.y - 175}px`,
+                                                                    maxWidth: 'calc(100vw - 40px)',
+                                                                    maxHeight: 'calc(100vh - 40px)'
+                                                                }}
+                                                            >
+                                                                <img
+                                                                    src={item.featuredImage || item.image || '/images/placeholder.png'}
+                                                                    alt={item.name}
+                                                                    className="w-full h-full object-contain"
+                                                                />
+                                                            </div>
+                                                        )}
                                                     </div>
-                                                )}
+                                                    <div className="flex-1 min-w-0">
+                                                        <h4 className="font-semibold text-gray-900 text-sm mb-1 break-words">{item.name}</h4>
+                                                        <div className="space-y-1">
+                                                            <p className="text-xs text-gray-600">
+                                                                <span className="font-medium">Price:</span> ৳{item.price.toLocaleString()} × {item.quantity} = ৳{(item.price * item.quantity).toLocaleString()}
+                                                            </p>
+                                                            {item.variant && (
+                                                                <p className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-md inline-block">
+                                                                    <span className="font-medium">Variant:</span> {item.variant.name}
+                                                                    <span className="text-gray-500 ml-1">(SKU: {item.variant.sku})</span>
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <div className="flex-1 min-w-0">
-                                                <h4 className="font-semibold text-gray-900 text-sm mb-1 break-words">{item.name}</h4>
-                                                <div className="space-y-1">
-                                                    <p className="text-xs text-gray-600">
-                                                        <span className="font-medium">Price:</span> ৳{item.price.toLocaleString()} × {item.quantity} = ৳{(item.price * item.quantity).toLocaleString()}
-                                                    </p>
-                                                    {item.variant && (
-                                                        <p className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded-md inline-block">
-                                                            <span className="font-medium">Variant:</span> {item.variant.name} 
-                                                            <span className="text-gray-500 ml-1">(SKU: {item.variant.sku})</span>
-                                                        </p>
-                                                    )}
+
+                                            <div className="bg-white rounded-md p-2 border border-gray-200">
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center space-x-2">
+                                                        <label className="text-xs font-semibold text-gray-700 whitespace-nowrap">
+                                                            Return Quantity:
+                                                        </label>
+                                                        <div className="relative">
+                                                            <input
+                                                                type="text"
+                                                                value={returnQuantities[index] || 0}
+                                                                onChange={(e) => {
+                                                                    const value = e.target.value;
+                                                                    // Allow only numbers
+                                                                    if (value === '' || /^\d+$/.test(value)) {
+                                                                        const numValue = parseInt(value) || 0;
+                                                                        handleReturnQuantityChange(index, numValue);
+                                                                    }
+                                                                }}
+                                                                className="w-16 px-2 py-1 border border-gray-300 rounded-md text-center font-medium text-gray-900 focus:ring-2 focus:ring-pink-600 focus:border-pink-600 transition-colors text-sm"
+                                                                placeholder="0"
+                                                            />
+                                                        </div>
+                                                        <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-md whitespace-nowrap">
+                                                            Max: {item.quantity}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <p className="text-xs text-gray-500">Ordered</p>
+                                                        <p className="font-bold text-gray-900 text-sm">{item.quantity}</p>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
-                                    </div>
-                                    
-                                    <div className="bg-white rounded-md p-2 border border-gray-200">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center space-x-2">
-                                                <label className="text-xs font-semibold text-gray-700 whitespace-nowrap">
-                                                    Return Quantity:
-                                                </label>
-                                                <div className="relative">
-                                                    <input
-                                                        type="text"
-                                                        value={returnQuantities[index] || 0}
-                                                        onChange={(e) => {
-                                                            const value = e.target.value;
-                                                            // Allow only numbers
-                                                            if (value === '' || /^\d+$/.test(value)) {
-                                                                const numValue = parseInt(value) || 0;
-                                                                handleReturnQuantityChange(index, numValue);
-                                                            }
-                                                        }}
-                                                        className="w-16 px-2 py-1 border border-gray-300 rounded-md text-center font-medium text-gray-900 focus:ring-2 focus:ring-pink-600 focus:border-pink-600 transition-colors text-sm"
-                                                        placeholder="0"
-                                                    />
-                                                </div>
-                                                <span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-md whitespace-nowrap">
-                                                    Max: {item.quantity}
-                                                </span>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-xs text-gray-500">Ordered</p>
-                                                <p className="font-bold text-gray-900 text-sm">{item.quantity}</p>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    ))}
                                 </div>
-                            ))}
-                        </div>
                             </div>
                         </div>
 
@@ -1491,7 +1641,7 @@ export default function OrderDetailsPage() {
                         <div className="bg-gray-50 px-3 py-2 border-t border-gray-200 flex-shrink-0">
                             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-2 sm:space-y-0">
                                 <div className="text-xs text-gray-600 text-center sm:text-left">
-                                    <span className="font-medium">Total Items:</span> {order.items.length} | 
+                                    <span className="font-medium">Total Items:</span> {order.items.length} |
                                     <span className="font-medium ml-2">Returning:</span> {Object.values(returnQuantities).filter(qty => qty > 0).length} items
                                 </div>
                                 <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
@@ -1504,11 +1654,10 @@ export default function OrderDetailsPage() {
                                     <button
                                         onClick={handleReturnSubmit}
                                         disabled={updatingStatus}
-                                        className={`w-full sm:w-auto px-4 py-1.5 rounded-md text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-600 transition-colors ${
-                                            updatingStatus
+                                        className={`w-full sm:w-auto px-4 py-1.5 rounded-md text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-600 transition-colors ${updatingStatus
                                                 ? 'bg-gray-400 cursor-not-allowed'
                                                 : 'bg-gradient-to-r from-pink-600 to-red-500 hover:from-pink-600 hover:to-red-600 shadow-lg'
-                                        }`}
+                                            }`}
                                     >
                                         {updatingStatus ? (
                                             <div className="flex items-center justify-center space-x-2">
@@ -1549,7 +1698,7 @@ export default function OrderDetailsPage() {
                                 {apiError.message}
                             </p>
                         </div>
-                        
+
                         <div className="p-6 bg-white flex flex-col space-y-4">
                             <p className="text-sm text-gray-600 text-center">
                                 Please check your configuration or try again later. If the problem persists, contact support.
@@ -1559,6 +1708,134 @@ export default function OrderDetailsPage() {
                                 className="w-full py-3 px-4 bg-gray-900 hover:bg-gray-800 text-white rounded-xl font-medium transition-colors shadow-md shadow-gray-900/20 active:scale-[0.98]"
                             >
                                 Close & Continue
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Print Label Modal */}
+            {isPrintModalOpen && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4 overflow-y-auto">
+                    <div className="bg-white rounded-lg p-6 w-full max-w-md mx-auto my-auto">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-lg font-bold text-gray-900">Print Shipping Label</h3>
+                            <button
+                                onClick={() => setIsPrintModalOpen(false)}
+                                className="text-gray-400 hover:text-gray-600 cursor-pointer"
+                            >
+                                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        {/* Printable Area */}
+                        <div className="bg-gray-100 p-4 rounded-lg flex justify-center mb-6 overflow-x-auto relative">
+                            {/* Hidden style for print layout specifically */}
+                            <style type="text/css" media="print">
+                                {`
+                                    @page { size: 3in 3in; margin: 0; }
+                                    body { margin: 0; padding: 0; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                                    .print-container { width: 3in !important; height: 3in !important; margin: 0 !important; border: none !important; box-shadow: none !important; }
+                                `}
+                            </style>
+
+                            <div
+                                ref={printRef}
+                                className="bg-white border border-gray-300 print-container"
+                                style={{
+                                    width: '300px', // Fallback for screen
+                                    height: '300px', // Fallback for screen
+                                    padding: '12px',
+                                    fontFamily: 'Arial, sans-serif',
+                                    color: '#000',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    justifyContent: 'space-between',
+                                    boxSizing: 'border-box'
+                                }}
+                            >
+                                {/* Header */}
+                                <div style={{ borderBottom: '2px solid #000', paddingBottom: '5px', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div style={{ fontWeight: 'bold', fontSize: '18px' }}>Pinkspot</div>
+                                    <div style={{ fontSize: '10px', textAlign: 'right' }}>
+                                        <div>Merchant ID</div>
+                                        <div style={{ fontWeight: 'bold' }}>71701</div>
+                                    </div>
+                                </div>
+
+                                {/* Barcode */}
+                                <div style={{ textAlign: 'center', marginBottom: '8px', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Barcode
+                                        value={order.steadfastConsignmentId || 'N/A'}
+                                        width={1.5}
+                                        height={45}
+                                        fontSize={16}
+                                        fontOptions="bold"
+                                        margin={0}
+                                        displayValue={true}
+                                    />
+                                </div>
+
+                                {/* Customer Info */}
+                                <div style={{ borderTop: '1px solid #ccc', paddingTop: '6px', fontSize: '11px', flex: 1 }}>
+                                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                        <tbody>
+                                            <tr>
+                                                <td style={{ width: '50px', color: '#555', verticalAlign: 'top', paddingBottom: '3px' }}>Name</td>
+                                                <td style={{ fontWeight: 'bold', paddingBottom: '3px', color: '#000' }}>
+                                                    {order.isGuestOrder && order.guestInfo?.name
+                                                        ? order.guestInfo.name
+                                                        : order.orderType === 'manual' && order.manualOrderInfo?.name
+                                                            ? order.manualOrderInfo.name
+                                                            : order.user ? (order.user.name || 'Registered User') : 'Guest User'}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style={{ color: '#555', verticalAlign: 'top', paddingBottom: '3px' }}>Phone</td>
+                                                <td style={{ fontWeight: 'bold', paddingBottom: '3px', color: '#000' }}>
+                                                    {order.isGuestOrder && order.guestInfo?.phone
+                                                        ? order.guestInfo.phone
+                                                        : order.orderType === 'manual' && order.manualOrderInfo?.phone
+                                                            ? order.manualOrderInfo.phone
+                                                            : order.user?.phone || 'N/A'}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td style={{ color: '#555', verticalAlign: 'top' }}>Address</td>
+                                                <td style={{ fontWeight: 'bold', lineHeight: '1.3', color: '#000' }}>
+                                                    {order.shippingAddress?.street}, {order.shippingAddress?.city}
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                {/* COD Amount */}
+                                <div style={{ border: '2px solid #000', padding: '6px 10px', marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#fff' }}>
+                                    <div style={{ fontSize: '11px', fontWeight: 'bold' }}>CASH ON DELIVERY</div>
+                                    <div style={{ fontSize: '18px', fontWeight: 'bold' }}>৳ {
+                                        order.paymentStatus === 'pending'
+                                            ? Math.round(order.total || 0)
+                                            : '0 (PAID)'
+                                    }</div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end space-x-3">
+                            <button
+                                onClick={() => setIsPrintModalOpen(false)}
+                                className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer"
+                            >
+                                Close
+                            </button>
+                            <button
+                                onClick={handlePrint}
+                                className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 cursor-pointer flex items-center shadow-sm"
+                            >
+                                <Printer className="h-4 w-4 mr-2" />
+                                Print Now
                             </button>
                         </div>
                     </div>

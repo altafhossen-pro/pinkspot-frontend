@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
+import { useInView } from 'react-intersection-observer';
 import ProductCard from '@/components/Common/ProductCard';
 import { productAPI, categoryAPI, transformProductData } from '@/services/api';
 import { addProductToCart } from '@/utils/cartUtils';
@@ -26,7 +27,14 @@ function ShopPageContent() {
     const [totalResults, setTotalResults] = useState(0);
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
+    const [hasMore, setHasMore] = useState(true);
     const [itemsPerPage] = useState(12);
+
+    // Setup intersection observer for infinite scroll
+    const { ref, inView } = useInView({
+        threshold: 0.1,
+        rootMargin: '100px',
+    });
 
     // State for filters
     const [categories, setCategories] = useState([]);
@@ -44,6 +52,7 @@ function ShopPageContent() {
     const [availableRingSizes, setAvailableRingSizes] = useState([]);
     const [showBraceletSizeFilter, setShowBraceletSizeFilter] = useState(false);
     const [showRingSizeFilter, setShowRingSizeFilter] = useState(false);
+    const [sizesLoading, setSizesLoading] = useState(true);
 
     // Sorting state
     const [sortBy, setSortBy] = useState(sortParam || 'popular'); // popular, new-arrivals, price-low, price-high, best-selling
@@ -73,29 +82,46 @@ function ShopPageContent() {
 
                     // If category slug is provided in URL, automatically select that category
                     if (categorySlug) {
-                        const category = response.data.find(cat => cat.slug === categorySlug);
+                        let category = (response.data || []).find(cat => cat.slug === categorySlug);
+                        
+                        if (!category) {
+                            try {
+                                const allCatRes = await categoryAPI.getCategories({ limit: 1000 });
+                                if (allCatRes.success) {
+                                    const allCats = allCatRes.data.categories || allCatRes.data || [];
+                                    category = allCats.find(cat => cat.slug === categorySlug);
+                                }
+                            } catch (e) {
+                                console.error('Error fetching all categories for slug', e);
+                            }
+                        }
+
                         if (category) {
                             setSelectedCategories([category._id]);
                             // Fetch available sizes for the selected category
                             fetchAvailableSizes([category._id]);
+                        } else {
+                            // Slug was provided but not found, just fetch all sizes
+                            fetchAvailableSizes([]);
                         }
+                    } else {
+                        // No slug provided, fetch all sizes
+                        fetchAvailableSizes([]);
                     }
                 } else {
                     setCategoriesLoaded(true);
+                    if (!categorySlug) fetchAvailableSizes([]);
                 }
             } catch (error) {
                 console.error('Error fetching main categories:', error);
                 setCategoriesLoaded(true);
+                if (!categorySlug) fetchAvailableSizes([]);
             }
         };
         fetchCategories();
     }, [categorySlug]);
 
-    // Fetch all available sizes when page loads (no categories selected)
-    useEffect(() => {
-        fetchAvailableSizes([]);
-    }, []);
-
+    // Fetch all available sizes when page loads is now handled inside fetchCategories to prevent race conditions
     // Load cart from localStorage
     useEffect(() => {
         const loadCart = () => {
@@ -109,6 +135,7 @@ function ShopPageContent() {
 
     // Fetch available sizes based on selected categories
     const fetchAvailableSizes = async (categoryIds) => {
+        setSizesLoading(true);
         try {
             const response = await productAPI.getAvailableFilters(categoryIds);
 
@@ -122,6 +149,8 @@ function ShopPageContent() {
             }
         } catch (error) {
             console.error('Error fetching available filters:', error);
+        } finally {
+            setSizesLoading(false);
         }
     };
 
@@ -168,14 +197,25 @@ function ShopPageContent() {
                     slug: product.slug, // Keep original slug
                     featuredImage: product.featuredImage, // Keep original image
                 }));
-                setSearchResults(transformedProducts);
+
+                if (currentPage === 1) {
+                    setSearchResults(transformedProducts);
+                } else {
+                    setSearchResults(prev => {
+                        const existingIds = new Set(prev.map(p => p.id || p._id));
+                        const newUnique = transformedProducts.filter(p => !existingIds.has(p.id || p._id));
+                        return [...prev, ...newUnique];
+                    });
+                }
+                const morePages = currentPage < (response.pagination?.totalPages || 1);
+                setHasMore(morePages);
                 setTotalResults(response.pagination?.total || 0);
                 setTotalPages(response.pagination?.totalPages || 1);
             } else {
                 // Handle API error response
+                if (currentPage === 1) setSearchResults([]);
+                setHasMore(false);
                 toast.error(response.message || 'Failed to fetch products');
-                setSearchResults([]);
-                setTotalResults(0);
             }
         } catch (error) {
             console.error('Error fetching products:', error);
@@ -195,6 +235,20 @@ function ShopPageContent() {
             fetchProducts();
         }
     }, [selectedCategories, selectedBraceletSizes, selectedRingSizes, priceRange, sortBy, currentPage, categoriesLoaded]);
+
+    // Load more when user scrolls to bottom (inView becomes true)
+    useEffect(() => {
+        let timeoutId;
+        if (inView && !loading && hasMore) {
+            // Add a small delay to allow DOM to paint and intersection observer to update
+            timeoutId = setTimeout(() => {
+                setCurrentPage(prev => prev + 1);
+            }, 100);
+        }
+        return () => {
+            if (timeoutId) clearTimeout(timeoutId);
+        };
+    }, [inView, loading, hasMore]);
 
     // Update products wishlist state when global wishlist changes
     useEffect(() => {
@@ -231,6 +285,7 @@ function ShopPageContent() {
         // Clear size selections when categories change
         setSelectedBraceletSizes([]);
         setSelectedRingSizes([]);
+        setCurrentPage(1); // Reset page on filter change
     };
 
     const handleBraceletSizeChange = (size) => {
@@ -240,6 +295,7 @@ function ShopPageContent() {
                 : [...prev, size];
             return newSizes;
         });
+        setCurrentPage(1);
     };
 
     const handleRingSizeChange = (size) => {
@@ -249,6 +305,7 @@ function ShopPageContent() {
                 : [...prev, size];
             return newSizes;
         });
+        setCurrentPage(1);
     };
 
     const handlePriceRangeChange = (type, value) => {
@@ -256,6 +313,7 @@ function ShopPageContent() {
             ...prev,
             [type]: value
         }));
+        setCurrentPage(1);
     };
 
     const clearAllFilters = () => {
@@ -387,8 +445,25 @@ function ShopPageContent() {
                                     </div>
                                 </div>
 
+                                {/* Sizes Loading Skeleton */}
+                                {sizesLoading && (
+                                    <div className="space-y-4 pt-4 border-t border-gray-100">
+                                        <div>
+                                            <div className="h-5 w-24 bg-gray-200 rounded animate-pulse mb-3"></div>
+                                            <div className="space-y-2">
+                                                {[...Array(3)].map((_, i) => (
+                                                    <div key={i} className="flex items-center space-x-2">
+                                                        <div className="h-4 w-4 bg-gray-200 rounded animate-pulse"></div>
+                                                        <div className="h-4 w-16 bg-gray-200 rounded animate-pulse"></div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {/* Bracelet Size Filter - Only show if category has bracelet products */}
-                                {showBraceletSizeFilter && (
+                                {!sizesLoading && showBraceletSizeFilter && (
                                     <div>
                                         <div className="flex items-center justify-between mb-3">
                                             <h3 className="font-semibold text-gray-900">Bracelet Size</h3>
@@ -418,7 +493,7 @@ function ShopPageContent() {
                                 )}
 
                                 {/* Ring Size Filter - Only show if category has ring products */}
-                                {showRingSizeFilter && (
+                                {!sizesLoading && showRingSizeFilter && (
                                     <div>
                                         <div className="flex items-center justify-between mb-3">
                                             <h3 className="font-semibold text-gray-900">Ring Size</h3>
@@ -524,7 +599,7 @@ function ShopPageContent() {
                                     </div>
                                 </div>
                             </div>
-                            {loading ? (
+                            {loading && currentPage === 1 ? (
                                 <div className="flex justify-center items-center py-12">
                                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500"></div>
                                 </div>
@@ -557,14 +632,20 @@ function ShopPageContent() {
                                 </div>
                             )}
 
-                            {/* Pagination */}
-                            <Pagination
-                                currentPage={currentPage}
-                                totalPages={totalPages}
-                                onPageChange={handlePageChange}
-                                totalItems={totalResults}
-                                itemsPerPage={itemsPerPage}
-                            />
+                            {/* Infinite Scroll Skeleton Loader */}
+                            {loading && currentPage > 1 && (
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 mt-6">
+                                    {[...Array(4)].map((_, index) => (
+                                        <div key={`skeleton-${index}`} className="bg-gray-100 rounded-xl aspect-[3/4] animate-pulse"></div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {/* Invisible element for Intersection Observer */}
+                            <div ref={ref} className="h-10 w-full mt-4 flex justify-center">
+                                {loading && currentPage > 1 && <span className="text-gray-400 text-sm">Loading more...</span>}
+                                {!hasMore && searchResults.length > 0 && <span className="text-gray-400 text-sm py-4">No more products</span>}
+                            </div>
                         </div>
                     </div>
                 </div>

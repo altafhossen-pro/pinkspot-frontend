@@ -1,5 +1,6 @@
 import CategorySlider from "@/components/Homepage/CategorySlider/CategorySlider";
 import HeroSection from "@/components/Homepage/HeroSection/HeroSection";
+import HeroOffers from "@/components/Homepage/HeroOffers/HeroOffers";
 import FeaturedProducts from "@/components/Homepage/FeaturedProducts/FeaturedProducts";
 import BestSellingProducts from "@/components/Homepage/BestSellingProducts/BestSellingProducts";
 import NewArrivalProducts from "@/components/Homepage/NewArrivalProducts/NewArrivalProducts";
@@ -17,7 +18,8 @@ export default function Home() {
     <div className="min-h-screen bg-gray-50">
       <HeroBanner />
       <StoreFeatures />
-      <HeroSection />
+      {/* <HeroSection /> */}
+      <HeroOffers />
       <CategorySlider />
       {/* <FeaturedProducts /> */}
       {/* <BestSellingProducts /> */}

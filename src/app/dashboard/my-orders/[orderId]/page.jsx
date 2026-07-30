@@ -165,13 +165,24 @@ export default function OrderDetails() {
                             <h1 className="text-2xl font-bold text-gray-900">Order Details</h1>
                             <p className="text-sm text-gray-500 mt-1">Order #{order.orderId}</p>
                         </div>
-                        <Link
-                            href={`/dashboard/my-orders/${params.orderId}/reorder`}
-                            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                        >
-                            <ShoppingCart className="h-4 w-4 mr-2" />
-                            Reorder
-                        </Link>
+                        <div className="flex gap-2">
+                            {order.status === 'pending' && (
+                                <Link
+                                    href={`/dashboard/my-orders/${params.orderId}/edit`}
+                                    className="inline-flex items-center px-4 py-2 bg-white text-pink-600 border border-pink-600 rounded-lg hover:bg-pink-50 transition-colors cursor-pointer"
+                                >
+                                    <RefreshCw className="h-4 w-4 mr-2" />
+                                    Edit Order
+                                </Link>
+                            )}
+                            <Link
+                                href={`/dashboard/my-orders/${params.orderId}/reorder`}
+                                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                                <ShoppingCart className="h-4 w-4 mr-2" />
+                                Reorder
+                            </Link>
+                        </div>
                     </div>
                 </div>
 

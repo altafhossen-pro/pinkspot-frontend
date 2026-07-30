@@ -88,6 +88,7 @@ const navigation = [
         type: 'group',
         children: [
             { name: 'Hero Banner Top', href: '/admin/dashboard/hero-banner-top', icon: Image },
+            { name: 'Hero Offers', href: '/admin/dashboard/hero-offer', icon: Grid3X3 },
             { name: 'Hero Banners', href: '/admin/dashboard/hero-banner', icon: Image },
             { name: 'Hero Products', href: '/admin/dashboard/hero-products', icon: Grid3X3 },
             { name: 'Offer Banners', href: '/admin/dashboard/offer-banner', icon: Megaphone },

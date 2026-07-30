@@ -393,6 +393,17 @@ export const googleAuthAPI = {
 
 // User API functions
 export const userAPI = {
+    // Create customer (admin)
+    createCustomer: (userData, token) => {
+        return apiCall('/admin/user/customer', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify(userData),
+        });
+    },
     // Login user
     login: (credentials) => {
         return apiCall('/user/login', {
@@ -626,6 +637,18 @@ export const orderAPI = {
             headers: {
                 'Authorization': `Bearer ${token}`,
             },
+        });
+    },
+
+    // Update order by user
+    updateOrderByUser: (orderId, data, token) => {
+        return apiCall(`/order/${orderId}/user-update`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data),
         });
     },
 

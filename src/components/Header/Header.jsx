@@ -113,6 +113,13 @@ function Header({ isTrackingShow = true, logoUrl }) {
               href: `/shop?category=${cat.slug}`,
               icon: cat.icon || 'diamond',
               target: '_self',
+              showChildAsSubMenu: cat.showChildAsSubMenu,
+              children: cat.children?.map(child => ({
+                  id: child._id,
+                  name: child.name,
+                  href: `/shop?category=${child.slug}`,
+                  target: '_self'
+              })) || []
             }));
           setNavigationMenu(transformedCategories);
         }
@@ -288,6 +295,30 @@ function Header({ isTrackingShow = true, logoUrl }) {
                       {navigationMenu.map((item) => (
                         item.name === "Categories" ? (
                           <CategoryMegamenu key={item.id} />
+                        ) : item.showChildAsSubMenu && item.children?.length > 0 ? (
+                          <div key={item.id} className="relative group py-4">
+                            <Link
+                              href={item.href}
+                              className={`text-sm font-medium transition-colors hover:text-pink-600 flex items-center ${isMenuItemActive(item.href) ? 'text-pink-600' : 'text-gray-700'
+                                }`}
+                            >
+                              {item.name}
+                              <svg className="w-4 h-4 ml-1 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </Link>
+                            <div className="absolute left-0 mt-[16px] w-56 bg-white rounded-lg shadow-[0_4px_20px_rgb(0,0,0,0.1)] border border-gray-100 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 z-50 overflow-hidden transform translate-y-2 group-hover:translate-y-0">
+                              <div className="py-2 flex flex-col">
+                                {item.children.map(child => (
+                                  <Link
+                                    key={child.id}
+                                    href={child.href}
+                                    className={`block px-4 py-2.5 text-sm transition-colors ${isMenuItemActive(child.href) ? 'bg-pink-50 text-pink-600 font-medium' : 'text-gray-700 hover:bg-gray-50 hover:text-pink-600'}`}
+                                  >
+                                    {child.name}
+                                  </Link>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
                         ) : (
                           <Link
                             key={item.id}
@@ -368,6 +399,42 @@ function Header({ isTrackingShow = true, logoUrl }) {
                 ) : (
                   navigationMenu.map((item, index) => {
                     const isActive = isMenuItemActive(item.href);
+                    
+                    if (item.showChildAsSubMenu && item.children?.length > 0) {
+                      return (
+                        <div key={item.id} className="flex flex-col mb-1" style={{ animationDelay: `${index * 0.05}s` }}>
+                          <Link
+                            href={item.href}
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className={`mobile-menu-item px-4 py-3 rounded-lg font-medium transition-all duration-200 ${isActive
+                              ? 'bg-[#EF3D6A] text-white shadow-sm'
+                              : 'text-gray-700 hover:bg-pink-50 hover:text-[#EF3D6A]'
+                              }`}
+                          >
+                            {item.name}
+                          </Link>
+                          <div className="pl-6 pr-2 py-1 flex flex-col space-y-1 mt-1 border-l-2 border-pink-100 ml-4">
+                            {item.children.map(child => {
+                                const isChildActive = isMenuItemActive(child.href);
+                                return (
+                                  <Link
+                                    key={child.id}
+                                    href={child.href}
+                                    onClick={() => setIsMobileMenuOpen(false)}
+                                    className={`px-3 py-2 rounded-md text-sm transition-all duration-200 ${isChildActive
+                                      ? 'bg-pink-50 text-pink-600 font-medium'
+                                      : 'text-gray-600 hover:text-pink-600 hover:bg-gray-50'
+                                    }`}
+                                  >
+                                    {child.name}
+                                  </Link>
+                                )
+                            })}
+                          </div>
+                        </div>
+                      );
+                    }
+                    
                     return (
                       <Link
                         key={item.id}

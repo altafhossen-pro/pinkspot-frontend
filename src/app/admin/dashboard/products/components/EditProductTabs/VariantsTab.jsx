@@ -182,8 +182,9 @@ export default function VariantsTab({
                             Variant Image
                         </label>
                         <ImageUpload
-                            value={variantForm.image}
-                            onChange={(url) => setVariantForm(prev => ({ ...prev, image: url }))}
+                            currentImage={variantForm.image}
+                            onImageUpload={(url) => setVariantForm(prev => ({ ...prev, image: url }))}
+                            onImageRemove={() => setVariantForm(prev => ({ ...prev, image: '' }))}
                         />
                     </div>
 

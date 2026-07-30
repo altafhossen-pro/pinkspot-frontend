@@ -1,17 +1,22 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Plus, Edit, Trash2, Eye, Search, Filter, ChevronLeft, ChevronRight, TrendingUp, Share2, Download } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { getCookie } from 'cookies-next'
-import { productAPI } from '@/services/api'
+import { productAPI, categoryAPI } from '@/services/api'
 import DeleteConfirmationModal from '@/components/Common/DeleteConfirmationModal'
 import ShareModal from '@/components/Common/ShareModal'
 import PermissionDenied from '@/components/Common/PermissionDenied'
 import { useAppContext } from '@/context/AppContext'
 
-export default function AdminProductsPage() {
+export default function CategoryProductsPage() {
+    const paramsRoute = useParams()
+    const slug = paramsRoute.slug
+    const [category, setCategory] = useState(null)
+    const [loadingCategory, setLoadingCategory] = useState(true)
     const { hasPermission } = useAppContext()
     const [products, setProducts] = useState([])
     const [loading, setLoading] = useState(true)
@@ -35,6 +40,7 @@ export default function AdminProductsPage() {
     const [hoveredImage, setHoveredImage] = useState(null)
 
     const fetchProducts = useCallback(async () => {
+        if (loadingCategory) return;
         try {
             setLoading(true)
             const token = getCookie('token')
@@ -42,6 +48,10 @@ export default function AdminProductsPage() {
             const params = {
                 page: currentPage,
                 limit: limit,
+            }
+
+            if (category) {
+                params.category = category._id
             }
 
             if (searchTerm.trim()) {
@@ -100,13 +110,35 @@ export default function AdminProductsPage() {
         } finally {
             setLoading(false)
         }
-    }, [currentPage, searchTerm, filterStatus, limit])
+    }, [currentPage, searchTerm, filterStatus, limit, category, loadingCategory])
 
     // Reset to page 1 and clear selection when search/filter changes
     useEffect(() => {
         setCurrentPage(1)
         setSelectedProducts([])
     }, [searchTerm, filterStatus])
+
+    // Debounce search - fetch after user stops typing (500ms delay)
+    useEffect(() => {
+        const fetchCategory = async () => {
+            try {
+                setLoadingCategory(true)
+                const data = await categoryAPI.getCategoryBySlug(slug)
+                if (data.success) {
+                    setCategory(data.data)
+                } else {
+                    toast.error('Category not found')
+                }
+            } catch(e) {
+                toast.error('Error loading category')
+            } finally {
+                setLoadingCategory(false)
+            }
+        }
+        if (slug) {
+            fetchCategory()
+        }
+    }, [slug])
 
     // Debounce search - fetch after user stops typing (500ms delay)
     useEffect(() => {
@@ -160,26 +192,6 @@ export default function AdminProductsPage() {
     const handleStatusChange = (status) => {
         setFilterStatus(status)
         setCurrentPage(1) // Reset to first page on filter change
-    }
-
-    const handleForceOutOfStockToggle = async (productId, currentVal) => {
-        try {
-            const token = getCookie('token')
-            if (!token) {
-                toast.error('Authentication required')
-                return
-            }
-            const res = await productAPI.updateProduct(productId, { isForceOutOfStock: !currentVal }, token)
-            if (res.success) {
-                toast.success(res.message || 'Product updated successfully')
-                fetchProducts()
-            } else {
-                toast.error(res.message || 'Failed to update product')
-            }
-        } catch (error) {
-            console.error('Error updating force out of stock:', error)
-            toast.error('Failed to update product')
-        }
     }
 
     // Handle individual product selection
@@ -275,6 +287,14 @@ export default function AdminProductsPage() {
         return product.basePrice ? `৳${Number(product.basePrice).toFixed(2)}` : 'N/A'
     }
 
+    if (loadingCategory) {
+        return (
+            <div className="flex items-center justify-center py-32">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+            </div>
+        )
+    }
+
     // Show permission denied if permission error exists
     if (permissionError && !loading) {
         return (
@@ -364,7 +384,7 @@ export default function AdminProductsPage() {
             <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
                 <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Products</h1>
+                        <h1 className="text-2xl font-bold text-gray-900">Products in {category?.name || 'Category'}</h1>
                         <p className="mt-1 text-sm text-gray-500">
                             Manage your product catalog
                         </p>
@@ -478,9 +498,6 @@ export default function AdminProductsPage() {
                                         Status
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Force Stock Out
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Created
                                     </th>
                                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -548,15 +565,6 @@ export default function AdminProductsPage() {
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 {getStatusBadge(product.status)}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <button
-                                                    onClick={() => handleForceOutOfStockToggle(product._id, product.isForceOutOfStock)}
-                                                    className={`relative inline-flex h-5 w-10 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-pink-500 focus:ring-offset-2 ${product.isForceOutOfStock ? 'bg-pink-600' : 'bg-gray-200'}`}
-                                                    title={product.isForceOutOfStock ? "Remove Force Out of Stock" : "Force Out of Stock"}
-                                                >
-                                                    <span className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${product.isForceOutOfStock ? 'translate-x-5' : 'translate-x-0'}`} />
-                                                </button>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                                 {new Date(product.createdAt).toLocaleDateString()}

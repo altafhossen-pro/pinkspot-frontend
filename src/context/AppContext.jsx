@@ -66,6 +66,11 @@ export const AppProvider = ({ children }) => {
 
     // Cart functions
     const addToCart = (product, selectedVariant, quantity = 1) => {
+        if (product.isForceOutOfStock) {
+            import('react-hot-toast').then(({ default: toast }) => toast.error(`Product "${product.title}" is currently out of stock`));
+            return;
+        }
+
         // Create variant key for unique identification (size is optional now)
         const variantKey = selectedVariant ?
             `${product._id}-${selectedVariant.size || 'no-size'}-${selectedVariant.color || 'no-color'}` :
@@ -121,12 +126,25 @@ export const AppProvider = ({ children }) => {
         if (existingItemIndex !== -1) {
             // Update quantity if same variant exists
             const updatedCart = [...cart];
-            updatedCart[existingItemIndex].quantity += quantity;
-            updatedCart[existingItemIndex].total = updatedCart[existingItemIndex].price * updatedCart[existingItemIndex].quantity;
+            const currentItem = updatedCart[existingItemIndex];
+            const newQuantity = currentItem.quantity + quantity;
+            
+            // Check stock limit
+            if (newQuantity > currentItem.stockQuantity) {
+                toast.error(`Cannot add more. Only ${currentItem.stockQuantity} available.`);
+                return;
+            }
+            
+            currentItem.quantity = newQuantity;
+            currentItem.total = currentItem.price * currentItem.quantity;
             setCart(updatedCart);
-            toast.success(`Quantity updated! Total: ${updatedCart[existingItemIndex].quantity}`);
+            toast.success(`Quantity updated! Total: ${currentItem.quantity}`);
         } else {
             // Add new item
+            if (quantity > cartItem.stockQuantity) {
+                toast.error(`Cannot add. Only ${cartItem.stockQuantity} available.`);
+                return;
+            }
             setCart([...cart, cartItem]);
             toast.success('Added to cart successfully!');
         }
@@ -143,6 +161,11 @@ export const AppProvider = ({ children }) => {
         const updatedCart = [...cart];
 
         items.forEach(({ product, selectedVariant, quantity = 1 }) => {
+            if (product.isForceOutOfStock) {
+                import('react-hot-toast').then(({ default: toast }) => toast.error(`Product "${product.title}" is currently out of stock`));
+                return;
+            }
+
             const variantKey = selectedVariant ?
                 `${product._id}-${selectedVariant.size || 'no-size'}-${selectedVariant.color || 'no-color'}` :
                 product._id;
@@ -196,11 +219,21 @@ export const AppProvider = ({ children }) => {
 
             if (existingItemIndex !== -1) {
                 // Update quantity if same variant exists
-                updatedCart[existingItemIndex].quantity += quantity;
-                updatedCart[existingItemIndex].total = updatedCart[existingItemIndex].price * updatedCart[existingItemIndex].quantity;
+                const currentItem = updatedCart[existingItemIndex];
+                const newQuantity = currentItem.quantity + quantity;
+                if (newQuantity <= currentItem.stockQuantity) {
+                    currentItem.quantity = newQuantity;
+                    currentItem.total = currentItem.price * currentItem.quantity;
+                } else {
+                    toast.error(`Stock limit reached for ${currentItem.name}`);
+                }
             } else {
                 // Add new item
-                newCartItems.push(cartItem);
+                if (quantity <= cartItem.stockQuantity) {
+                    newCartItems.push(cartItem);
+                } else {
+                    toast.error(`Stock limit reached for ${cartItem.name}`);
+                }
             }
         });
 
@@ -223,6 +256,12 @@ export const AppProvider = ({ children }) => {
         // Don't allow quantity less than 1
         if (quantity < 1) {
             toast.error('Quantity cannot be less than 1');
+            return;
+        }
+        
+        const item = cart.find(i => i.id === cartItemId);
+        if (item && quantity > item.stockQuantity) {
+            toast.error(`Only ${item.stockQuantity} items available.`);
             return;
         }
 

@@ -24,6 +24,7 @@ import { getCookie } from 'cookies-next'
 import { useAppContext } from '@/context/AppContext'
 import PermissionDenied from '@/components/Common/PermissionDenied'
 import DeleteConfirmationModal from '@/components/Common/DeleteConfirmationModal'
+import CreateCustomerModal from './components/CreateCustomerModal'
 
 export default function AdminCustomersPage() {
     const router = useRouter()
@@ -43,6 +44,7 @@ export default function AdminCustomersPage() {
     const [showDeleteModal, setShowDeleteModal] = useState(false)
     const [userToDelete, setUserToDelete] = useState(null)
     const [deleting, setDeleting] = useState(false)
+    const [showCreateModal, setShowCreateModal] = useState(false)
 
     useEffect(() => {
         if (!contextLoading) {
@@ -218,6 +220,14 @@ export default function AdminCustomersPage() {
                         <div className="text-sm text-gray-500">
                             Total: {totalItems} users
                         </div>
+                        {hasPermission('user', 'create') && (
+                            <button
+                                onClick={() => setShowCreateModal(true)}
+                                className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 cursor-pointer"
+                            >
+                                Add Customer
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -517,6 +527,16 @@ export default function AdminCustomersPage() {
                     isLoading={deleting}
                 />
             )}
+
+            {/* Create Customer Modal */}
+            <CreateCustomerModal
+                isOpen={showCreateModal}
+                onClose={() => setShowCreateModal(false)}
+                onSuccess={() => {
+                    setShowCreateModal(false)
+                    fetchUsers()
+                }}
+            />
         </div>
     )
 }
