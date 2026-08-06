@@ -1031,29 +1031,39 @@ export default function Checkout() {
         switch (paymentMethod) {
             case 'cash':
                 try {
-                    // Calculate total from cart items
-                    const calculatedTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+                    // Calculate total from cart items and total category discount
+                    let totalCategoryDiscount = 0;
+                    const calculatedTotal = cart.reduce((sum, item) => {
+                        const itemPrice = item.categoryDiscountApplied ? (item.originalPrice || item.price) : item.price;
+                        if (item.categoryDiscountApplied && item.originalPrice > item.price) {
+                            totalCategoryDiscount += (item.originalPrice - item.price) * item.quantity;
+                        }
+                        return sum + (itemPrice * item.quantity);
+                    }, 0);
 
                     // Prepare order data for Cash on Delivery
                     const orderData = {
-                        items: cart.map(item => ({
-                            product: item.productId,
-                            variantSku: item.sku,
-                            name: item.name,
-                            image: item.image,
-                            price: item.price,
-                            quantity: item.quantity,
-                            subtotal: item.price * item.quantity,
-                            // Add variant information for admin
-                            variant: {
-                                size: item.size,
-                                color: item.color,
-                                colorHexCode: item.colorHexCode,
-                                sku: item.sku,
-                                stockQuantity: item.stockQuantity,
-                                stockStatus: item.stockStatus
-                            }
-                        })),
+                        items: cart.map(item => {
+                            const itemPrice = item.categoryDiscountApplied ? (item.originalPrice || item.price) : item.price;
+                            return {
+                                product: item.productId,
+                                variantSku: item.sku,
+                                name: item.name,
+                                image: item.image,
+                                price: itemPrice,
+                                quantity: item.quantity,
+                                subtotal: itemPrice * item.quantity,
+                                // Add variant information for admin
+                                variant: {
+                                    size: item.size,
+                                    color: item.color,
+                                    colorHexCode: item.colorHexCode,
+                                    sku: item.sku,
+                                    stockQuantity: item.stockQuantity,
+                                    stockStatus: item.stockStatus
+                                }
+                            };
+                        }),
                         shippingAddress: {
                             label: 'Delivery Address',
                             street: formData.deliveryAddress,
@@ -1092,8 +1102,8 @@ export default function Checkout() {
                         },
                         paymentMethod: 'cod',
                         paymentStatus: 'pending',
-                        total: useLoyaltyPoints ? 0 : calculatedTotal, // If using loyalty points, total is 0
-                        discount: discount,
+                        total: useLoyaltyPoints ? 0 : totalCost, // Use totalCost which includes shipping and discounts
+                        discount: discount + totalCategoryDiscount,
                         upsellDiscount: upsellDiscount, // Separate field for upsell discount
                         // Calculate loyalty discount based on coins used * coin value (not subtotal)
                         // This ensures frontend and backend calculations match

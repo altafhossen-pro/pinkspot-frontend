@@ -18,6 +18,34 @@ import {
     Package
 } from 'lucide-react'
 
+export const RollingNumber = ({ value }) => {
+    if (value === null || value === undefined) {
+        return <span className="h-[1em] leading-[1em] font-bold">-</span>;
+    }
+    const numStr = value.toString();
+    return (
+        <div className="flex overflow-hidden h-[1em] leading-[1em] font-bold font-inherit text-inherit">
+            {numStr.split('').map((char, i) => {
+                const num = parseInt(char);
+                if (isNaN(num)) return <span key={i} className="h-[1em] flex items-center">{char}</span>;
+                return (
+                    <div 
+                        key={i} 
+                        className="flex flex-col transition-transform duration-500 ease-in-out" 
+                        style={{ transform: `translateY(-${num * 100}%)` }}
+                    >
+                        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
+                            <span key={n} className="h-[1em] flex items-center justify-center">
+                                {n}
+                            </span>
+                        ))}
+                    </div>
+                );
+            })}
+        </div>
+    );
+};
+
 export default function AdminHeader({ onMobileMenuToggle }) {
     const [isSearchFocused, setIsSearchFocused] = useState(false)
     const [isProfileOpen, setIsProfileOpen] = useState(false)
@@ -27,6 +55,8 @@ export default function AdminHeader({ onMobileMenuToggle }) {
     const [page, setPage] = useState(1)
     const [hasMore, setHasMore] = useState(false)
     const [loadingNotifications, setLoadingNotifications] = useState(false)
+    const [liveVisitors, setLiveVisitors] = useState(null)
+    const [todayTotal, setTodayTotal] = useState(null)
 
     const { user, logout } = useAppContext()
     const router = useRouter()
@@ -92,8 +122,12 @@ export default function AdminHeader({ onMobileMenuToggle }) {
     // Socket.io integration
     useEffect(() => {
         const socketUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace('/api/v1', '');
+        const visitorId = getCookie('visitor_id');
         const socket = io(socketUrl, {
-            transports: ['websocket', 'polling']
+            transports: ['websocket'],
+            auth: {
+                visitorId: visitorId
+            }
         });
 
         socket.on('connect', () => {
@@ -105,6 +139,14 @@ export default function AdminHeader({ onMobileMenuToggle }) {
             orderData.isReadByAdmin = false;
             setNotifications(prev => [orderData, ...prev]);
             setUnreadCount(prev => prev + 1);
+        });
+
+        socket.on('unique_visitors_count', (count) => {
+            setLiveVisitors(count);
+        });
+
+        socket.on('today_total_visitors', (count) => {
+            setTodayTotal(count);
         });
 
         return () => {
@@ -188,7 +230,13 @@ export default function AdminHeader({ onMobileMenuToggle }) {
 
                 {/* Right Side - Notifications + Profile */}
                 <div className="flex items-center space-x-4">
-                    {/* Notifications */}
+                    {/* Realtime Visitors Badge */}
+                    <div className="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 bg-blue-50 border border-blue-100 rounded-full text-blue-700">
+                        <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse"></div>
+                        <span className="text-xs font-semibold mr-1">Realtime:</span>
+                        <RollingNumber value={liveVisitors} />
+                    </div>
+
                     {/* Notifications */}
                     <div className="relative" ref={notificationDropdownRef}>
                         <button

@@ -104,6 +104,7 @@ const navigation = [
             { name: 'Coupons', href: '/admin/dashboard/coupons', icon: Ticket },
             { name: 'Upsells', href: '/admin/dashboard/upsells', icon: Link2 },
             { name: 'Own Products Ads', href: '/admin/dashboard/own-ads', icon: Presentation },
+            { name: 'Category Discount', href: '/admin/dashboard/category-discount', icon: Tag },
         ]
     },
     {

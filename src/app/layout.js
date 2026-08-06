@@ -8,6 +8,7 @@ import MobileBottomNavigation from "@/components/Common/MobileBottomNavigation";
 import { Suspense } from "react";
 import AffiliateTracker from "@/components/Common/AffiliateTracker";
 import Script from "next/script";
+import VisitorTracker from "@/components/VisitorTracker/VisitorTracker";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -73,6 +74,7 @@ export default async function RootLayout({ children }) {
           />
         </noscript>
         <AppProvider>
+          <VisitorTracker />
           <Suspense fallback={null}>
             <AffiliateTracker />
           </Suspense>

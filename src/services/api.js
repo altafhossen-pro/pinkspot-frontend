@@ -178,6 +178,18 @@ export const productAPI = {
         });
     },
 
+    // Admin: Bulk update category discount exclusion
+    bulkExcludeCategoryDiscount: (data, token) => {
+        return apiCall('/product/admin/bulk-exclude-category-discount', {
+            method: 'PATCH',
+            body: JSON.stringify(data),
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+    },
+
     // Admin: Get single product by ID (with permission check)
     getAdminProductById: (id, token) => {
         return apiCall(`/product/admin/${id}`, {
@@ -846,21 +858,41 @@ export const uploadAPI = {
 };
 
 // Utility function to transform product data for components
-export const transformProductData = (product) => ({
-    id: product._id,
-    name: product.title,
-    price: product.variants?.[0]?.currentPrice || product.basePrice || 0,
-    originalPrice: product.variants?.[0]?.originalPrice || null,
-    rating: product.averageRating || 0,
-    image: product.featuredImage || '/images/placeholder.png',
-    category: product.category?.name?.toLowerCase() || 'other',
-    isWishlisted: false,
-    isHighlighted: product.isFeatured || product.isBestselling || product.isNewArrival || false,
-    slug: product.slug,
-    description: product.shortDescription || product.description,
-    totalReviews: product.totalReviews || 0,
-    totalSold: product.totalSold || 0,
-});
+export const transformProductData = (product) => {
+    let discountObj = null;
+    if (product.category && typeof product.category === 'object' && product.category.categoryDiscount) {
+        if (product.category.categoryDiscount.isActive && product.category.categoryDiscount.percentage > 0 && !product.excludeFromCategoryDiscount) {
+            discountObj = product.category.categoryDiscount;
+        }
+    }
+
+    let basePrice = product.variants?.[0]?.currentPrice || product.basePrice || product.salePrice || product.price || 0;
+    let originalPrice = product.variants?.[0]?.originalPrice || product.regularPrice || null;
+    let finalPrice = basePrice;
+
+    if (discountObj) {
+        // ALWAYS use basePrice as the original price when applying category discount
+        originalPrice = basePrice;
+        finalPrice = basePrice - (basePrice * (discountObj.percentage / 100));
+    }
+
+    return {
+        id: product._id,
+        name: product.title,
+        price: Number(finalPrice.toFixed(2)),
+        originalPrice: originalPrice ? Number(Number(originalPrice).toFixed(2)) : null,
+        rating: product.averageRating || 0,
+        image: product.featuredImage || '/images/placeholder.png',
+        category: product.category?.name?.toLowerCase() || 'other',
+        categoryDiscount: discountObj,
+        isWishlisted: false,
+        isHighlighted: product.isFeatured || product.isBestselling || product.isNewArrival || false,
+        slug: product.slug,
+        description: product.shortDescription || product.description,
+        totalReviews: product.totalReviews || 0,
+        totalSold: product.totalSold || 0,
+    };
+};
 
 // Review API functions
 export const reviewAPI = {

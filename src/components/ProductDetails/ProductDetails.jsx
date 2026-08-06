@@ -343,21 +343,38 @@ export default function ProductDetails({ productSlug }) {
             return;
         }
 
+        // Calculate actual price with category discount if applicable
+        let finalPrice = selectedVariant ? selectedVariant.currentPrice : (product.variants?.[0]?.currentPrice || product.basePrice || 0);
+        let finalOriginalPrice = selectedVariant ? selectedVariant.originalPrice : (product.variants?.[0]?.originalPrice || null);
+        
+        if (product?.category?.categoryDiscount?.isActive && product.category.categoryDiscount.percentage > 0 && !product.excludeFromCategoryDiscount) {
+            finalOriginalPrice = finalPrice;
+            finalPrice = finalPrice - (finalPrice * (product.category.categoryDiscount.percentage / 100));
+        }
+
         // Create selected variant object
         const selectedVariantData = selectedVariant ? {
             size: selectedSize,
             color: selectedColor,
-            currentPrice: selectedVariant.currentPrice,
-            originalPrice: selectedVariant.originalPrice,
+            currentPrice: Number(finalPrice.toFixed(2)),
+            originalPrice: finalOriginalPrice ? Number(Number(finalOriginalPrice).toFixed(2)) : null,
             hexCode: selectedVariant.attributes.find(attr => attr.name === 'Color')?.hexCode,
             sku: selectedVariant.sku,
             stockQuantity: selectedVariant.stockQuantity,
             stockStatus: selectedVariant.stockStatus
         } : null;
 
+        // If no variant is selected, we should still pass the discounted price to product
+        const productToAdd = {
+            ...product,
+            price: Number(finalPrice.toFixed(2)),
+            originalPrice: finalOriginalPrice ? Number(Number(finalOriginalPrice).toFixed(2)) : null,
+            categoryDiscountApplied: !!(product?.category?.categoryDiscount?.isActive && !product.excludeFromCategoryDiscount)
+        };
+
         // Add to cart using context
         const q = quantity === '' || quantity < 1 ? 1 : quantity;
-        addToCart(product, selectedVariantData, q);
+        addToCart(productToAdd, selectedVariantData, q);
     };
 
     const handleBuyNow = () => {
@@ -366,21 +383,38 @@ export default function ProductDetails({ productSlug }) {
             return;
         }
 
+        // Calculate actual price with category discount if applicable
+        let finalPrice = selectedVariant ? selectedVariant.currentPrice : (product.variants?.[0]?.currentPrice || product.basePrice || 0);
+        let finalOriginalPrice = selectedVariant ? selectedVariant.originalPrice : (product.variants?.[0]?.originalPrice || null);
+        
+        if (product?.category?.categoryDiscount?.isActive && product.category.categoryDiscount.percentage > 0 && !product.excludeFromCategoryDiscount) {
+            finalOriginalPrice = finalPrice;
+            finalPrice = finalPrice - (finalPrice * (product.category.categoryDiscount.percentage / 100));
+        }
+
         // Create selected variant object
         const selectedVariantData = selectedVariant ? {
             size: selectedSize,
             color: selectedColor,
-            currentPrice: selectedVariant.currentPrice,
-            originalPrice: selectedVariant.originalPrice,
+            currentPrice: Number(finalPrice.toFixed(2)),
+            originalPrice: finalOriginalPrice ? Number(Number(finalOriginalPrice).toFixed(2)) : null,
             hexCode: selectedVariant.attributes.find(attr => attr.name === 'Color')?.hexCode,
             sku: selectedVariant.sku,
             stockQuantity: selectedVariant.stockQuantity,
             stockStatus: selectedVariant.stockStatus
         } : null;
 
+        // If no variant is selected, we should still pass the discounted price to product
+        const productToAdd = {
+            ...product,
+            price: Number(finalPrice.toFixed(2)),
+            originalPrice: finalOriginalPrice ? Number(Number(finalOriginalPrice).toFixed(2)) : null,
+            categoryDiscountApplied: !!(product?.category?.categoryDiscount?.isActive && !product.excludeFromCategoryDiscount)
+        };
+
         // Add to cart using context
         const q = quantity === '' || quantity < 1 ? 1 : quantity;
-        addToCart(product, selectedVariantData, q);
+        addToCart(productToAdd, selectedVariantData, q);
 
         // Navigate to checkout page
         router.push('/checkout');
@@ -426,22 +460,26 @@ export default function ProductDetails({ productSlug }) {
     };
 
     // Calculate price from selected variant
-    const getCurrentPrice = () => {
-        if (selectedVariant) {
-            return selectedVariant.currentPrice;
-        }
-        return product?.variants?.[0]?.currentPrice || product?.basePrice || 0;
-    };
+    let baseCurrentPrice = selectedVariant ? selectedVariant.currentPrice : (product?.variants?.[0]?.currentPrice || product?.basePrice || product?.salePrice || product?.price || 0);
+    let baseOriginalPrice = selectedVariant ? selectedVariant.originalPrice : (product?.variants?.[0]?.originalPrice || product?.regularPrice || null);
 
-    const getOriginalPrice = () => {
-        if (selectedVariant) {
-            return selectedVariant.originalPrice;
+    let categoryDiscountObj = null;
+    if (product?.category && product.category.categoryDiscount) {
+        if (product.category.categoryDiscount.isActive && product.category.categoryDiscount.percentage > 0 && !product.excludeFromCategoryDiscount) {
+            categoryDiscountObj = product.category.categoryDiscount;
         }
-        return product?.variants?.[0]?.originalPrice || null;
-    };
+    }
 
-    const currentPrice = getCurrentPrice();
-    const originalPrice = getOriginalPrice();
+    let finalCurrentPrice = baseCurrentPrice;
+    let finalOriginalPrice = baseOriginalPrice;
+
+    if (categoryDiscountObj) {
+        finalOriginalPrice = baseCurrentPrice;
+        finalCurrentPrice = baseCurrentPrice - (baseCurrentPrice * (categoryDiscountObj.percentage / 100));
+    }
+
+    const currentPrice = Number(Number(finalCurrentPrice).toFixed(2));
+    const originalPrice = finalOriginalPrice ? Number(Number(finalOriginalPrice).toFixed(2)) : null;
     const discount = originalPrice ? Math.round(((originalPrice - currentPrice) / originalPrice) * 100) : 0;
 
     // Get default product images (featured + gallery) - always used for gallery slider
@@ -670,10 +708,18 @@ export default function ProductDetails({ productSlug }) {
                     <div className="lg:w-[55%]  flex flex-col lg:flex-row justify-between gap-8">
                         {/* Left Part - Product Details */}
                         <div className="space-y-3 lg:flex-1">
-                            {/* Product Title */}
-                            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-                                {product.title}
-                            </h1>
+                            {/* Product Title and Category Badge */}
+                            <div className="flex flex-col gap-2">
+                                {categoryDiscountObj && (
+                                    <div className="inline-flex items-center w-max px-2.5 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-600 border border-red-200 shadow-sm">
+                                        <Package className="w-3.5 h-3.5 mr-1" />
+                                        Discount -{categoryDiscountObj.percentage}% OFF
+                                    </div>
+                                )}
+                                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                                    {product.title}
+                                </h1>
+                            </div>
 
                             {/* Reviews Count - Above Price */}
                             <div className="flex items-center gap-2">

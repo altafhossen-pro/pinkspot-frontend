@@ -21,11 +21,18 @@ import {
     Calendar,
     Settings as SettingsIcon,
     X,
-    Save
+    Save,
+    UserCheck,
+    Clock,
+    History,
+    Menu,
+    Tag
 } from 'lucide-react'
+import { io } from 'socket.io-client'
 import { analyticsAPI, settingsAPI } from '@/services/api'
 import { useAppContext } from '@/context/AppContext'
 import PermissionDenied from '@/components/Common/PermissionDenied'
+import { RollingNumber } from '@/components/Admin/AdminHeader'
 import toast from 'react-hot-toast'
 import { formatDateForTable } from '@/utils/formatDate'
 import {
@@ -73,6 +80,19 @@ export default function DashboardPage() {
     const [showThresholdModal, setShowThresholdModal] = useState(false)
     const [thresholdValue, setThresholdValue] = useState(10)
     const [savingThreshold, setSavingThreshold] = useState(false)
+    const [realtimeVisitors, setRealtimeVisitors] = useState(null)
+
+    // Socket connection for realtime visitors
+    useEffect(() => {
+        const socketUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000').replace('/api/v1', '');
+        const socket = io(socketUrl, { transports: ['websocket'] });
+
+        socket.on('unique_visitors_count', (count) => {
+            setRealtimeVisitors(count);
+        });
+
+        return () => socket.disconnect();
+    }, []);
 
     // Fetch dashboard data
     const fetchDashboardData = async (period = selectedPeriod) => {
@@ -267,13 +287,18 @@ export default function DashboardPage() {
         )
     }
 
-    const { overview, orders, products, sales, recentOrders } = dashboardData
+    const { overview, orders, products, sales, recentOrders, visitors } = dashboardData
+
+    const todayVisitorsCount = visitors?.today || 0;
+    const todayOrdersCount = orders?.periodTotal || 0;
+    const conversionRate = todayVisitorsCount > 0 ? ((todayOrdersCount / todayVisitorsCount) * 100).toFixed(2) : 0;
 
     // Prepare stats data - use period-based data for better accuracy
     const stats = [
         {
             title: 'Revenue',
             value: formatCurrency(sales.period || 0),
+            subtitle: `${selectedPeriod === 'today' ? "Today's" : selectedPeriod === 'yesterday' ? "Yesterday's" : "Period"} Steadfast Collected Amount`,
             change: `${overview.salesGrowth >= 0 ? '+' : ''}${overview.salesGrowth}%`,
             trend: overview.salesGrowth >= 0 ? 'up' : 'down',
             icon: DollarSign,
@@ -302,6 +327,22 @@ export default function DashboardPage() {
             trend: 'down',
             icon: Package,
             color: 'orange'
+        },
+        {
+            title: 'Pending Orders',
+            value: formatNumber(orders.pending || 0),
+            change: '',
+            trend: 'neutral',
+            icon: Clock,
+            color: 'yellow'
+        },
+        {
+            title: 'Total Categories',
+            value: formatNumber(overview.totalCategories || 0),
+            change: '',
+            trend: 'neutral',
+            icon: Menu,
+            color: 'indigo'
         }
     ]
 
@@ -362,7 +403,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
                 {stats.map((stat, index) => (
                     <div
                         key={index}
@@ -387,16 +428,115 @@ export default function DashboardPage() {
                             </div>
                             <div className={`p-3 rounded-full ${stat.color === 'blue' ? 'bg-blue-100' :
                                 stat.color === 'green' ? 'bg-green-100' :
-                                    stat.color === 'purple' ? 'bg-purple-100' : 'bg-orange-100'
+                                    stat.color === 'purple' ? 'bg-purple-100' : 
+                                    stat.color === 'yellow' ? 'bg-yellow-100' :
+                                    stat.color === 'indigo' ? 'bg-indigo-100' : 'bg-orange-100'
                                 }`}>
                                 <stat.icon className={`h-6 w-6 ${stat.color === 'blue' ? 'text-blue-600' :
                                     stat.color === 'green' ? 'text-green-600' :
-                                        stat.color === 'purple' ? 'text-purple-600' : 'text-orange-600'
+                                        stat.color === 'purple' ? 'text-purple-600' : 
+                                        stat.color === 'yellow' ? 'text-yellow-600' :
+                                        stat.color === 'indigo' ? 'text-indigo-600' : 'text-orange-600'
                                     }`} />
                             </div>
                         </div>
+                        {stat.subtitle && (
+                            <p className="text-[10px] text-gray-400 mt-2 leading-tight">{stat.subtitle}</p>
+                        )}
                     </div>
                 ))}
+            </div>
+
+            {/* Visitor Stats Grid */}
+            <h2 className="text-lg font-semibold text-gray-900 mt-2 mb-4">Traffic & Visitors</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6">
+                {/* Realtime */}
+                <div className="bg-white rounded-xl border border-gray-200 p-6 card-hover relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-4">
+                        <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-ping absolute"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-blue-500 relative"></div>
+                    </div>
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-gray-600">Realtime Active</p>
+                            <div className="text-2xl font-bold text-blue-600 mt-1">
+                                <RollingNumber value={realtimeVisitors} />
+                            </div>
+                        </div>
+                        <div className="p-3 rounded-full bg-blue-50">
+                            <Clock className="h-6 w-6 text-blue-500" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Today */}
+                <div className="bg-white rounded-xl border border-gray-200 p-6 card-hover">
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-gray-600">Today's Visitors</p>
+                            <p className="text-2xl font-bold text-green-600 mt-1">{visitors?.today || 0}</p>
+                        </div>
+                        <div className="p-3 rounded-full bg-green-50">
+                            <UserCheck className="h-6 w-6 text-green-500" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Yesterday */}
+                <div className="bg-white rounded-xl border border-gray-200 p-6 card-hover">
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-gray-600">Yesterday's Visitors</p>
+                            <p className="text-2xl font-bold text-gray-700 mt-1">{visitors?.yesterday || 0}</p>
+                        </div>
+                        <div className="p-3 rounded-full bg-gray-100">
+                            <History className="h-6 w-6 text-gray-500" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Conversion Rate */}
+                <div className="bg-white rounded-xl border border-gray-200 p-6 card-hover">
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-gray-600">
+                                {selectedPeriod === 'today' ? "Today's " : 
+                                 selectedPeriod === 'yesterday' ? "Yesterday's " : ""}Conversion
+                            </p>
+                            <p className="text-2xl font-bold text-pink-600 mt-1">{conversionRate}%</p>
+                        </div>
+                        <div className="p-3 rounded-full bg-pink-50">
+                            <Activity className="h-6 w-6 text-pink-500" />
+                        </div>
+                    </div>
+                    <p className="text-[10px] text-gray-400 mt-2 leading-tight">Formula: (Orders ÷ Visitors) × 100</p>
+                </div>
+
+                {/* Active Coupons */}
+                <div className="bg-white rounded-xl border border-gray-200 p-6 card-hover">
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-gray-600">Active Coupons</p>
+                            <p className="text-2xl font-bold text-orange-600 mt-1">{overview?.totalCoupons || 0}</p>
+                        </div>
+                        <div className="p-3 rounded-full bg-orange-50">
+                            <Tag className="h-6 w-6 text-orange-500" />
+                        </div>
+                    </div>
+                </div>
+
+                {/* Registered Users */}
+                <div className="bg-white rounded-xl border border-gray-200 p-6 card-hover">
+                    <div className="flex items-start justify-between">
+                        <div>
+                            <p className="text-sm font-medium text-gray-600">Registered Users</p>
+                            <p className="text-2xl font-bold text-purple-600 mt-1">{overview?.totalUsers || 0}</p>
+                        </div>
+                        <div className="p-3 rounded-full bg-purple-50">
+                            <Users className="h-6 w-6 text-purple-500" />
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* Charts Section */}
@@ -756,7 +896,7 @@ export default function DashboardPage() {
                                 &le; {dashboardData?.products?.lowStockThreshold || 10}
                             </span>
                         </h3>
-                        <button 
+                        <button
                             onClick={() => setShowThresholdModal(true)}
                             className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                             title="Edit Threshold"
@@ -790,7 +930,7 @@ export default function DashboardPage() {
                         )}
                     </div>
                     <div className="pt-3 border-t border-gray-100 mt-2">
-                        <Link 
+                        <Link
                             href="/admin/dashboard/low-stock"
                             className="text-sm font-medium text-blue-600 hover:text-blue-700 flex items-center justify-center"
                         >
@@ -834,10 +974,10 @@ export default function DashboardPage() {
                             <label className="block text-sm font-medium text-gray-700 mb-1">
                                 Threshold Value
                             </label>
-                            <input 
-                                type="number" 
+                            <input
+                                type="number"
                                 min="1"
-                                value={thresholdValue} 
+                                value={thresholdValue}
                                 onChange={(e) => setThresholdValue(e.target.value)}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-pink-500"
                                 placeholder="e.g. 10"
@@ -847,13 +987,13 @@ export default function DashboardPage() {
                             </p>
                         </div>
                         <div className="flex justify-end gap-3">
-                            <button 
+                            <button
                                 onClick={() => setShowThresholdModal(false)}
                                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                             >
                                 Cancel
                             </button>
-                            <button 
+                            <button
                                 onClick={handleUpdateThreshold}
                                 disabled={savingThreshold}
                                 className="flex items-center px-4 py-2 text-sm font-medium text-white bg-pink-600 hover:bg-pink-700 rounded-lg transition-colors disabled:opacity-50"

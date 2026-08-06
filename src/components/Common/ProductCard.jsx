@@ -199,6 +199,13 @@ function ProductCard({ product, onWishlistToggle, onAddToCart, showWishlistOnHov
                 >
                     <Heart className={`w-4 h-4 ${product.isWishlisted ? 'fill-current' : ''}`} />
                 </button>
+
+                {/* Category Discount Badge */}
+                {product.categoryDiscount && (
+                    <div className="absolute top-3 left-3 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded shadow-md z-10">
+                        -{product.categoryDiscount.percentage}%
+                    </div>
+                )}
             </div>
 
             {/* Product Info */}
