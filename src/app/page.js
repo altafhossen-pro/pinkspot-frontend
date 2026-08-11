@@ -27,7 +27,7 @@ export default function Home() {
       {/* <OfferBanner /> */}
       {/* <JustForYou /> */}
       <ProductForYou />
-      <FactsSection />
+      {/* <FactsSection /> */}
       <CustomerTestimonial />
       <Footer />
     </div>

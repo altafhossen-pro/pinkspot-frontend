@@ -20,11 +20,11 @@ import SettingsTab from '../components/EditProductTabs/SettingsTab'
 export default function CreateProductPage() {
     const router = useRouter()
     const { hasPermission, loading: contextLoading } = useAppContext()
-    
+
     const [loading, setLoading] = useState(false)
     const [checkingPermission, setCheckingPermission] = useState(true)
     const [categories, setCategories] = useState([])
-    
+
     // Active Tab State
     const [activeTab, setActiveTab] = useState('basic_info')
 
@@ -58,6 +58,7 @@ export default function CreateProductPage() {
     const [customRingSize, setCustomRingSize] = useState('');
     const [tagInput, setTagInput] = useState('');
     const [videoInput, setVideoInput] = useState({ platform: 'youtube', url: '' });
+    const [skuSuggestion, setSkuSuggestion] = useState('');
 
     const [variantForm, setVariantForm] = useState({
         image: '',
@@ -67,7 +68,8 @@ export default function CreateProductPage() {
         sku: '',
         oldPrice: '',
         currentPrice: '',
-        stock: 0
+        stock: 0,
+        sortOrder: 1
     })
 
     const [hasColorVariants, setHasColorVariants] = useState(true)
@@ -103,12 +105,38 @@ export default function CreateProductPage() {
         }
     }
 
-    const handleInputChange = (e) => {
+    const handleInputChange = async (e) => {
         const { name, value, type, checked } = e.target
         setFormData(prev => ({
             ...prev,
             [name]: type === 'checkbox' ? checked : value
         }))
+
+        // Auto-fetch SKU on category change
+        if (name === 'category') {
+            if (value) {
+                try {
+                    const token = getCookie('token')
+                    const res = await productAPI.getNextSkuForCategory(value, token)
+                    if (res.success && res.data && res.data.sku) {
+                        setVariantForm(prev => {
+                            if (!prev.sku) {
+                                return { ...prev, sku: res.data.sku }
+                            }
+                            return prev
+                        })
+                        setSkuSuggestion(`Auto-filled next SKU. Previous highest was: ${res.data.previousMax || 0}`)
+                    } else {
+                        setSkuSuggestion('')
+                    }
+                } catch (error) {
+                    console.error('Error fetching next SKU:', error)
+                    setSkuSuggestion('')
+                }
+            } else {
+                setSkuSuggestion('')
+            }
+        }
     }
 
     const addTag = () => {
@@ -153,7 +181,7 @@ export default function CreateProductPage() {
     const updateSpecification = (index, field, value) => {
         setFormData(prev => ({
             ...prev,
-            specifications: prev.specifications.map((spec, i) => 
+            specifications: prev.specifications.map((spec, i) =>
                 i === index ? { ...spec, [field]: value } : spec
             )
         }))
@@ -170,7 +198,7 @@ export default function CreateProductPage() {
         let isValid = false
         let processedUrl = trimmedUrl
 
-        switch(platform) {
+        switch (platform) {
             case 'youtube':
                 if (trimmedUrl.includes('youtube.com/watch?v=') || trimmedUrl.includes('youtu.be/') || trimmedUrl.includes('youtube.com/shorts/')) {
                     isValid = true
@@ -273,21 +301,21 @@ export default function CreateProductPage() {
         }
 
         const attributes = []
-        
+
         if (variantForm.size && variantForm.size.trim()) {
-            attributes.push({ 
-                name: 'Size', 
-                value: variantForm.size.trim(), 
-                displayValue: variantForm.size.trim() 
+            attributes.push({
+                name: 'Size',
+                value: variantForm.size.trim(),
+                displayValue: variantForm.size.trim()
             })
         }
 
         if (hasColorVariants && variantForm.color && variantForm.color.trim()) {
-            attributes.push({ 
-                name: 'Color', 
-                value: variantForm.color.trim(), 
-                displayValue: variantForm.color.trim(), 
-                hexCode: variantForm.colorCode 
+            attributes.push({
+                name: 'Color',
+                value: variantForm.color.trim(),
+                displayValue: variantForm.color.trim(),
+                hexCode: variantForm.colorCode
             })
         }
 
@@ -304,7 +332,8 @@ export default function CreateProductPage() {
             originalPrice: variantForm.oldPrice ? parseFloat(variantForm.oldPrice) : null,
             stockQuantity: parseInt(variantForm.stock),
             images: variantForm.image ? [{ url: variantForm.image, isPrimary: true }] : [],
-            isActive: true
+            isActive: true,
+            sortOrder: parseInt(variantForm.sortOrder) || 1
         }
 
         setFormData(prev => ({
@@ -312,15 +341,27 @@ export default function CreateProductPage() {
             variants: [...prev.variants, newVariant]
         }))
 
+        let nextSku = '';
+        if (sku) {
+            const match = sku.match(/(.*?)(\d+)$/);
+            if (match) {
+                const prefix = match[1];
+                const numberStr = match[2];
+                const nextNumber = (parseInt(numberStr, 10) + 1).toString();
+                nextSku = prefix + nextNumber.padStart(numberStr.length, '0');
+            }
+        }
+
         setVariantForm({
             image: '',
             size: '',
             color: '',
             colorCode: '#000000',
-            sku: '',
+            sku: nextSku,
             oldPrice: '',
             currentPrice: '',
-            stock: 0
+            stock: 0,
+            sortOrder: 1
         })
     }
 
@@ -331,10 +372,22 @@ export default function CreateProductPage() {
         }))
     }
 
+    const moveVariant = (index, direction) => {
+        setFormData(prev => {
+            const newVariants = [...prev.variants];
+            if (direction === 'up' && index > 0) {
+                [newVariants[index - 1], newVariants[index]] = [newVariants[index], newVariants[index - 1]];
+            } else if (direction === 'down' && index < newVariants.length - 1) {
+                [newVariants[index + 1], newVariants[index]] = [newVariants[index], newVariants[index + 1]];
+            }
+            return { ...prev, variants: newVariants };
+        });
+    }
+
     const updateVariant = (index, field, value) => {
         setFormData(prev => ({
             ...prev,
-            variants: prev.variants.map((variant, i) => 
+            variants: prev.variants.map((variant, i) =>
                 i === index ? { ...variant, [field]: value } : variant
             )
         }))
@@ -475,9 +528,9 @@ export default function CreateProductPage() {
 
             {/* Main Form Content */}
             <form id="create-product-form" onSubmit={handleSubmit} className="space-y-6">
-                
+
                 {activeTab === 'basic_info' && (
-                    <BasicInfoTab 
+                    <BasicInfoTab
                         formData={formData}
                         handleInputChange={handleInputChange}
                         categories={categories}
@@ -491,7 +544,7 @@ export default function CreateProductPage() {
                 )}
 
                 {activeTab === 'images' && (
-                    <ImagesMediaTab 
+                    <ImagesMediaTab
                         formData={formData}
                         setFormData={setFormData}
                         videoInput={videoInput}
@@ -503,7 +556,7 @@ export default function CreateProductPage() {
                 )}
 
                 {activeTab === 'jewelry_specs' && (
-                    <JewelrySpecsTab 
+                    <JewelrySpecsTab
                         formData={formData}
                         setFormData={setFormData}
                         handleInputChange={handleInputChange}
@@ -518,11 +571,12 @@ export default function CreateProductPage() {
                 )}
 
                 {activeTab === 'variants' && (
-                    <VariantsTab 
+                    <VariantsTab
                         formData={formData}
                         setFormData={setFormData}
                         variantForm={variantForm}
                         setVariantForm={setVariantForm}
+                        skuSuggestion={skuSuggestion}
                         handleVariantInputChange={handleVariantInputChange}
                         hasColorVariants={hasColorVariants}
                         setHasColorVariants={setHasColorVariants}
@@ -531,11 +585,12 @@ export default function CreateProductPage() {
                         updateVariant={updateVariant}
                         updateVariantAttribute={updateVariantAttribute}
                         onManageStock={handleManageStock}
+                        moveVariant={moveVariant}
                     />
                 )}
 
                 {activeTab === 'settings' && (
-                    <SettingsTab 
+                    <SettingsTab
                         formData={formData}
                         handleInputChange={handleInputChange}
                     />

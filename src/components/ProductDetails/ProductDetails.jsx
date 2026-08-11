@@ -79,13 +79,31 @@ export default function ProductDetails({ productSlug }) {
                 setProduct(data.data);
                 // Set default size and color if available
                 if (data.data.variants && data.data.variants.length > 0) {
-                    // Find first stock in variant (stockQuantity > 0 and stockStatus !== 'out_of_stock')
-                    const stockInVariant = data.data.variants.find(variant =>
+                    // First determine the default size based on array order (with stock priority)
+                    const stockInVariantGlobal = data.data.variants.find(variant =>
                         variant.stockQuantity > 0 && variant.stockStatus !== 'out_of_stock'
                     );
+                    const defaultVariantBase = stockInVariantGlobal || data.data.variants[0];
+                    
+                    const baseSizeAttr = defaultVariantBase.attributes.find(attr => attr.name === 'Size');
+                    const defaultSize = baseSizeAttr ? baseSizeAttr.value : "";
 
-                    // Use stock in variant if available, otherwise use first variant
-                    const defaultVariant = stockInVariant || data.data.variants[0];
+                    // Then get all variants for that size and sort them by sortOrder
+                    const variantsForDefaultSize = data.data.variants.filter(v => {
+                        const sAttr = v.attributes.find(attr => attr.name === 'Size');
+                        if (defaultSize) {
+                            return sAttr && sAttr.value === defaultSize;
+                        } else {
+                            return !sAttr;
+                        }
+                    });
+                    
+                    const sortedVariantsForSize = variantsForDefaultSize.sort((a, b) => (a.sortOrder || 1) - (b.sortOrder || 1));
+                    
+                    const stockInSize = sortedVariantsForSize.find(variant =>
+                        variant.stockQuantity > 0 && variant.stockStatus !== 'out_of_stock'
+                    );
+                    const defaultVariant = stockInSize || sortedVariantsForSize[0];
 
                     const sizeAttr = defaultVariant.attributes.find(attr => attr.name === 'Size');
                     const colorAttr = defaultVariant.attributes.find(attr => attr.name === 'Color');
@@ -159,6 +177,7 @@ export default function ProductDetails({ productSlug }) {
                     const sizeAttr = variant.attributes.find(attr => attr.name === 'Size');
                     return sizeAttr && sizeAttr.value === size;
                 })
+                .sort((a, b) => (a.sortOrder || 1) - (b.sortOrder || 1))
                 .map(variant => {
                     const colorAttr = variant.attributes.find(attr => attr.name === 'Color');
                     return colorAttr ? { value: colorAttr.value, hexCode: colorAttr.hexCode } : null;
@@ -171,6 +190,7 @@ export default function ProductDetails({ productSlug }) {
                     const sizeAttr = variant.attributes.find(attr => attr.name === 'Size');
                     return !sizeAttr; // Only variants without size
                 })
+                .sort((a, b) => (a.sortOrder || 1) - (b.sortOrder || 1))
                 .map(variant => {
                     const colorAttr = variant.attributes.find(attr => attr.name === 'Color');
                     return colorAttr ? { value: colorAttr.value, hexCode: colorAttr.hexCode } : null;
@@ -329,11 +349,11 @@ export default function ProductDetails({ productSlug }) {
             return product.variants.filter(variant => {
                 const sizeAttr = variant.attributes.find(attr => attr.name === 'Size');
                 return sizeAttr && sizeAttr.value === size;
-            });
+            }).sort((a, b) => (a.sortOrder || 1) - (b.sortOrder || 1));
         } else {
             // If no size selected, show all variants (both with and without size)
             // This allows user to choose variant even when size is not available
-            return product.variants;
+            return [...product.variants].sort((a, b) => (a.sortOrder || 1) - (b.sortOrder || 1));
         }
     };
 

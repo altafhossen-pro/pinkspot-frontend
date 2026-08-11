@@ -35,6 +35,16 @@ export default function ProductForYou() {
         }
         return true;
     });
+    const [autoLoadLimit, setAutoLoadLimit] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const cached = sessionStorage.getItem('forYouProducts');
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                return Math.max(50, Math.ceil(parsed.length / 50) * 50);
+            }
+        }
+        return 50;
+    });
 
     // Set up intersection observer for infinite scrolling
     const { ref, inView } = useInView({
@@ -59,7 +69,7 @@ export default function ProductForYou() {
             setLoading(true);
             setError(null);
 
-            const limit = 12;
+            const limit = 10;
             const response = await productAPI.getProducts({
                 page: pageNumber,
                 limit,
@@ -140,7 +150,7 @@ export default function ProductForYou() {
     // Load more when user scrolls to bottom (inView becomes true)
     useEffect(() => {
         let timeoutId;
-        if (inView && !loading && hasMore && !initialLoad) {
+        if (inView && !loading && hasMore && !initialLoad && products.length < autoLoadLimit) {
             // Add a small delay to allow DOM to paint and intersection observer to update
             timeoutId = setTimeout(() => {
                 setPage(prev => {
@@ -153,7 +163,7 @@ export default function ProductForYou() {
         return () => {
             if (timeoutId) clearTimeout(timeoutId);
         };
-    }, [inView]); // Only trigger when inView changes
+    }, [inView, loading, hasMore, initialLoad, products.length, autoLoadLimit, fetchProducts]);
 
     if (error && products.length === 0) {
         return (
@@ -180,8 +190,8 @@ export default function ProductForYou() {
                         <div className="w-24 h-1 bg-pink-500 mx-auto rounded-full"></div>
                     </div>
                     {/* Skeleton loading grid */}
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4 sm:gap-6">
-                        {[...Array(12)].map((_, index) => (
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-5 gap-4 sm:gap-6">
+                        {[...Array(10)].map((_, index) => (
                             <div key={index} className="bg-gray-100 rounded-xl aspect-[3/4] animate-pulse"></div>
                         ))}
                     </div>
@@ -208,13 +218,33 @@ export default function ProductForYou() {
                     ))}
 
                     {/* Skeleton loader for infinite scroll */}
-                    {loading && !initialLoad && [...Array(12)].map((_, index) => (
+                    {loading && !initialLoad && [...Array(10)].map((_, index) => (
                         <div key={`skeleton-${index}`} className="bg-gray-100 rounded-xl aspect-[3/4] animate-pulse"></div>
                     ))}
                 </div>
 
-                {/* Invisible element for Intersection Observer */}
-                <div ref={ref} className="h-4 w-full"></div>
+                {/* Intersection Observer or Load More Button */}
+                {products.length < autoLoadLimit ? (
+                    <div ref={ref} className="h-4 w-full"></div>
+                ) : (
+                    hasMore && !loading && (
+                        <div className="flex justify-center mt-10 mb-4">
+                            <button
+                                onClick={() => {
+                                    setAutoLoadLimit(prev => prev + 50);
+                                    setPage(prev => {
+                                        const nextPage = prev + 1;
+                                        fetchProducts(nextPage);
+                                        return nextPage;
+                                    });
+                                }}
+                                className="px-8 py-3 bg-pink-500 text-white font-medium rounded-full hover:bg-pink-600 hover:shadow-lg transition-all duration-300"
+                            >
+                                Load Next
+                            </button>
+                        </div>
+                    )
+                )}
             </div>
         </section>
     );

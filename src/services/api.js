@@ -178,6 +178,16 @@ export const productAPI = {
         });
     },
 
+    // Admin: Get next SKU for category
+    getNextSkuForCategory: (categoryId, token) => {
+        return apiCall(`/product/admin/next-sku/${categoryId}`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+    },
+
     // Admin: Bulk update category discount exclusion
     bulkExcludeCategoryDiscount: (data, token) => {
         return apiCall('/product/admin/bulk-exclude-category-discount', {
@@ -414,6 +424,15 @@ export const userAPI = {
                 'Authorization': `Bearer ${token}`,
             },
             body: JSON.stringify(userData),
+        });
+    },
+    // Login as Customer (Admin only)
+    loginAsCustomer: (userId, token) => {
+        return apiCall(`/admin/user/${userId}/login-as`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            }
         });
     },
     // Login user

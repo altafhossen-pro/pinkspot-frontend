@@ -77,7 +77,8 @@ export default function EditProductPage() {
         sku: '',
         oldPrice: '',
         currentPrice: '',
-        stock: 0
+        stock: 0,
+        sortOrder: 1
     })
 
     const [hasColorVariants, setHasColorVariants] = useState(true)
@@ -360,7 +361,8 @@ export default function EditProductPage() {
             originalPrice: variantForm.oldPrice ? parseFloat(variantForm.oldPrice) : null,
             stockQuantity: parseInt(variantForm.stock),
             images: variantForm.image ? [{ url: variantForm.image, isPrimary: true }] : [],
-            isActive: true
+            isActive: true,
+            sortOrder: parseInt(variantForm.sortOrder) || 1
         }
 
         setFormData(prev => ({
@@ -368,15 +370,27 @@ export default function EditProductPage() {
             variants: [...prev.variants, newVariant]
         }))
 
+        let nextSku = '';
+        if (sku) {
+            const match = sku.match(/(.*?)(\d+)$/);
+            if (match) {
+                const prefix = match[1];
+                const numberStr = match[2];
+                const nextNumber = (parseInt(numberStr, 10) + 1).toString();
+                nextSku = prefix + nextNumber.padStart(numberStr.length, '0');
+            }
+        }
+
         setVariantForm({
             image: '',
             size: '',
             color: '',
             colorCode: '#000000',
-            sku: '',
+            sku: nextSku,
             oldPrice: '',
             currentPrice: '',
-            stock: 0
+            stock: 0,
+            sortOrder: 1
         })
     }
 
@@ -385,6 +399,18 @@ export default function EditProductPage() {
             ...prev,
             variants: prev.variants.filter((_, i) => i !== index)
         }))
+    }
+
+    const moveVariant = (index, direction) => {
+        setFormData(prev => {
+            const newVariants = [...prev.variants];
+            if (direction === 'up' && index > 0) {
+                [newVariants[index - 1], newVariants[index]] = [newVariants[index], newVariants[index - 1]];
+            } else if (direction === 'down' && index < newVariants.length - 1) {
+                [newVariants[index + 1], newVariants[index]] = [newVariants[index], newVariants[index + 1]];
+            }
+            return { ...prev, variants: newVariants };
+        });
     }
 
     const updateVariant = (index, field, value) => {
@@ -412,6 +438,63 @@ export default function EditProductPage() {
                 return variant
             })
         }))
+    }
+
+    const handleAutoGenerateSku = async (vIndex = null) => {
+        try {
+            if (!formData.category) {
+                toast.error('Please select a category first')
+                return
+            }
+            const token = getCookie('token') || getCookie('admin_token')
+            const res = await productAPI.getNextSkuForCategory(formData.category, token)
+            
+            if (res.success && res.data && res.data.sku) {
+                let baseSku = res.data.sku;
+                let maxNumber = parseInt(res.data.previousMax || 0, 10);
+                const searchPrefix = res.data.sku.replace(/\d+$/, '');
+
+                // Check unsaved variants for higher SKUs
+                formData.variants.forEach(v => {
+                    if (v.sku && v.sku.startsWith(searchPrefix)) {
+                        const numStr = v.sku.substring(searchPrefix.length);
+                        const num = parseInt(numStr, 10);
+                        if (!isNaN(num) && num > maxNumber) {
+                            maxNumber = num;
+                        }
+                    }
+                });
+
+                // Check variantForm if generating for table
+                if (vIndex !== null && variantForm.sku && variantForm.sku.startsWith(searchPrefix)) {
+                    const numStr = variantForm.sku.substring(searchPrefix.length);
+                    const num = parseInt(numStr, 10);
+                    if (!isNaN(num) && num > maxNumber) {
+                        maxNumber = num;
+                    }
+                }
+
+                // Increment
+                const digitsLength = baseSku.length - searchPrefix.length;
+                const nextNumber = (maxNumber + 1).toString();
+                const nextSku = searchPrefix + nextNumber.padStart(digitsLength, '0');
+
+                if (vIndex !== null) {
+                    // Update specific variant in the table
+                    updateVariant(vIndex, 'sku', nextSku);
+                    toast.success('SKU auto-generated for variant');
+                } else {
+                    // Update the new variant form
+                    setVariantForm(prev => ({ ...prev, sku: nextSku }));
+                    toast.success('SKU auto-generated');
+                }
+            } else {
+                toast.error('Failed to generate SKU or no active SKU settings for this category')
+            }
+        } catch (error) {
+            console.error('Error auto-generating SKU:', error)
+            toast.error('Error generating SKU')
+        }
     }
 
     const handleManageStock = (variant, index) => {
@@ -613,6 +696,8 @@ export default function EditProductPage() {
                         updateVariant={updateVariant}
                         updateVariantAttribute={updateVariantAttribute}
                         onManageStock={handleManageStock}
+                        onAutoGenerateSku={handleAutoGenerateSku}
+                        moveVariant={moveVariant}
                     />
                 )}
 

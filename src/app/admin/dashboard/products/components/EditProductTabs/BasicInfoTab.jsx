@@ -20,11 +20,29 @@ export default function BasicInfoTab({
     const [showDescSuggestions, setShowDescSuggestions] = useState(false);
     const searchRef = useRef(null);
 
+    const [shortDescSearchQuery, setShortDescSearchQuery] = useState('');
+    const [shortDescSearchResults, setShortDescSearchResults] = useState([]);
+    const [isSearchingShortDesc, setIsSearchingShortDesc] = useState(false);
+    const [showShortDescSuggestions, setShowShortDescSuggestions] = useState(false);
+    const shortDescSearchRef = useRef(null);
+
+    const [announcementSearchQuery, setAnnouncementSearchQuery] = useState('');
+    const [announcementSearchResults, setAnnouncementSearchResults] = useState([]);
+    const [isSearchingAnnouncement, setIsSearchingAnnouncement] = useState(false);
+    const [showAnnouncementSuggestions, setShowAnnouncementSuggestions] = useState(false);
+    const announcementSearchRef = useRef(null);
+
     // Handle outside click to close suggestions
     useEffect(() => {
         function handleClickOutside(event) {
             if (searchRef.current && !searchRef.current.contains(event.target)) {
                 setShowDescSuggestions(false);
+            }
+            if (shortDescSearchRef.current && !shortDescSearchRef.current.contains(event.target)) {
+                setShowShortDescSuggestions(false);
+            }
+            if (announcementSearchRef.current && !announcementSearchRef.current.contains(event.target)) {
+                setShowAnnouncementSuggestions(false);
             }
         }
         document.addEventListener("mousedown", handleClickOutside);
@@ -66,6 +84,76 @@ export default function BasicInfoTab({
         return () => clearTimeout(timeoutId);
     }, [descSearchQuery]);
 
+    useEffect(() => {
+        const searchProducts = async () => {
+            if (!shortDescSearchQuery.trim()) {
+                setShortDescSearchResults([]);
+                return;
+            }
+            
+            setIsSearchingShortDesc(true);
+            try {
+                const token = getCookie('token');
+                const response = await productAPI.getAdminProducts({ 
+                    search: shortDescSearchQuery, 
+                    limit: 5,
+                    sort: 'createdAt',
+                    order: 'desc'
+                }, token);
+                
+                if (response.success) {
+                    const products = Array.isArray(response.data) ? response.data : (response.data?.products || []);
+                    setShortDescSearchResults(products);
+                }
+            } catch (error) {
+                console.error('Error searching products:', error);
+            } finally {
+                setIsSearchingShortDesc(false);
+            }
+        };
+
+        const timeoutId = setTimeout(() => {
+            searchProducts();
+        }, 500);
+
+        return () => clearTimeout(timeoutId);
+    }, [shortDescSearchQuery]);
+
+    useEffect(() => {
+        const searchProducts = async () => {
+            if (!announcementSearchQuery.trim()) {
+                setAnnouncementSearchResults([]);
+                return;
+            }
+            
+            setIsSearchingAnnouncement(true);
+            try {
+                const token = getCookie('token');
+                const response = await productAPI.getAdminProducts({ 
+                    search: announcementSearchQuery, 
+                    limit: 5,
+                    sort: 'createdAt',
+                    order: 'desc'
+                }, token);
+                
+                if (response.success) {
+                    const products = Array.isArray(response.data) ? response.data : (response.data?.products || []);
+                    setAnnouncementSearchResults(products);
+                }
+            } catch (error) {
+                console.error('Error searching products:', error);
+            } finally {
+                setIsSearchingAnnouncement(false);
+            }
+        };
+
+        const timeoutId = setTimeout(() => {
+            searchProducts();
+        }, 500);
+
+        return () => clearTimeout(timeoutId);
+    }, [announcementSearchQuery]);
+
     const handleSelectDescription = (product) => {
         handleInputChange({
             target: {
@@ -75,6 +163,28 @@ export default function BasicInfoTab({
         });
         setDescSearchQuery('');
         setShowDescSuggestions(false);
+    };
+
+    const handleSelectShortDescription = (product) => {
+        handleInputChange({
+            target: {
+                name: 'shortDescription',
+                value: product.shortDescription || ''
+            }
+        });
+        setShortDescSearchQuery('');
+        setShowShortDescSuggestions(false);
+    };
+
+    const handleSelectAnnouncement = (product) => {
+        handleInputChange({
+            target: {
+                name: 'announcementText',
+                value: product.announcementText || ''
+            }
+        });
+        setAnnouncementSearchQuery('');
+        setShowAnnouncementSuggestions(false);
     };
 
     return (
@@ -212,10 +322,61 @@ export default function BasicInfoTab({
                 </div>
             </div>
 
-            <div className="mt-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Short Description
-                </label>
+            <div className="mt-6 border-t border-gray-100 pt-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                        Short Description
+                    </label>
+                    
+                    <div className="relative" ref={shortDescSearchRef}>
+                        <div className="flex items-center">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search short description..."
+                                    value={shortDescSearchQuery}
+                                    onChange={(e) => {
+                                        setShortDescSearchQuery(e.target.value);
+                                        setShowShortDescSuggestions(true);
+                                    }}
+                                    onFocus={() => setShowShortDescSuggestions(true)}
+                                    className="pl-9 pr-8 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full sm:w-64 md:w-80"
+                                />
+                                {isSearchingShortDesc && (
+                                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />
+                                )}
+                            </div>
+                        </div>
+
+                        {showShortDescSuggestions && shortDescSearchQuery.trim() !== '' && (
+                            <div className="absolute right-0 mt-1 w-full sm:w-96 bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto">
+                                {shortDescSearchResults.length > 0 ? (
+                                    <div className="py-1">
+                                        {shortDescSearchResults.map(prod => (
+                                            <div 
+                                                key={prod._id}
+                                                onClick={() => handleSelectShortDescription(prod)}
+                                                className="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0 transition-colors"
+                                            >
+                                                <p className="text-sm font-medium text-gray-900 truncate">{prod.title}</p>
+                                                <p className="text-xs text-gray-500 truncate mt-0.5">
+                                                    {prod.shortDescription ? prod.shortDescription.substring(0, 80) + '...' : 'No short description available'}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    !isSearchingShortDesc && (
+                                        <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                                            No products found matching "{shortDescSearchQuery}"
+                                        </div>
+                                    )
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
                 <textarea
                     name="shortDescription"
                     value={formData.shortDescription}
@@ -291,10 +452,61 @@ export default function BasicInfoTab({
                 />
             </div>
 
-            <div className="mt-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Announcement / Instruction Text (Optional)
-                </label>
+            <div className="mt-6 border-t border-gray-100 pt-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+                    <label className="block text-sm font-medium text-gray-700">
+                        Announcement / Instruction Text (Optional)
+                    </label>
+                    
+                    <div className="relative" ref={announcementSearchRef}>
+                        <div className="flex items-center">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search announcement text..."
+                                    value={announcementSearchQuery}
+                                    onChange={(e) => {
+                                        setAnnouncementSearchQuery(e.target.value);
+                                        setShowAnnouncementSuggestions(true);
+                                    }}
+                                    onFocus={() => setShowAnnouncementSuggestions(true)}
+                                    className="pl-9 pr-8 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full sm:w-64 md:w-80"
+                                />
+                                {isSearchingAnnouncement && (
+                                    <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 animate-spin" />
+                                )}
+                            </div>
+                        </div>
+
+                        {showAnnouncementSuggestions && announcementSearchQuery.trim() !== '' && (
+                            <div className="absolute right-0 mt-1 w-full sm:w-96 bg-white border border-gray-200 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto">
+                                {announcementSearchResults.length > 0 ? (
+                                    <div className="py-1">
+                                        {announcementSearchResults.map(prod => (
+                                            <div 
+                                                key={prod._id}
+                                                onClick={() => handleSelectAnnouncement(prod)}
+                                                className="px-4 py-2 hover:bg-blue-50 cursor-pointer border-b border-gray-100 last:border-0 transition-colors"
+                                            >
+                                                <p className="text-sm font-medium text-gray-900 truncate">{prod.title}</p>
+                                                <p className="text-xs text-gray-500 truncate mt-0.5">
+                                                    {prod.announcementText ? prod.announcementText.substring(0, 80) + '...' : 'No announcement text available'}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    !isSearchingAnnouncement && (
+                                        <div className="px-4 py-3 text-sm text-gray-500 text-center">
+                                            No products found matching "{announcementSearchQuery}"
+                                        </div>
+                                    )
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
                 <textarea
                     name="announcementText"
                     value={formData.announcementText || ''}

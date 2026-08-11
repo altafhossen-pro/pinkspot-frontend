@@ -16,11 +16,12 @@ import {
     Mail,
     Phone,
     Calendar,
-    MoreVertical
+    MoreVertical,
+    LogIn
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { userAPI } from '@/services/api'
-import { getCookie } from 'cookies-next'
+import { getCookie, setCookie } from 'cookies-next'
 import { useAppContext } from '@/context/AppContext'
 import PermissionDenied from '@/components/Common/PermissionDenied'
 import DeleteConfirmationModal from '@/components/Common/DeleteConfirmationModal'
@@ -45,6 +46,9 @@ export default function AdminCustomersPage() {
     const [userToDelete, setUserToDelete] = useState(null)
     const [deleting, setDeleting] = useState(false)
     const [showCreateModal, setShowCreateModal] = useState(false)
+    const [showLoginModal, setShowLoginModal] = useState(false)
+    const [userToLogin, setUserToLogin] = useState(null)
+    const [loggingIn, setLoggingIn] = useState(false)
 
     useEffect(() => {
         if (!contextLoading) {
@@ -123,6 +127,37 @@ export default function AdminCustomersPage() {
             toast.error('Error deleting user')
         } finally {
             setDeleting(false)
+        }
+    }
+
+    const handleLoginAsCustomerClick = (user) => {
+        setUserToLogin(user)
+        setShowLoginModal(true)
+    }
+
+    const confirmLoginAsCustomer = async () => {
+        if (!userToLogin) return
+        const token = getCookie('token')
+        try {
+            setLoggingIn(true)
+            const data = await userAPI.loginAsCustomer(userToLogin._id, token)
+            if (data.success) {
+                toast.success(`Logging in as ${userToLogin.name}...`)
+                setShowLoginModal(false)
+                
+                // Set the new token in cookies
+                setCookie('token', data.data.token, { maxAge: 60 * 60 * 24 * 7, path: '/' })
+                
+                // Redirect to homepage to refresh context
+                window.location.href = '/'
+            } else {
+                toast.error('Failed to login as customer: ' + data.message)
+            }
+        } catch (error) {
+            console.error('Error logging in as customer:', error)
+            toast.error('Error logging in as customer')
+        } finally {
+            setLoggingIn(false)
         }
     }
 
@@ -388,6 +423,15 @@ export default function AdminCustomersPage() {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <div className="flex items-center justify-end space-x-2">
+                                                {hasPermission('user','update') && (
+                                                    <button
+                                                        onClick={() => handleLoginAsCustomerClick(user)}
+                                                        className="text-green-600 hover:text-green-900 p-1 rounded hover:bg-green-50 cursor-pointer"
+                                                        title="Login as Customer"
+                                                    >
+                                                        <LogIn className="h-4 w-4" />
+                                                    </button>
+                                                )}
                                                 {hasPermission('user','read') && (
                                                     <button
                                                         onClick={() => router.push(`/admin/dashboard/customers/${user._id}`)}
@@ -525,6 +569,19 @@ export default function AdminCustomersPage() {
                     onClose={() => { setShowDeleteModal(false); setUserToDelete(null); }}
                     onConfirm={confirmDeleteUser}
                     isLoading={deleting}
+                />
+            )}
+
+            {/* Login as Customer Confirmation Modal */}
+            {showLoginModal && (
+                <DeleteConfirmationModal
+                    isOpen={showLoginModal}
+                    title="Login as Customer"
+                    message={`Are you sure you want to log in as ${userToLogin?.name}? You will lose your current admin session in this tab and be redirected to the homepage as the customer.`}
+                    confirmText={loggingIn ? 'Logging in...' : 'Login as Customer'}
+                    onClose={() => { setShowLoginModal(false); setUserToLogin(null); }}
+                    onConfirm={confirmLoginAsCustomer}
+                    isLoading={loggingIn}
                 />
             )}
 

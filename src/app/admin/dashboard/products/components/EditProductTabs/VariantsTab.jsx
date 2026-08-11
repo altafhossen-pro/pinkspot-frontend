@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Edit, Upload, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Edit, Upload, Loader2, ChevronUp, ChevronDown } from 'lucide-react';
 import ImageUpload from '@/components/Common/ImageUpload';
 import { uploadAPI } from '@/services/api';
 import toast from 'react-hot-toast';
@@ -8,6 +8,8 @@ export default function VariantsTab({
     formData, 
     setFormData, 
     variantForm, 
+    setVariantForm, 
+    skuSuggestion,
     handleVariantInputChange, 
     hasColorVariants, 
     setHasColorVariants, 
@@ -15,8 +17,9 @@ export default function VariantsTab({
     removeVariant, 
     updateVariant, 
     updateVariantAttribute,
-    setVariantForm,
-    onManageStock
+    onManageStock,
+    onAutoGenerateSku,
+    moveVariant
 }) {
     const [uploadingVariantIndex, setUploadingVariantIndex] = useState(null);
 
@@ -121,9 +124,20 @@ export default function VariantsTab({
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                            SKU (Optional - auto generated if empty)
-                        </label>
+                        <div className="flex justify-between items-center mb-2">
+                            <label className="block text-sm font-medium text-gray-700">
+                                SKU (Optional - auto generated if empty)
+                            </label>
+                            {onAutoGenerateSku && (
+                                <button
+                                    type="button"
+                                    onClick={() => onAutoGenerateSku()}
+                                    className="text-xs text-blue-600 hover:text-blue-800 font-medium cursor-pointer"
+                                >
+                                    Auto Generate
+                                </button>
+                            )}
+                        </div>
                         <input
                             type="text"
                             name="sku"
@@ -131,6 +145,9 @@ export default function VariantsTab({
                             onChange={handleVariantInputChange}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                         />
+                        {skuSuggestion && (
+                            <p className="mt-1 text-xs text-green-600">{skuSuggestion}</p>
+                        )}
                     </div>
 
                     <div>
@@ -177,6 +194,20 @@ export default function VariantsTab({
                         />
                     </div>
 
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Sort Order *
+                        </label>
+                        <input
+                            type="number"
+                            name="sortOrder"
+                            value={variantForm.sortOrder}
+                            onChange={handleVariantInputChange}
+                            min="1"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        />
+                    </div>
+
                     <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                             Variant Image
@@ -188,13 +219,16 @@ export default function VariantsTab({
                         />
                     </div>
 
-                    <div className="md:col-span-2 pt-2">
+                    <div className="flex flex-col items-end w-full space-y-4">
+                        <p className="text-xs text-gray-500 text-left w-full">
+                            Note: Use the <span className="font-semibold text-gray-700">Sort Order</span> field to organize the order of colors/images when multiple variants have the same size. Lower number means first.
+                        </p>
                         <button
                             type="button"
                             onClick={addVariant}
-                            className="w-full flex justify-center items-center px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer font-medium"
+                            className="inline-flex items-center px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-gray-800 focus:ring-4 focus:ring-gray-200 transition-colors cursor-pointer"
                         >
-                            <Plus className="w-5 h-5 mr-2" />
+                            <Plus className="w-4 h-4 mr-2" />
                             Add Variant
                         </button>
                     </div>
@@ -214,7 +248,8 @@ export default function VariantsTab({
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Image</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Attributes</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SKU</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Price (৳)</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sort Order</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Stock</th>
                                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                 </tr>
@@ -290,12 +325,34 @@ export default function VariantsTab({
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
+                                            <div className="flex items-center space-x-2">
+                                                <input
+                                                    type="text"
+                                                    value={variant.sku || ''}
+                                                    onChange={(e) => updateVariant(vIndex, 'sku', e.target.value)}
+                                                    className="w-32 text-sm px-2 py-1 border border-gray-300 rounded"
+                                                    placeholder="SKU"
+                                                />
+                                                {onAutoGenerateSku && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => onAutoGenerateSku(vIndex)}
+                                                        className="text-xs text-blue-600 hover:text-blue-800 cursor-pointer"
+                                                        title="Auto Generate"
+                                                    >
+                                                        Auto
+                                                    </button>
+                                                )}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
                                             <input
-                                                type="text"
-                                                value={variant.sku || ''}
-                                                onChange={(e) => updateVariant(vIndex, 'sku', e.target.value)}
-                                                className="w-32 text-sm px-2 py-1 border border-gray-300 rounded"
-                                                placeholder="SKU"
+                                                type="number"
+                                                value={variant.sortOrder || 1}
+                                                onChange={(e) => updateVariant(vIndex, 'sortOrder', parseInt(e.target.value))}
+                                                className="w-20 text-sm px-2 py-1 border border-gray-300 rounded"
+                                                min="1"
+                                                placeholder="Order"
                                             />
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
@@ -335,14 +392,38 @@ export default function VariantsTab({
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <button
-                                                type="button"
-                                                onClick={() => removeVariant(vIndex)}
-                                                className="text-red-600 hover:text-red-900 bg-red-50 p-2 rounded-md hover:bg-red-100 transition-colors cursor-pointer"
-                                                title="Remove Variant"
-                                            >
-                                                <Trash2 className="w-5 h-5" />
-                                            </button>
+                                            <div className="flex justify-end space-x-2">
+                                                {moveVariant && (
+                                                    <div className="flex flex-col space-y-1 mr-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => moveVariant(vIndex, 'up')}
+                                                            disabled={vIndex === 0}
+                                                            className={`p-1 rounded text-gray-500 hover:bg-gray-100 hover:text-blue-600 ${vIndex === 0 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                                                            title="Move Up"
+                                                        >
+                                                            <ChevronUp className="h-4 w-4" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => moveVariant(vIndex, 'down')}
+                                                            disabled={vIndex === formData.variants.length - 1}
+                                                            className={`p-1 rounded text-gray-500 hover:bg-gray-100 hover:text-blue-600 ${vIndex === formData.variants.length - 1 ? 'opacity-30 cursor-not-allowed' : ''}`}
+                                                            title="Move Down"
+                                                        >
+                                                            <ChevronDown className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeVariant(vIndex)}
+                                                    className="text-red-600 hover:text-red-900 bg-red-50 p-2 rounded-md hover:bg-red-100 transition-colors cursor-pointer"
+                                                    title="Remove Variant"
+                                                >
+                                                    <Trash2 className="w-5 h-5" />
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

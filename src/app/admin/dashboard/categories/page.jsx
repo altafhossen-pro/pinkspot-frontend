@@ -8,6 +8,8 @@ import { categoryAPI } from '@/services/api'
 import DeleteConfirmationModal from '@/components/Common/DeleteConfirmationModal'
 import { useAppContext } from '@/context/AppContext'
 import PermissionDenied from '@/components/Common/PermissionDenied'
+import CategorySKUModal from '@/components/Admin/CategorySKUModal'
+import { Settings } from 'lucide-react'
 
 export default function AdminCategoriesPage() {
     const { hasPermission, contextLoading } = useAppContext()
@@ -15,7 +17,9 @@ export default function AdminCategoriesPage() {
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState('')
     const [deleteModal, setDeleteModal] = useState({ isOpen: false, categoryId: null, categoryName: '' })
+    const [skuModal, setSkuModal] = useState({ isOpen: false, category: null })
     const [isDeleting, setIsDeleting] = useState(false)
+    const [isUpdatingSku, setIsUpdatingSku] = useState(false)
     const [checkingPermission, setCheckingPermission] = useState(true)
     const [hasReadPermission, setHasReadPermission] = useState(false)
     const [permissionError, setPermissionError] = useState(null)
@@ -92,6 +96,26 @@ export default function AdminCategoriesPage() {
             toast.error('Error deleting category')
         } finally {
             setIsDeleting(false)
+        }
+    }
+
+    const handleSaveSKUSettings = async (skuSettings) => {
+        try {
+            setIsUpdatingSku(true)
+            const data = await categoryAPI.updateCategory(skuModal.category._id, { skuSettings })
+            
+            if (data.success) {
+                toast.success('SKU settings updated successfully!')
+                fetchCategories() // Refresh the list
+                setSkuModal({ isOpen: false, category: null })
+            } else {
+                toast.error('Failed to update SKU settings: ' + data.message)
+            }
+        } catch (error) {
+            console.error('Error updating SKU settings:', error)
+            toast.error('Error updating SKU settings')
+        } finally {
+            setIsUpdatingSku(false)
         }
     }
 
@@ -364,6 +388,15 @@ export default function AdminCategoriesPage() {
                                                         <Edit className="h-4 w-4" />
                                                     </Link>
                                                 )}
+                                                {hasPermission('category','update') && (
+                                                    <button
+                                                        onClick={() => setSkuModal({ isOpen: true, category })}
+                                                        className="text-orange-600 hover:text-orange-900 p-1 cursor-pointer"
+                                                        title="SKU Settings"
+                                                    >
+                                                        <Settings className="h-4 w-4" />
+                                                    </button>
+                                                )}
                                                 {hasPermission('category','delete') && (
                                                     <button
                                                         onClick={() => openDeleteModal(category._id, category.name)}
@@ -403,6 +436,15 @@ export default function AdminCategoriesPage() {
                 confirmText="Delete Category"
                 cancelText="Cancel"
                 dangerLevel="high"
+            />
+
+            {/* SKU Settings Modal */}
+            <CategorySKUModal
+                isOpen={skuModal.isOpen}
+                onClose={() => setSkuModal({ isOpen: false, category: null })}
+                onSave={handleSaveSKUSettings}
+                category={skuModal.category}
+                isLoading={isUpdatingSku}
             />
         </div>
     )

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Facebook, Twitter, Instagram, Linkedin, MapPin, Phone, Mail, MessageCircle } from 'lucide-react';
-import { menuAPI } from '@/services/api';
+import { menuAPI, settingsAPI } from '@/services/api';
 
 // Fallback footer data
 const fallbackFooterData = {
@@ -40,24 +40,28 @@ const fallbackFooterData = {
 
 export default function Footer() {
   const [footerData, setFooterData] = useState(fallbackFooterData);
+  const [logoUrl, setLogoUrl] = useState("/images/logo.svg");
   const [loading, setLoading] = useState(true);
 
-  // Fetch footer menus from API
+  // Fetch footer data from API
   useEffect(() => {
-    const fetchFooterMenus = async () => {
+    const fetchFooterData = async () => {
       try {
         setLoading(true);
-        const response = await menuAPI.getFooterMenus();
+        const [menuResponse, settingsResponse] = await Promise.all([
+          menuAPI.getFooterMenus().catch(() => ({ success: false })),
+          settingsAPI.getSiteSettings().catch(() => ({ success: false }))
+        ]);
 
-        if (response.success && response.data) {
+        if (menuResponse?.success && menuResponse?.data) {
           // Transform API data to match component format
           const transformedData = {
             about: footerData.about, // Keep static about section
-            quickLinks: response.data.quickLinks || fallbackFooterData.quickLinks,
-            utilities: response.data.utilities || fallbackFooterData.utilities,
-            contact: response.data.contact || fallbackFooterData.contact,
-            socialMedia: response.data.socialMedia && response.data.socialMedia.length > 0
-              ? response.data.socialMedia
+            quickLinks: menuResponse.data.quickLinks || fallbackFooterData.quickLinks,
+            utilities: menuResponse.data.utilities || fallbackFooterData.utilities,
+            contact: menuResponse.data.contact || fallbackFooterData.contact,
+            socialMedia: menuResponse.data.socialMedia && menuResponse.data.socialMedia.length > 0
+              ? menuResponse.data.socialMedia
               : fallbackFooterData.socialMedia
           };
 
@@ -65,6 +69,10 @@ export default function Footer() {
         } else {
           // Use fallback data if API fails
           setFooterData(fallbackFooterData);
+        }
+
+        if (settingsResponse?.success && settingsResponse?.data?.logoUrl) {
+          setLogoUrl(settingsResponse.data.logoUrl);
         }
       } catch (error) {
         console.error('Error fetching footer menus:', error);
@@ -75,10 +83,10 @@ export default function Footer() {
       }
     };
 
-    fetchFooterMenus();
+    fetchFooterData();
   }, []);
   return (
-    <footer className=" text-black bg-gradient-to-r from-pink-100  to-purple-100" >
+    <footer className=" text-black bg-gradient-to-bl from-pink-300 via-red-200  to-purple-300" >
       {/* Main Footer Content */}
       <div className="max-w-screen-2xl mx-auto px-4 lg:py-12 py-4">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -89,11 +97,12 @@ export default function Footer() {
             <div className="flex items-center">
               <Link className='' href="/">
                 <Image
-                  src="/images/logo.svg"
+                  src={logoUrl || "/images/logo.svg"}
                   alt="FORPINK.COM"
                   width={190}
                   height={80}
                   className="w-36 sm:w-40 "
+                  unoptimized={logoUrl && logoUrl !== "/images/logo.svg" ? true : false}
                   priority
                 />
               </Link>
@@ -345,11 +354,11 @@ export default function Footer() {
       </div>
 
       {/* Copyright Section */}
-      <div className="border-t border-pink-400/30">
+      <div className="border-t border-pink-400/30 bg-pink-600 text-white">
         <div className="max-w-screen-2xl mx-auto px-4 py-6">
           <div className="text-center">
-            <p className="text-gray-900 text-sm">
-              ©2025 Pinkspot. All rights reserved. Developed by <span className="text-pink-400 font-semibold hover:text-pink-500 transition-colors duration-300">Pinkspot</span>
+            <p className="text-white text-sm">
+              ©2025 Pinkspot. All rights reserved. Developed by <span className="text-white font-semibold hover:text-white transition-colors duration-300">Pinkspot</span>
             </p>
           </div>
         </div>
