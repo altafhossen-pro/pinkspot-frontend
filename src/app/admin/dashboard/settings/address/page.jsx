@@ -11,7 +11,10 @@ import {
     ChevronLeft,
     Filter,
     Trash2,
-    AlertTriangle
+    AlertTriangle,
+    Database,
+    Download,
+    Plus
 } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { addressAPI } from '@/services/api';
@@ -37,12 +40,20 @@ export default function AddressSettingsPage() {
     const [data, setData] = useState([]);
     const [loading, setLoading] = useState(false);
     const [showModal, setShowModal] = useState(false);
+    const [isCreating, setIsCreating] = useState(false);
     const [editingItem, setEditingItem] = useState(null);
     const [editData, setEditData] = useState({});
     const [saving, setSaving] = useState(false);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
     const [deletingItem, setDeletingItem] = useState(null);
     const [deleting, setDeleting] = useState(false);
+
+    const [showDeleteAllModal, setShowDeleteAllModal] = useState(false);
+    const [deleteAllType, setDeleteAllType] = useState(null);
+    const [deletingAll, setDeletingAll] = useState(false);
+    
+    const [showSeedModal, setShowSeedModal] = useState(false);
+    const [seeding, setSeeding] = useState(false);
 
     // Pagination
     const [page, setPage] = useState(1);
@@ -171,6 +182,7 @@ export default function AddressSettingsPage() {
     };
 
     const handleEdit = (item) => {
+        setIsCreating(false);
         setEditingItem(item);
         setEditData({
             name: item.name,
@@ -181,15 +193,21 @@ export default function AddressSettingsPage() {
         setShowModal(true);
     };
 
+    const handleAdd = () => {
+        setIsCreating(true);
+        setEditingItem(null);
+        setEditData({ isActive: true });
+        setShowModal(true);
+    };
+
     const handleCloseModal = () => {
         setShowModal(false);
         setEditingItem(null);
         setEditData({});
+        setIsCreating(false);
     };
 
     const handleSave = async () => {
-        if (!editingItem) return;
-
         try {
             setSaving(true);
             const token = getCookie('token');
@@ -199,33 +217,41 @@ export default function AddressSettingsPage() {
             }
 
             let response;
-            switch (activeTab) {
-                case 'divisions':
-                    response = await addressAPI.adminUpdateDivision(editingItem._id, editData, token);
-                    break;
-                case 'districts':
-                    response = await addressAPI.adminUpdateDistrict(editingItem._id, editData, token);
-                    break;
-                case 'upazilas':
-                    response = await addressAPI.adminUpdateUpazila(editingItem._id, editData, token);
-                    break;
-                case 'dhaka-city':
-                    response = await addressAPI.adminUpdateDhakaCityArea(editingItem._id, editData, token);
-                    break;
-                default:
-                    return;
+            
+            if (isCreating) {
+                if (activeTab === 'dhaka-city') {
+                    response = await addressAPI.adminCreateDhakaCityArea(editData, token);
+                }
+            } else {
+                if (!editingItem) return;
+                switch (activeTab) {
+                    case 'divisions':
+                        response = await addressAPI.adminUpdateDivision(editingItem._id, editData, token);
+                        break;
+                    case 'districts':
+                        response = await addressAPI.adminUpdateDistrict(editingItem._id, editData, token);
+                        break;
+                    case 'upazilas':
+                        response = await addressAPI.adminUpdateUpazila(editingItem._id, editData, token);
+                        break;
+                    case 'dhaka-city':
+                        response = await addressAPI.adminUpdateDhakaCityArea(editingItem._id, editData, token);
+                        break;
+                    default:
+                        return;
+                }
             }
 
-            if (response.success) {
-                toast.success('Updated successfully');
+            if (response?.success) {
+                toast.success(isCreating ? 'Created successfully' : 'Updated successfully');
                 handleCloseModal();
                 loadData();
             } else {
-                toast.error(response.message || 'Failed to update');
+                toast.error(response?.message || 'Failed to save');
             }
         } catch (error) {
-            console.error('Error updating:', error);
-            toast.error('Failed to update');
+            console.error('Error saving:', error);
+            toast.error('Failed to save');
         } finally {
             setSaving(false);
         }
@@ -266,6 +292,50 @@ export default function AddressSettingsPage() {
             toast.error('Failed to delete');
         } finally {
             setDeleting(false);
+        }
+    };
+
+    const handleDeleteAllClick = () => {
+        setShowDeleteAllModal(true);
+    };
+
+    const confirmDeleteAll = async () => {
+        try {
+            setDeletingAll(true);
+            const token = getCookie('token');
+            const response = await addressAPI.deleteAllAddressData(token);
+
+            if (response.success) {
+                toast.success(response.message || 'All address data cleared successfully');
+                setShowDeleteAllModal(false);
+                loadData();
+            } else {
+                toast.error(response.message || 'Failed to delete');
+            }
+        } catch (error) {
+            toast.error('Failed to delete all items');
+        } finally {
+            setDeletingAll(false);
+        }
+    };
+
+    const confirmSeedData = async () => {
+        try {
+            setSeeding(true);
+            const token = getCookie('token');
+            const response = await addressAPI.seedAddressData(token);
+
+            if (response.success) {
+                toast.success(response.message || 'Data imported successfully');
+                setShowSeedModal(false);
+                loadData();
+            } else {
+                toast.error(response.message || 'Failed to import data');
+            }
+        } catch (error) {
+            toast.error('Failed to import data');
+        } finally {
+            setSeeding(false);
         }
     };
 
@@ -314,36 +384,74 @@ export default function AddressSettingsPage() {
         <div className="p-6">
             <div className=" mx-auto">
                 {/* Header */}
-                <div className="mb-6">
-                    <button
-                        onClick={() => router.push('/admin/dashboard/settings')}
-                        className="flex items-center text-gray-600 hover:text-gray-900 mb-4 cursor-pointer"
-                    >
-                        <ChevronLeft className="h-5 w-5 mr-1" />
-                        Back to Settings
-                    </button>
-                    <div className="flex items-center space-x-3 mb-2">
-                        <MapPin className="h-8 w-8 text-blue-500" />
-                        <h1 className="text-3xl font-bold text-gray-900">Address Settings</h1>
+                <div className="mb-6 flex flex-col md:flex-row md:items-start justify-between gap-4">
+                    <div>
+                        <button
+                            onClick={() => router.push('/admin/dashboard/settings')}
+                            className="flex items-center text-gray-600 hover:text-gray-900 mb-4 cursor-pointer"
+                        >
+                            <ChevronLeft className="h-5 w-5 mr-1" />
+                            Back to Settings
+                        </button>
+                        <div className="flex items-center space-x-3 mb-2">
+                            <MapPin className="h-8 w-8 text-blue-500" />
+                            <h1 className="text-3xl font-bold text-gray-900">Address Settings</h1>
+                        </div>
+                        <p className="text-gray-600">Manage divisions, districts, upazilas, and Dhaka city areas</p>
                     </div>
-                    <p className="text-gray-600">Manage divisions, districts, upazilas, and Dhaka city areas</p>
+                    {hasWritePermission && (
+                        <div className="flex items-center gap-3 bg-white p-3 rounded-lg shadow-sm border border-gray-200">
+                            <div className="flex flex-col gap-2">
+                                <span className="text-xs font-semibold text-gray-500 uppercase">Data Management</span>
+                                <div className="flex flex-wrap gap-2">
+                                    <button
+                                        onClick={handleDeleteAllClick}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-md text-sm font-medium hover:bg-red-100 transition-colors cursor-pointer"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                        Clear All Data
+                                    </button>
+                                    <button
+                                        onClick={() => setShowSeedModal(true)}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-md text-sm font-medium hover:bg-green-100 transition-colors cursor-pointer"
+                                    >
+                                        <Database className="h-4 w-4" />
+                                        Import All Data
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
                 {/* Tabs */}
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-6">
-                    <div className="flex flex-wrap border-b border-gray-200">
-                        {TABS.map((tab) => (
-                            <button
-                                key={tab.id}
-                                onClick={() => handleTabChange(tab.id)}
-                                className={`px-6 py-3 text-sm font-medium transition-colors cursor-pointer ${activeTab === tab.id
-                                        ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
-                                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                                    }`}
-                            >
-                                {tab.label}
-                            </button>
-                        ))}
+                    <div className="flex flex-wrap border-b border-gray-200 justify-between items-center">
+                        <div className="flex flex-wrap">
+                            {TABS.map((tab) => (
+                                <button
+                                    key={tab.id}
+                                    onClick={() => handleTabChange(tab.id)}
+                                    className={`px-6 py-3 text-sm font-medium transition-colors cursor-pointer ${activeTab === tab.id
+                                            ? 'text-blue-600 border-b-2 border-blue-600 bg-blue-50'
+                                            : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                                        }`}
+                                >
+                                    {tab.label}
+                                </button>
+                            ))}
+                        </div>
+                        {hasWritePermission && activeTab === 'dhaka-city' && (
+                            <div className="p-2">
+                                <button
+                                    onClick={handleAdd}
+                                    className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors cursor-pointer"
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    Add New Area
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* Filters */}
@@ -474,10 +582,10 @@ export default function AddressSettingsPage() {
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-200">
-                                        {data.map((item) => (
+                                        {data.map((item, index) => (
                                             <tr key={item._id} className="hover:bg-gray-50">
                                                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-mono">
-                                                    {item.id}
+                                                    {(page - 1) * limit + index + 1}
                                                 </td>
                                                 <td className="px-6 py-4 whitespace-nowrap">
                                                     <span className="text-sm text-gray-900">{item.name}</span>
@@ -560,13 +668,15 @@ export default function AddressSettingsPage() {
                 </div>
             </div>
 
-            {/* Edit Modal */}
-            {showModal && editingItem && (
+            {/* Edit/Create Modal */}
+            {showModal && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
                         {/* Modal Header */}
                         <div className="flex items-center justify-between p-6 border-b border-gray-200">
-                            <h2 className="text-xl font-semibold text-gray-900">Edit {TABS.find(t => t.id === activeTab)?.label}</h2>
+                            <h2 className="text-xl font-semibold text-gray-900">
+                                {isCreating ? `Add New ${TABS.find(t => t.id === activeTab)?.label}` : `Edit ${TABS.find(t => t.id === activeTab)?.label}`}
+                            </h2>
                             <button
                                 onClick={handleCloseModal}
                                 className="text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
@@ -578,17 +688,19 @@ export default function AddressSettingsPage() {
                         {/* Modal Body */}
                         <div className="p-6 space-y-4">
                             {/* ID (Read-only) */}
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    ID (Read-only)
-                                </label>
-                                <input
-                                    type="text"
-                                    value={editingItem.id}
-                                    disabled
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500 cursor-not-allowed"
-                                />
-                            </div>
+                            {!isCreating && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        ID (Read-only)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        value={editingItem?.id || editingItem?._id || ''}
+                                        disabled
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500 cursor-not-allowed"
+                                    />
+                                </div>
+                            )}
 
                             {/* Name (EN) */}
                             <div>
@@ -758,6 +870,108 @@ export default function AddressSettingsPage() {
                                         <Trash2 className="h-4 w-4" />
                                         Delete
                                     </>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete All Modal */}
+            {showDeleteAllModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+                        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-red-100 rounded-full">
+                                    <AlertTriangle className="h-5 w-5 text-red-600" />
+                                </div>
+                                <h2 className="text-xl font-semibold text-gray-900">Clear All Address Data</h2>
+                            </div>
+                            <button
+                                onClick={() => setShowDeleteAllModal(false)}
+                                disabled={deletingAll}
+                                className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <div className="p-6">
+                            <p className="text-gray-700 mb-4">
+                                Are you sure you want to delete <span className="font-bold text-red-600">ALL</span> Divisions, Districts, Upazilas, and Dhaka City areas globally? 
+                            </p>
+                            <p className="text-sm text-red-600 font-medium bg-red-50 p-3 rounded border border-red-100">
+                                ⚠️ This action will completely wipe all address data in the system and cannot be undone.
+                            </p>
+                        </div>
+                        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
+                            <button
+                                onClick={() => setShowDeleteAllModal(false)}
+                                disabled={deletingAll}
+                                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmDeleteAll}
+                                disabled={deletingAll}
+                                className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 transition-colors flex items-center gap-2 cursor-pointer"
+                            >
+                                {deletingAll ? (
+                                    <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Clearing...</>
+                                ) : (
+                                    <><Trash2 className="h-4 w-4" /> Yes, Clear All</>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Seed Modal */}
+            {showSeedModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+                        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-blue-100 rounded-full">
+                                    <Download className="h-5 w-5 text-blue-600" />
+                                </div>
+                                <h2 className="text-xl font-semibold text-gray-900">Import Address Data</h2>
+                            </div>
+                            <button
+                                onClick={() => setShowSeedModal(false)}
+                                disabled={seeding}
+                                className="text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <div className="p-6">
+                            <p className="text-gray-700 mb-4">
+                                This will import predefined Divisions, Districts, Upazilas, and Dhaka City areas from the system's seed files.
+                            </p>
+                            <p className="text-sm text-yellow-700 font-medium bg-yellow-50 p-3 rounded border border-yellow-200">
+                                ⚠️ Important: This process will <span className="font-bold">REPLACE</span> your current address data. Any custom additions will be lost.
+                            </p>
+                        </div>
+                        <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
+                            <button
+                                onClick={() => setShowSeedModal(false)}
+                                disabled={seeding}
+                                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={confirmSeedData}
+                                disabled={seeding}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 transition-colors flex items-center gap-2 cursor-pointer"
+                            >
+                                {seeding ? (
+                                    <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div> Importing...</>
+                                ) : (
+                                    <><Download className="h-4 w-4" /> Start Import</>
                                 )}
                             </button>
                         </div>

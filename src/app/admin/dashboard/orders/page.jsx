@@ -1204,12 +1204,22 @@ export default function AdminOrdersPage() {
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex items-center">
                                                 <Mail className="h-4 w-4 text-gray-400 mr-2" />
-                                                <div className="text-sm text-gray-900">
-                                                    {order.isGuestOrder && order.guestInfo?.phone
-                                                        ? order.guestInfo.phone
-                                                        : order.orderType === 'manual' && order.manualOrderInfo?.phone
-                                                            ? order.manualOrderInfo.phone
-                                                            : order.user?.email || 'N/A'}
+                                                <div className="text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer">
+                                                    {(() => {
+                                                        const identifier = order.isGuestOrder && order.guestInfo?.phone
+                                                            ? order.guestInfo.phone
+                                                            : order.orderType === 'manual' && order.manualOrderInfo?.phone
+                                                                ? order.manualOrderInfo.phone
+                                                                : order.user?.email;
+                                                        
+                                                        return identifier ? (
+                                                            <Link href={`/admin/dashboard/order-history/${encodeURIComponent(identifier)}`}>
+                                                                {identifier}
+                                                            </Link>
+                                                        ) : (
+                                                            <span className="text-gray-900">N/A</span>
+                                                        );
+                                                    })()}
                                                 </div>
                                             </div>
                                         </td>

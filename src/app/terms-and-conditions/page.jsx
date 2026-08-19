@@ -1,61 +1,114 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from "@/components/Header/Header";
 import Footer from "@/components/Footer/Footer";
 import { FileText, ShoppingCart, CreditCard, Truck, AlertTriangle, Users, Scale, Mail, Phone } from 'lucide-react';
+import { menuAPI } from '@/services/api';
 
 export default function TermsConditions() {
-  const lastUpdated = "January 15, 2025";
+  const lastUpdated = "August 6, 2026";
+  const [contactData, setContactData] = useState(null);
+  const [loadingContact, setLoadingContact] = useState(true);
+
+  useEffect(() => {
+    const fetchContactData = async () => {
+      try {
+        const response = await menuAPI.getFooterMenus();
+        if (response?.success && response?.data?.contact) {
+          setContactData(response.data.contact);
+        }
+      } catch (error) {
+        console.error('Error fetching contact details:', error);
+      } finally {
+        setLoadingContact(false);
+      }
+    };
+    fetchContactData();
+  }, []);
+
+  let email = "N/A";
+  let phone = "N/A";
+
+  if (contactData) {
+    if (Array.isArray(contactData)) {
+      const emailContact = contactData.find(c => c.contactType === 'email');
+      const phoneContact = contactData.find(c => c.contactType === 'phone');
+      if (emailContact) email = emailContact.href || emailContact.description || email;
+      if (phoneContact) phone = phoneContact.href || phoneContact.description || phone;
+    } else {
+      if (contactData.email) email = contactData.email;
+      if (contactData.phone) phone = contactData.phone;
+    }
+  }
 
   const sections = [
+    {
+      id: "intro",
+      title: "Welcome",
+      icon: FileText,
+      content: `Welcome to Pinkspot.bd. By using our website, you agree to the following Terms & Conditions.`
+    },
     {
       id: "general",
       title: "1. General",
       icon: FileText,
-      content: `FORPINK.COM is an eCommerce platform selling Beauty and Jewelry products. We reserve the right to change prices, policies, and content at any time without prior notice.`
+      content: `Pinkspot.bd reserves the right to update products, prices, offers, and these terms at any time without prior notice.`
     },
     {
       id: "product-information",
       title: "2. Product Information",
       icon: ShoppingCart,
-      content: `We try our best to display accurate product descriptions and images. However, slight variations in color or design may occur due to lighting or screen differences.`
+      content: `We try to ensure that all product descriptions and images are accurate. However:
+• Slight color differences may occur due to screen settings.
+• Product size may vary slightly due to manufacturing tolerance.`
     },
     {
-      id: "order-confirmation",
-      title: "3. Order Confirmation",
-      icon: FileText,
-      content: `An order is confirmed only after successful payment or confirmation call (if applicable).`
-    },
-    {
-      id: "pricing-payment",
-      title: "4. Pricing & Payment",
+      id: "pricing",
+      title: "3. Pricing",
       icon: CreditCard,
-      content: `• All prices are shown in BDT
-      • Payment methods may include Cash on Delivery, Mobile Banking, or Online Payment
-      • We reserve the right to cancel any suspicious order`
+      content: `All prices are listed in Bangladeshi Taka (BDT). Prices may change without prior notice.`
     },
     {
-      id: "shipping-delivery",
-      title: "5. Shipping & Delivery",
+      id: "orders",
+      title: "4. Orders",
+      icon: ShoppingCart,
+      content: `Pinkspot.bd reserves the right to:
+• Accept or cancel any order
+• Verify customer information before processing an order
+• Cancel orders due to stock unavailability or pricing errors`
+    },
+    {
+      id: "delivery",
+      title: "5. Delivery",
       icon: Truck,
-      content: `Delivery time may vary depending on location and circumstances beyond our control.`
+      content: `Delivery time depends on your location and courier availability. Delays caused by natural disasters, political situations, strikes, or courier issues are beyond our control.`
     },
     {
-      id: "user-responsibility",
-      title: "6. User Responsibility",
+      id: "customer-responsibilities",
+      title: "6. Customer Responsibilities",
       icon: Users,
-      content: `You agree not to misuse the website or provide false information.`
+      content: `Customers must provide:
+• Correct name
+• Valid phone number
+• Accurate delivery address
+Incorrect information may result in delivery failure.`
+    },
+    {
+      id: "intellectual-property",
+      title: "7. Intellectual Property",
+      icon: FileText,
+      content: `All logos, images, product descriptions, graphics, and website content belong to Pinkspot.bd and may not be copied without permission.`
     },
     {
       id: "limitation-liability",
-      title: "7. Limitation of Liability",
+      title: "8. Limitation of Liability",
       icon: AlertTriangle,
-      content: `FORPINK.COM will not be liable for any indirect or incidental damages arising from the use of our products or services.`
+      content: `Pinkspot.bd shall not be responsible for indirect, incidental, or consequential damages arising from the use of the website or purchased products.`
     },
     {
       id: "governing-law",
-      title: "8. Governing Law",
+      title: "9. Governing Law",
       icon: Scale,
       content: `These Terms & Conditions are governed by the laws of Bangladesh.`
     }
@@ -115,11 +168,19 @@ export default function TermsConditions() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div className="flex items-center justify-center space-x-2 text-gray-600">
                 <Mail className="w-4 h-4 text-pink-500" />
-                <span>forpink@gmail.com</span>
+                {loadingContact ? (
+                  <div className="h-4 w-32 bg-gray-200 animate-pulse rounded"></div>
+                ) : (
+                  <span>{email}</span>
+                )}
               </div>
               <div className="flex items-center justify-center space-x-2 text-gray-600">
                 <Phone className="w-4 h-4 text-pink-500" />
-                <span>+8801313664466</span>
+                {loadingContact ? (
+                  <div className="h-4 w-32 bg-gray-200 animate-pulse rounded"></div>
+                ) : (
+                  <span>{phone}</span>
+                )}
               </div>
             </div>
           </div>

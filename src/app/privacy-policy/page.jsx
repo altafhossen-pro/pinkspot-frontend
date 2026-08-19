@@ -1,74 +1,122 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Header from "@/components/Header/Header";
 import Footer from "@/components/Footer/Footer";
 import { Shield, Database, Users, Lock, FileText, Mail } from 'lucide-react';
+import { menuAPI } from '@/services/api';
 
 export default function PrivacyPolicy() {
   const lastUpdated = "January 15, 2025";
+  const [contactData, setContactData] = useState(null);
+  const [loadingContact, setLoadingContact] = useState(true);
+
+  useEffect(() => {
+    const fetchContactData = async () => {
+      try {
+        const response = await menuAPI.getFooterMenus();
+        if (response?.success && response?.data?.contact) {
+          setContactData(response.data.contact);
+        }
+      } catch (error) {
+        console.error('Error fetching contact details:', error);
+      } finally {
+        setLoadingContact(false);
+      }
+    };
+    fetchContactData();
+  }, []);
+
+  let email = "N/A";
+
+  if (contactData) {
+    if (Array.isArray(contactData)) {
+      const emailContact = contactData.find(c => c.contactType === 'email');
+      if (emailContact) email = emailContact.href || emailContact.description || email;
+    } else {
+      if (contactData.email) email = contactData.email;
+    }
+  }
 
   const sections = [
     {
       id: "introduction",
       title: "Privacy Policy",
       icon: Shield,
-      content: `Welcome to FORPINK.COM. Your privacy is very important to us. This Privacy Policy explains how we collect, use, and protect your personal information when you visit or purchase from our website.`
+      content: `Welcome to Pinkspot.bd. Your privacy is important to us. This Privacy Policy explains how we collect, use, and protect your personal information.`
     },
     {
       id: "information-collection",
       title: "1. Information We Collect",
       icon: Database,
-      content: `When you use our website, we may collect the following information:
-      • Full Name
-      • Phone Number
-      • Email Address
-      • Shipping & Billing Address
-      • Payment-related information (we do not store card details)
-      • Browsing data (cookies, IP address, device info)`
+      content: `We may collect the following information:
+• Full Name
+• Mobile Number
+• Email Address
+• Delivery Address
+• Billing Information
+• Order History
+• Device and Browser Information
+• IP Address`
     },
     {
-      id: "information-use",
+      id: "how-we-use",
       title: "2. How We Use Your Information",
       icon: Users,
       content: `We use your information to:
-      • Process and deliver your orders
-      • Contact you regarding your order or support requests
-      • Improve our products, services, and website experience
-      • Send promotional offers (only if you agree)`
+• Process and deliver your orders
+• Contact you regarding your order
+• Provide customer support
+• Improve our website and services
+• Send promotional offers (only if you agree)`
     },
     {
-      id: "information-protection",
-      title: "3. Information Protection",
+      id: "payment-information",
+      title: "3. Payment Information",
       icon: Lock,
-      content: `We take reasonable security measures to protect your personal data from unauthorized access, misuse, or disclosure.`
-    },
-    {
-      id: "information-sharing",
-      title: "4. Sharing Information",
-      icon: Lock,
-      content: `We do not sell or rent your personal information. Your data may only be shared with:
-      • Delivery partners
-      • Payment service providers
-      • Legal authorities if required by law`
+      content: `Pinkspot.bd does not store your debit or credit card details. Online payments are processed securely through trusted payment gateway providers.`
     },
     {
       id: "cookies",
-      title: "5. Cookies",
+      title: "4. Cookies",
       icon: FileText,
-      content: `FORPINK.COM uses cookies to improve your browsing experience and analyze website traffic.`
+      content: `We use cookies to improve your browsing experience, remember your preferences, and analyze website traffic.`
     },
     {
-      id: "consent",
-      title: "6. Your Consent",
+      id: "information-sharing",
+      title: "5. Information Sharing",
+      icon: Users,
+      content: `We do not sell or rent your personal information. We may share necessary information only with:
+• Delivery Partners
+• Payment Gateway Providers
+• Government authorities if legally required`
+    },
+    {
+      id: "data-security",
+      title: "6. Data Security",
       icon: Shield,
-      content: `By using our website, you consent to our Privacy Policy.`
+      content: `We use reasonable security measures to protect your personal information from unauthorized access or misuse.`
+    },
+    {
+      id: "your-rights",
+      title: "7. Your Rights",
+      icon: Users,
+      content: `You may request to:
+• Update your information
+• Correct incorrect information
+• Delete your account (subject to legal obligations)`
     },
     {
       id: "changes",
-      title: "7. Changes to Privacy Policy",
-      icon: Shield,
-      content: `We reserve the right to update this policy at any time. Changes will be posted on this page.`
+      title: "8. Changes to This Policy",
+      icon: FileText,
+      content: `Pinkspot.bd reserves the right to modify this Privacy Policy at any time. Updated versions will be published on this page.`
+    },
+    {
+      id: "contact-us",
+      title: "9. Contact Us",
+      icon: Mail,
+      content: `For any privacy-related questions, please contact us through our official Facebook page, email, or customer support number listed on Pinkspot.bd.`
     }
   ];
 
@@ -129,7 +177,11 @@ export default function PrivacyPolicy() {
             <div className="text-sm">
               <div className="flex items-center justify-center space-x-2 text-gray-700 mb-2">
                 <Mail className="w-4 h-4 text-pink-500" />
-                <span className="font-medium">Email: support@pinkspot.bd</span>
+                {loadingContact ? (
+                  <div className="h-4 w-32 bg-gray-200 animate-pulse rounded"></div>
+                ) : (
+                  <span className="font-medium">Email: {email}</span>
+                )}
               </div>
             </div>
           </div>

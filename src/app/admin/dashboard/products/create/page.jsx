@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Save, Share2 } from 'lucide-react'
+import { ArrowLeft, Save, Share2, AlertCircle } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { productAPI, categoryAPI } from '@/services/api'
 import { getCookie } from 'cookies-next'
@@ -22,6 +22,7 @@ export default function CreateProductPage() {
     const { hasPermission, loading: contextLoading } = useAppContext()
 
     const [loading, setLoading] = useState(false)
+    const [errorMessage, setErrorMessage] = useState(null)
     const [checkingPermission, setCheckingPermission] = useState(true)
     const [categories, setCategories] = useState([])
 
@@ -427,7 +428,8 @@ export default function CreateProductPage() {
 
     const handleSubmit = async (e) => {
         e.preventDefault()
-        setLoading(true);
+        setLoading(true)
+        setErrorMessage(null)
         const token = getCookie('token')
 
         try {
@@ -437,10 +439,13 @@ export default function CreateProductPage() {
                 toast.success('Product created successfully!')
                 router.push('/admin/dashboard/products')
             } else {
-                toast.error('Failed to create product: ' + data.message)
+                setErrorMessage(data.message)
+                toast.error('Failed to create product')
             }
         } catch (error) {
             console.error('Error creating product:', error)
+            const msg = error.response?.data?.message || error.message || 'Error creating product'
+            setErrorMessage(msg)
             toast.error('Error creating product')
         } finally {
             setLoading(false)
@@ -525,6 +530,22 @@ export default function CreateProductPage() {
                     </nav>
                 </div>
             </div>
+
+            {/* Error Message */}
+            {errorMessage && (
+                <div className="bg-red-50 border-l-4 border-red-500 p-4">
+                    <div className="flex">
+                        <div className="flex-shrink-0">
+                            <AlertCircle className="h-5 w-5 text-red-500" />
+                        </div>
+                        <div className="ml-3">
+                            <p className="text-sm text-red-700 font-medium">
+                                {errorMessage}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Main Form Content */}
             <form id="create-product-form" onSubmit={handleSubmit} className="space-y-6">

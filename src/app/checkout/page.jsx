@@ -68,7 +68,9 @@ export default function Checkout() {
     const [couponCode, setCouponCode] = useState('');
     const [appliedCoupon, setAppliedCoupon] = useState(null);
     const [couponDiscount, setCouponDiscount] = useState(0);
+    const [checkoutLoading, setCheckoutLoading] = useState(false);
     const [couponLoading, setCouponLoading] = useState(false);
+    const [blockMessage, setBlockMessage] = useState('');
     const [couponError, setCouponError] = useState('');
 
     // Upsell discount state
@@ -1065,6 +1067,8 @@ export default function Checkout() {
                             };
                         }),
                         shippingAddress: {
+                            name: formData.fullName,
+                            phone: formData.mobileNumber,
                             label: 'Delivery Address',
                             street: formData.deliveryAddress,
                             city: formData.division,
@@ -1083,6 +1087,8 @@ export default function Checkout() {
                             area: formData.area
                         },
                         billingAddress: {
+                            name: formData.fullName,
+                            phone: formData.mobileNumber,
                             label: 'Billing Address',
                             street: formData.deliveryAddress,
                             city: formData.division,
@@ -1176,10 +1182,14 @@ export default function Checkout() {
                         });
                         router.push(`/order-confirmation?${params.toString()}`);
                     } else {
-                        toast.error('Failed to place order. Please try again.');
+                        toast.error(response.message || 'Failed to place order. Please try again.');
                     }
                 } catch (error) {
-                    toast.error('Failed to place order. Please try again.');
+                    if (error.status === 403) {
+                        setBlockMessage(error.message || 'Your IP address or phone number has been blocked from placing orders.');
+                    } else {
+                        toast.error(error.message || 'Failed to place order. Please try again.');
+                    }
                 }
                 break;
 
@@ -1501,36 +1511,6 @@ export default function Checkout() {
                                         Cash On Delivery
                                     </span>
                                 </label>
-
-                                {/* <label className="flex items-center space-x-3 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="paymentMethod"
-                                        value="bkash"
-                                        checked={paymentMethod === 'bkash'}
-                                        onChange={(e) => setPaymentMethod(e.target.value)}
-                                        className="w-4 h-4 text-pink-500"
-                                    />
-                                    <span className="flex items-center gap-2">
-                                        <span className="w-6 h-6 bg-pink-500 rounded flex items-center justify-center text-white text-xs">▶</span>
-                                        Bkash Live
-                                    </span>
-                                </label>
-
-                                <label className="flex items-center space-x-3 cursor-pointer">
-                                    <input
-                                        type="radio"
-                                        name="paymentMethod"
-                                        value="manual"
-                                        checked={paymentMethod === 'manual'}
-                                        onChange={(e) => setPaymentMethod(e.target.value)}
-                                        className="w-4 h-4 text-pink-500"
-                                    />
-                                    <span className="flex items-center gap-2">
-                                        <span className="w-6 h-6 bg-gray-200 rounded flex items-center justify-center">💰</span>
-                                        Manual Payment
-                                    </span>
-                                </label> */}
                             </div>
 
                             {/* Payment Instructions */}
@@ -2098,7 +2078,27 @@ export default function Checkout() {
                     </div>
                 </div>
             </div>
-
+            
+            {/* Block Modal */}
+            {blockMessage && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md overflow-hidden border-t-4 border-red-500">
+                        <div className="p-6 text-center">
+                            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <span className="text-3xl">🚫</span>
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-900 mb-2">Action Blocked</h3>
+                            <p className="text-gray-600 mb-6 font-medium">{blockMessage}</p>
+                            <button
+                                onClick={() => setBlockMessage('')}
+                                className="w-full py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white rounded-md font-medium transition-colors cursor-pointer"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

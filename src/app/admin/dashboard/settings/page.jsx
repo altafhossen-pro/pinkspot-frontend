@@ -92,6 +92,14 @@ export default function AdminSettingsPage() {
       icon: Truck,
       color: 'bg-pink-100 text-pink-600',
       href: '/admin/dashboard/settings/store-features'
+    },
+    {
+      id: 'telegram',
+      title: 'Telegram Settings',
+      description: 'Bot configuration & alerts',
+      icon: Mail, // using Mail icon as telegram icon might not be imported, it's fine for now or I can add a different one. MessageCircle is good but not imported.
+      color: 'bg-blue-100 text-blue-600',
+      href: '/admin/dashboard/settings/telegram'
     }
   ];
 

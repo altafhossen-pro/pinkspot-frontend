@@ -1522,6 +1522,31 @@ export const settingsAPI = {
             body: JSON.stringify(emailSMSData),
         });
     },
+
+    // Test Email Configuration
+    testEmailConfig: (emailConfig, token) => {
+        return apiCall('/settings/email-sms/test', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(emailConfig),
+        });
+    },
+
+    // Test SMS Configuration
+    testSmsConfig: (smsConfig, token) => {
+        return apiCall('/settings/sms/test', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(smsConfig),
+        });
+    },
+
     // Get affiliate settings only
     getAffiliateSettings: () => {
         return apiCall('/settings/affiliate');
@@ -1581,6 +1606,35 @@ export const settingsAPI = {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify(siteData),
+        });
+    },
+
+    // Telegram settings
+    getTelegramSettings: (token) => {
+        return apiCall('/settings/telegram', {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+    },
+    updateTelegramSettings: (telegramData, token) => {
+        return apiCall('/settings/telegram', {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(telegramData),
+        });
+    },
+    testTelegramConfig: (telegramData, token) => {
+        return apiCall('/settings/telegram/test', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(telegramData),
         });
     },
 };
@@ -1702,6 +1756,18 @@ export const addressAPI = {
         });
     },
 
+    // Admin: Create Dhaka city area
+    adminCreateDhakaCityArea: (data, token) => {
+        return apiCall(`/address/admin/dhaka-city`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+    },
+
     // Admin: Update Dhaka city area
     adminUpdateDhakaCityArea: (id, data, token) => {
         return apiCall(`/address/admin/dhaka-city/${id}`, {
@@ -1721,6 +1787,54 @@ export const addressAPI = {
             headers: {
                 'Authorization': `Bearer ${token}`,
             },
+        });
+    },
+
+    // Admin: Delete All Address Data Globally
+    deleteAllAddressData: (token) => {
+        return apiCall('/address/admin/all', {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+
+    // Admin: Delete All Divisions
+    deleteAllDivisions: (token) => {
+        return apiCall('/address/admin/divisions/all', {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+
+    // Admin: Delete All Districts
+    deleteAllDistricts: (token) => {
+        return apiCall('/address/admin/districts/all', {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+
+    // Admin: Delete All Upazilas
+    deleteAllUpazilas: (token) => {
+        return apiCall('/address/admin/upazilas/all', {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+
+    // Admin: Delete All Dhaka Cities
+    deleteAllDhakaCities: (token) => {
+        return apiCall('/address/admin/dhaka-cities/all', {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+
+    // Admin: Seed Address Data
+    seedAddressData: (token) => {
+        return apiCall('/address/admin/seed', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${token}` }
         });
     },
 };
@@ -2489,4 +2603,29 @@ export default {
     affiliateAPI,
     contactAPI,
     transformProductData,
+};
+
+export const blocklistAPI = {
+    getAllBlocks: async (token) => {
+        return apiCall('/blocklist', {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+    blockEntity: async (data, token) => {
+        return apiCall('/blocklist/block', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` 
+            },
+            body: JSON.stringify(data)
+        });
+    },
+    unblockEntity: async (value, token) => {
+        return apiCall(`/blocklist/unblock/${value}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    }
 };
