@@ -343,22 +343,29 @@ export default function OrderHistoryPage() {
             email = latestOrder.user.email || 'N/A';
         }
 
+        let shippingPhone = latestOrder.shippingAddress?.phone || latestOrder.guestInfo?.phone || latestOrder.manualOrderInfo?.phone || 'N/A';
+
         if (name === 'N/A' || name === '') {
             name = latestOrder.guestInfo?.name || latestOrder.manualOrderInfo?.name || latestOrder.shippingAddress?.name || 'N/A';
         }
+        
         if (phone === 'N/A' || phone === '') {
-            phone = latestOrder.guestInfo?.phone || latestOrder.manualOrderInfo?.phone || latestOrder.shippingAddress?.phone || 'N/A';
+            phone = shippingPhone;
+            shippingPhone = 'N/A';
+        } else if (phone === shippingPhone) {
+            shippingPhone = 'N/A';
         }
+
         if (email === 'N/A' || email === '') {
             email = latestOrder.guestInfo?.email || 'N/A';
         }
 
         const addr = latestOrder.shippingAddress;
         if (addr) {
-            address = `${addr.street || ''}, ${addr.area || ''}, ${addr.upazila || ''}, ${addr.district || ''}`.replace(/(^[,\s]+)|([,\s]+$)/g, '');
+            address = `${addr.street || addr.address || ''}, ${addr.area || ''}, ${addr.upazila || ''}, ${addr.district || ''}`.replace(/(^[,\s]+)|([,\s]+$)/g, '');
         }
 
-        return { name, phone, email, address };
+        return { name, phone, shippingPhone, email, address };
     };
 
     if (permissionError) {
@@ -400,8 +407,8 @@ export default function OrderHistoryPage() {
                                 <Phone className="h-5 w-5 text-green-600" />
                             </div>
                             <div>
-                                <p className="text-xs font-medium text-gray-500 uppercase">Phone</p>
-                                <div className="flex items-center gap-2 mt-1">
+                                <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</p>
+                                <div className="mt-1 flex flex-wrap items-center gap-y-2">
                                     <p className="text-sm font-medium text-gray-900">{customerProfile.phone}</p>
                                     {customerProfile.phone && customerProfile.phone !== 'N/A' && (
                                         isBlocked('phone', customerProfile.phone) ? (
@@ -423,6 +430,29 @@ export default function OrderHistoryPage() {
                                         )
                                     )}
                                 </div>
+                                {customerProfile.shippingPhone && customerProfile.shippingPhone !== 'N/A' && (
+                                    <div className="mt-2 pt-2 border-t border-gray-100 flex flex-wrap items-center gap-y-2">
+                                        <p className="text-xs font-medium text-gray-500 mr-2">Shipping:</p>
+                                        <p className="text-sm font-medium text-gray-900">{customerProfile.shippingPhone}</p>
+                                        {isBlocked('phone', customerProfile.shippingPhone) ? (
+                                            <button
+                                                onClick={() => handleOpenUnblockModal('phone', customerProfile.shippingPhone)}
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-red-100 text-red-700 hover:bg-red-200 border border-red-300 transition-colors cursor-pointer shadow-sm ml-2"
+                                                title="Click to Unblock"
+                                            >
+                                                <ShieldBan className="h-3.5 w-3.5" /> Blocked (Unblock)
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => handleOpenBlockModal('phone', customerProfile.shippingPhone)}
+                                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium bg-gray-100 text-gray-600 hover:bg-gray-200 border border-gray-200 transition-colors cursor-pointer ml-2"
+                                                title="Block Shipping Phone"
+                                            >
+                                                <ShieldAlert className="h-3.5 w-3.5" /> Block
+                                            </button>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </div>
                         <div className="flex items-start gap-3">

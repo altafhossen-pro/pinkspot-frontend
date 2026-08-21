@@ -22,18 +22,21 @@ function OrderConfirmation() {
     const coupon = searchParams.get('coupon');
     const isGuestOrder = searchParams.get('isGuestOrder') === 'true';
 
-    // Calculate final total after discounts
-    const calculateFinalTotal = () => {
-        let finalTotal = parseFloat(total) || 0;
-        if (couponDiscount) finalTotal -= parseFloat(couponDiscount);
-        if (loyaltyDiscount) finalTotal -= parseFloat(loyaltyDiscount);
-        if (discount) finalTotal -= parseFloat(discount);
-        if (upsellDiscount) finalTotal -= parseFloat(upsellDiscount);
-        if (affiliateDiscount) finalTotal -= parseFloat(affiliateDiscount);
-        return Math.max(0, finalTotal); // Ensure total doesn't go below 0
+    // total from query params is already the final paid amount
+    const finalTotal = parseFloat(total) || 0;
+    
+    // Calculate original total before discounts to show crossed-out price
+    const calculateOriginalTotal = () => {
+        let originalTotal = finalTotal;
+        if (couponDiscount) originalTotal += parseFloat(couponDiscount);
+        if (loyaltyDiscount) originalTotal += parseFloat(loyaltyDiscount);
+        if (discount) originalTotal += parseFloat(discount);
+        if (upsellDiscount) originalTotal += parseFloat(upsellDiscount);
+        if (affiliateDiscount) originalTotal += parseFloat(affiliateDiscount);
+        return originalTotal;
     };
 
-    const finalTotal = calculateFinalTotal();
+    const originalTotal = calculateOriginalTotal();
 
     // Generate tracking URL
     const getTrackingUrl = () => {
@@ -166,10 +169,10 @@ function OrderConfirmation() {
                                     <DollarSign className="w-3 h-3 text-green-600 mr-1" />
                                     <span className="text-xs font-medium text-green-600">Total</span>
                                 </div>
-                                {finalTotal !== parseFloat(total) ? (
+                                {originalTotal > finalTotal ? (
                                     <div className="text-center">
                                         <p className="text-sm font-bold text-gray-900">৳{finalTotal.toFixed(2)}</p>
-                                        <p className="text-xs text-gray-500 line-through">৳{parseFloat(total).toFixed(2)}</p>
+                                        <p className="text-xs text-gray-500 line-through">৳{originalTotal.toFixed(2)}</p>
                                     </div>
                                 ) : (
                                     <p className="text-sm font-bold text-gray-900">৳{finalTotal.toFixed(2)}</p>

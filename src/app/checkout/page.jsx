@@ -838,6 +838,18 @@ export default function Checkout() {
     const handleInputChange = (e) => {
         const { name, value } = e.target;
 
+        if (name === 'mobileNumber') {
+            let val = value.replace(/\D/g, '');
+            
+            // Limit to 11 digits
+            if (val.length > 11) {
+                val = val.substring(0, 11);
+            }
+
+            setFormData(prev => ({ ...prev, [name]: val }));
+            return;
+        }
+
         if (name === 'division') {
             // Find division ID from name
             const selectedDivision = divisions.find(div => div.name === value);
@@ -972,6 +984,12 @@ export default function Checkout() {
         // Validate form data
         if (!formData.fullName || !formData.mobileNumber || !formData.deliveryAddress) {
             toast.error('Please fill in all required fields');
+            return;
+        }
+
+        // Validate phone number exactly 11 digits and starts with 01
+        if (!/^01\d{9}$/.test(formData.mobileNumber)) {
+            toast.error('Phone number must start with 01 and be exactly 11 digits');
             return;
         }
 
@@ -1169,7 +1187,7 @@ export default function Checkout() {
                         const params = new URLSearchParams({
                             orderId: order.orderId,
                             status: order.status,
-                            total: order.total + order.shippingCost, // Include shipping cost in total
+                            total: order.total, // order.total already includes shipping cost
                             createdAt: order.createdAt,
                             ...(order.couponDiscount > 0 && { couponDiscount: order.couponDiscount }),
                             ...(order.loyaltyDiscount > 0 && { loyaltyDiscount: order.loyaltyDiscount }),
@@ -1266,8 +1284,11 @@ export default function Checkout() {
                                         onChange={handleInputChange}
                                         placeholder="Enter your mobile number here"
                                         autoComplete="tel"
-                                        className="w-full px-3 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-pink-500 focus:border-pink-500"
+                                        className={`w-full px-3 py-2 border rounded focus:ring-1 focus:ring-pink-500 focus:border-pink-500 ${formData.mobileNumber && (!formData.mobileNumber.startsWith('01') || formData.mobileNumber.length !== 11) ? 'border-red-500' : 'border-gray-300'}`}
                                     />
+                                    {formData.mobileNumber && (!formData.mobileNumber.startsWith('01') || formData.mobileNumber.length !== 11) && (
+                                        <p className="text-red-500 text-xs mt-1 font-medium">Must start with 01 and be exactly 11 digits</p>
+                                    )}
                                 </div>
                             </div>
 

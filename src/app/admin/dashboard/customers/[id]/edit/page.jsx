@@ -13,12 +13,14 @@ import {
     Phone,
     MapPin,
     Calendar,
-    AlertCircle
+    AlertCircle,
+    Key
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { userAPI, roleAPI } from '@/services/api'
 import { getCookie } from 'cookies-next'
 import LoyaltyPointsSection from '@/components/Admin/LoyaltyPointsSection'
+import ChangePasswordModal from '@/components/Admin/ChangePasswordModal'
 import { useAppContext } from '@/context/AppContext'
 import PermissionDenied from '@/components/Common/PermissionDenied'
 
@@ -52,6 +54,7 @@ export default function EditCustomerPage() {
     const [hasUpdatePermission, setHasUpdatePermission] = useState(false)
     const [hasRoleUpdatePermission, setHasRoleUpdatePermission] = useState(false)
     const [permissionError, setPermissionError] = useState(null)
+    const [showPasswordModal, setShowPasswordModal] = useState(false)
 
     useEffect(() => {
         if (!customerId) return
@@ -341,8 +344,17 @@ export default function EditCustomerPage() {
                         <div>
                             <h1 className="text-2xl font-bold text-gray-900">Edit Customer</h1>
                             <p className="text-sm text-gray-500">Update customer information and settings</p>
-                            
                         </div>
+                    </div>
+                    <div className="flex items-center">
+                        <button
+                            type="button"
+                            onClick={() => setShowPasswordModal(true)}
+                            className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors duration-200"
+                        >
+                            <Key className="h-4 w-4 mr-2 text-blue-600" />
+                            Change Password
+                        </button>
                     </div>
                 </div>
             </div>
@@ -655,6 +667,13 @@ export default function EditCustomerPage() {
                     </div>
                 </div>
             )}
+
+            <ChangePasswordModal
+                isOpen={showPasswordModal}
+                onClose={() => setShowPasswordModal(false)}
+                userId={customerId}
+                userName={customer?.name}
+            />
         </div>
     )
 }

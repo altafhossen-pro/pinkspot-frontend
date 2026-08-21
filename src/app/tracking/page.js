@@ -178,17 +178,9 @@ function TrackingPageContent() {
         {/* Order Details */}
         {orderData && (() => {
           const order = orderData.order;
-          // Calculate items subtotal from order.total (which is items total)
-          const itemsSubtotal = order.total || 0;
-          const shippingCost = order.shippingCost || 0;
-          const discount = order.discount || 0;
-          const couponDiscount = order.couponDiscount || 0;
-          const upsellDiscount = order.upsellDiscount || 0;
-          const loyaltyDiscount = order.loyaltyDiscount || 0;
-          const affiliateDiscount = order.affiliateOrder?.affiliateDiscount || 0;
           
-          // Calculate final total: items + shipping - all discounts
-          const finalTotal = itemsSubtotal + shippingCost - discount - couponDiscount - upsellDiscount - loyaltyDiscount - affiliateDiscount;
+          // order.total is already the final total (subtotal + shipping - discounts)
+          const finalTotal = order.total || 0;
           
           return (
           <div className="space-y-6">

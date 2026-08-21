@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Eye, Trash2, Package, Calendar, User, MapPin, CreditCard, Mail, Edit, MoreVertical, Copy, Download, Truck, CheckCircle2, AlertTriangle, X } from 'lucide-react';
+import { Eye, Trash2, Package, Calendar, User, MapPin, CreditCard, Mail, Edit, MoreVertical, Copy, Download, Truck, CheckCircle2, AlertTriangle, X, Phone } from 'lucide-react';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
 import { formatDateForTable } from '@/utils/formatDate';
@@ -996,7 +996,7 @@ export default function AdminOrdersPage() {
                             </label>
                             <input
                                 type="text"
-                                placeholder="Search by Order ID, Email, or Phone..."
+                                placeholder="Search by Order/Consignment ID, Email, Phone..."
                                 value={filters.search}
                                 onChange={(e) => {
                                     handleFilterChange('search', e.target.value);
@@ -1202,25 +1202,47 @@ export default function AdminOrdersPage() {
                                         </td>
 
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="flex items-center">
-                                                <Mail className="h-4 w-4 text-gray-400 mr-2" />
-                                                <div className="text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer">
-                                                    {(() => {
-                                                        const identifier = order.isGuestOrder && order.guestInfo?.phone
-                                                            ? order.guestInfo.phone
-                                                            : order.orderType === 'manual' && order.manualOrderInfo?.phone
-                                                                ? order.manualOrderInfo.phone
-                                                                : order.user?.email;
-                                                        
-                                                        return identifier ? (
-                                                            <Link href={`/admin/dashboard/order-history/${encodeURIComponent(identifier)}`}>
-                                                                {identifier}
-                                                            </Link>
-                                                        ) : (
-                                                            <span className="text-gray-900">N/A</span>
-                                                        );
-                                                    })()}
-                                                </div>
+                                            <div className="flex flex-col space-y-1.5">
+                                                {(() => {
+                                                    const contactPhone = order.shippingAddress?.phone
+                                                        || (order.isGuestOrder ? order.guestInfo?.phone : null)
+                                                        || (order.orderType === 'manual' ? order.manualOrderInfo?.phone : null)
+                                                        || order.user?.phone;
+
+                                                    const contactEmail = order.isGuestOrder ? order.guestInfo?.email
+                                                        : order.orderType === 'manual' ? order.manualOrderInfo?.email
+                                                            : order.user?.email;
+
+                                                    return (
+                                                        <>
+                                                            {contactPhone && (
+                                                                <div className="flex items-center">
+                                                                    <Phone className="h-3.5 w-3.5 text-emerald-500 mr-2 shrink-0" />
+                                                                    <Link
+                                                                        href={`/admin/dashboard/order-history/${encodeURIComponent(contactPhone)}`}
+                                                                        className="text-sm font-medium text-slate-800 hover:text-blue-600 hover:underline"
+                                                                    >
+                                                                        {contactPhone}
+                                                                    </Link>
+                                                                </div>
+                                                            )}
+                                                            {contactEmail && (
+                                                                <div className="flex items-center">
+                                                                    <Mail className="h-3.5 w-3.5 text-blue-400 mr-2 shrink-0" />
+                                                                    <Link
+                                                                        href={`/admin/dashboard/order-history/${encodeURIComponent(contactEmail)}`}
+                                                                        className="text-xs text-slate-500 hover:text-blue-600 hover:underline"
+                                                                    >
+                                                                        {contactEmail}
+                                                                    </Link>
+                                                                </div>
+                                                            )}
+                                                            {!contactPhone && !contactEmail && (
+                                                                <span className="text-gray-900 text-sm">N/A</span>
+                                                            )}
+                                                        </>
+                                                    );
+                                                })()}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
@@ -1358,8 +1380,8 @@ export default function AdminOrdersPage() {
                                                 key={pageNum}
                                                 onClick={() => handlePageChange(pageNum)}
                                                 className={`px-3 py-1 text-sm border rounded ${pageNum === pagination.currentPage
-                                                        ? 'bg-blue-600 text-white border-blue-600'
-                                                        : 'border-gray-300 hover:bg-gray-50'
+                                                    ? 'bg-blue-600 text-white border-blue-600'
+                                                    : 'border-gray-300 hover:bg-gray-50'
                                                     }`}
                                             >
                                                 {pageNum}
@@ -1446,8 +1468,8 @@ export default function AdminOrdersPage() {
                                 onClick={handleStatusUpdate}
                                 disabled={updatingStatus || newStatus === selectedOrder.status}
                                 className={`px-4 py-2 rounded-md text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${updatingStatus || newStatus === selectedOrder.status
-                                        ? 'bg-gray-400 cursor-not-allowed'
-                                        : 'bg-blue-600 hover:bg-blue-700'
+                                    ? 'bg-gray-400 cursor-not-allowed'
+                                    : 'bg-blue-600 hover:bg-blue-700'
                                     }`}
                             >
                                 {updatingStatus ? 'Updating...' : 'Update Status'}
@@ -2066,8 +2088,8 @@ export default function AdminOrdersPage() {
                                 onClick={handleExportOrders}
                                 disabled={exporting || !exportStartDate || !exportEndDate}
                                 className={`px-4 py-2 rounded-md text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${exporting || !exportStartDate || !exportEndDate
-                                        ? 'bg-gray-400 cursor-not-allowed'
-                                        : 'bg-blue-600 hover:bg-blue-700'
+                                    ? 'bg-gray-400 cursor-not-allowed'
+                                    : 'bg-blue-600 hover:bg-blue-700'
                                     }`}
                             >
                                 {exporting ? 'Exporting...' : 'Export CSV'}

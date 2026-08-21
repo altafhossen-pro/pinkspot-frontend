@@ -23,7 +23,7 @@ export default function ManualOrderCreation() {
     // Form states
     const [orderType, setOrderType] = useState('guest'); // 'existing' or 'guest'
     const [orderSource, setOrderSource] = useState(''); // no default, user must select
-    
+
     // Unified Customer State
     const [customerIdentifier, setCustomerIdentifier] = useState('');
     const [customerStatus, setCustomerStatus] = useState('idle'); // idle | searching | found_existing | found_guest | not_found
@@ -32,13 +32,18 @@ export default function ManualOrderCreation() {
         phone: '',
         email: '',
         address: '',
-        userId: null
+        userId: null,
+        isBlocked: false,
+        blockMessage: '',
+        blockReason: ''
     });
+
+    const [showBlockedModal, setShowBlockedModal] = useState(false);
 
     const [orderItems, setOrderItems] = useState([]);
     const [orderNotes, setOrderNotes] = useState('');
     const [discountAmount, setDiscountAmount] = useState(0);
-    const [deliveryCharge, setDeliveryCharge] = useState(150);
+    const [deliveryCharge, setDeliveryCharge] = useState(null);
     const [deliveryAddress, setDeliveryAddress] = useState('');
 
     // Search states
@@ -51,6 +56,7 @@ export default function ManualOrderCreation() {
     const [selectedSize, setSelectedSize] = useState("");
     const [selectedColor, setSelectedColor] = useState("");
     const [quantity, setQuantity] = useState(1);
+    const [hoveredImage, setHoveredImage] = useState(null);
 
     // Debounce search
     useEffect(() => {
@@ -96,14 +102,14 @@ export default function ManualOrderCreation() {
             const searchResponse = await userAPI.searchUsers(query, token);
             if (searchResponse.success && searchResponse.data && searchResponse.data.length > 0) {
                 // Exact match check
-                const exactMatch = searchResponse.data.find(u => 
+                const exactMatch = searchResponse.data.find(u =>
                     (isPhone && u.phone === query) || (!isPhone && u.email === query)
                 );
 
                 if (exactMatch) {
                     foundExisting = true;
                     setOrderType('existing');
-                    
+
                     // Update state with user info
                     setCustomerInfo(prev => ({
                         ...prev,
@@ -116,8 +122,23 @@ export default function ManualOrderCreation() {
                     // Fetch their latest address from past orders
                     if (exactMatch.phone) {
                         const orderResponse = await orderAPI.getCustomerInfoByPhone(exactMatch.phone, token);
-                        if (orderResponse.success && orderResponse.data && orderResponse.data.address) {
-                            setCustomerInfo(prev => ({ ...prev, address: orderResponse.data.address }));
+                        if (orderResponse.success && orderResponse.data) {
+                            setCustomerInfo(prev => ({
+                                ...prev,
+                                name: orderResponse.data.name || prev.name,
+                                address: orderResponse.data.address || '',
+                                isBlocked: orderResponse.data.isBlocked || false,
+                                blockMessage: orderResponse.data.blockMessage || '',
+                                blockReason: orderResponse.data.blockReason || ''
+                            }));
+                            if (orderResponse.data.notes) {
+                                setOrderNotes(orderResponse.data.notes);
+                            } else {
+                                setOrderNotes('');
+                            }
+                            if (orderResponse.data.isBlocked) {
+                                setShowBlockedModal(true);
+                            }
                         }
                     }
 
@@ -130,7 +151,7 @@ export default function ManualOrderCreation() {
             // 2. If not registered, check if they are a guest with past orders (using phone)
             if (!foundExisting && isPhone) {
                 const orderResponse = await orderAPI.getCustomerInfoByPhone(query, token);
-                if (orderResponse.success && orderResponse.data && (orderResponse.data.name || orderResponse.data.address)) {
+                if (orderResponse.success && orderResponse.data && (orderResponse.data.name || orderResponse.data.address || orderResponse.data.isBlocked)) {
                     setOrderType('guest');
                     setCustomerInfo(prev => ({
                         ...prev,
@@ -138,8 +159,21 @@ export default function ManualOrderCreation() {
                         phone: query,
                         email: '',
                         address: orderResponse.data.address || '',
-                        userId: null
+                        userId: null,
+                        isBlocked: orderResponse.data.isBlocked || false,
+                        blockMessage: orderResponse.data.blockMessage || '',
+                        blockReason: orderResponse.data.blockReason || ''
                     }));
+                    if (orderResponse.data.notes) {
+                        setOrderNotes(orderResponse.data.notes);
+                    } else {
+                        setOrderNotes('');
+                    }
+
+                    if (orderResponse.data.isBlocked) {
+                        setShowBlockedModal(true);
+                    }
+
                     setCustomerStatus('found_guest');
                     toast.success('Guest details auto-filled from past order');
                     return;
@@ -154,8 +188,12 @@ export default function ManualOrderCreation() {
                 phone: isPhone ? query : '',
                 email: !isPhone ? query : '',
                 address: '',
-                userId: null
+                userId: null,
+                isBlocked: false,
+                blockMessage: '',
+                blockReason: ''
             }));
+            setOrderNotes('');
             setCustomerStatus('not_found');
             toast('No existing record found. Please enter details.', {
                 icon: 'ℹ️',
@@ -223,7 +261,7 @@ export default function ManualOrderCreation() {
                             setProductSearchTerm('');
                             return;
                         }
-                        
+
                         // Update existing item quantity
                         setOrderItems(prev => prev.map((item, index) =>
                             index === existingItemIndex
@@ -333,7 +371,7 @@ export default function ManualOrderCreation() {
     // Get available colors for selected size (size is optional now)
     const getAvailableColorsForSize = (size) => {
         if (!currentProduct?.variants) return [];
-        
+
         // If size is provided, filter by size
         if (size) {
             return currentProduct.variants
@@ -458,7 +496,7 @@ export default function ManualOrderCreation() {
                 toast.error(`Insufficient stock! Only ${stockQuantity} available. Current in cart: ${currentQuantity}.`);
                 return;
             }
-            
+
             // Update existing item quantity
             setOrderItems(prev => prev.map((item, index) => {
                 if (index === existingItemIndex) {
@@ -466,11 +504,11 @@ export default function ManualOrderCreation() {
                     const newQuantity = currentQ + quantity;
                     const activeEditedPrice = item.editedPrice !== undefined ? (item.editedPrice === '' ? 0 : item.editedPrice) : item.price;
                     const discountPerUnit = item.price - activeEditedPrice;
-                    
+
                     const oldTotalDiscount = discountPerUnit * currentQ;
                     const newTotalDiscount = discountPerUnit * newQuantity;
                     const differenceInDiscount = newTotalDiscount - oldTotalDiscount;
-                    
+
                     setDiscountAmount(d => Math.max(0, d + differenceInDiscount));
 
                     const newOriginalTotal = selectedVariant.currentPrice * newQuantity;
@@ -519,11 +557,11 @@ export default function ManualOrderCreation() {
     const handleUpdateQuantity = (index, newQuantityVal) => {
         const item = orderItems[index];
         let newQuantity = newQuantityVal;
-        
+
         if (newQuantity !== '') {
             newQuantity = parseInt(newQuantityVal);
             if (isNaN(newQuantity) || newQuantity < 0) return;
-            
+
             const stockQuantity = item.variant.stockQuantity || 0;
             if (newQuantity > stockQuantity) {
                 toast.error(`Insufficient stock! Only ${stockQuantity} available.`);
@@ -537,7 +575,7 @@ export default function ManualOrderCreation() {
         const originalPrice = item.price;
         const activeEditedPrice = item.editedPrice !== undefined ? (item.editedPrice === '' ? 0 : item.editedPrice) : originalPrice;
         const discountPerUnit = originalPrice - activeEditedPrice;
-        
+
         const oldTotalDiscount = discountPerUnit * oldQ;
         const newTotalDiscount = discountPerUnit * activeQuantityForMath;
         const differenceInDiscount = newTotalDiscount - oldTotalDiscount;
@@ -562,21 +600,21 @@ export default function ManualOrderCreation() {
     const handleUpdateItemPrice = (index, newPriceStr) => {
         const item = orderItems[index];
         const originalPrice = item.price;
-        
+
         let newPrice = newPriceStr === '' ? '' : parseInt(newPriceStr);
         if (newPriceStr !== '' && isNaN(newPrice)) newPrice = 0;
-        
+
         if (newPriceStr !== '' && newPrice > originalPrice) {
             toast.error('Cannot set price higher than original price');
             newPrice = originalPrice;
         }
-        
+
         const oldEditedPrice = item.editedPrice !== undefined ? (item.editedPrice === '' ? 0 : item.editedPrice) : originalPrice;
         const activeNewPrice = newPrice === '' ? 0 : newPrice;
-        
+
         const differencePerUnit = oldEditedPrice - activeNewPrice;
         const totalDifference = differencePerUnit * item.quantity;
-        
+
         setDiscountAmount(prev => Math.max(0, prev + totalDifference));
 
         setOrderItems(prev => prev.map((itm, i) => {
@@ -594,12 +632,12 @@ export default function ManualOrderCreation() {
     const handleResetItemPrice = (index) => {
         const item = orderItems[index];
         const activeEditedPrice = item.editedPrice !== undefined ? (item.editedPrice === '' ? 0 : item.editedPrice) : item.price;
-        
+
         if (activeEditedPrice >= item.price) return;
-        
+
         const discountPerUnit = item.price - activeEditedPrice;
         const totalDifference = discountPerUnit * item.quantity;
-        
+
         setDiscountAmount(prev => Math.max(0, prev - totalDifference));
 
         setOrderItems(prev => prev.map((itm, i) => {
@@ -620,9 +658,9 @@ export default function ManualOrderCreation() {
         const activeEditedPrice = item.editedPrice !== undefined ? (item.editedPrice === '' ? 0 : item.editedPrice) : item.price;
         const discountPerUnit = item.price - activeEditedPrice;
         const itemTotalDiscount = discountPerUnit * item.quantity;
-        
+
         setDiscountAmount(prev => Math.max(0, prev - itemTotalDiscount));
-        
+
         setOrderItems(prev => prev.filter((_, i) => i !== index));
         toast.success('Item removed from order');
     };
@@ -640,15 +678,13 @@ export default function ManualOrderCreation() {
         return Math.max(0, subtotal + delivery - discount);
     };
 
-    // Set default delivery charge from context when available
-    useEffect(() => {
-        if (deliveryChargeSettings?.outsideDhaka) {
-            setDeliveryCharge(deliveryChargeSettings.outsideDhaka);
-        }
-    }, [deliveryChargeSettings]);
-
     // Create manual order
     const createManualOrder = async () => {
+        if (deliveryCharge === null || deliveryCharge === '') {
+            toast.error('Please select a delivery charge');
+            return;
+        }
+
         if (orderItems.length === 0) {
             toast.error('Please add at least one item to the order');
             return;
@@ -674,6 +710,7 @@ export default function ManualOrderCreation() {
             const token = getCookie('token');
 
             const orderData = {
+                overrideBlock: customerInfo.isBlocked === true,
                 orderType: orderType,
                 orderSource: orderSource,
                 items: orderItems.map(item => ({
@@ -697,7 +734,7 @@ export default function ManualOrderCreation() {
                 notes: orderNotes,
                 deliveryAddress: customerInfo.address,
                 ...(orderType === 'existing' && customerInfo.userId
-                    ? { 
+                    ? {
                         userId: customerInfo.userId,
                         guestInfo: {
                             name: customerInfo.name,
@@ -726,10 +763,11 @@ export default function ManualOrderCreation() {
                 setCustomerInfo({ name: '', phone: '', email: '', address: '', userId: null });
                 setOrderNotes('');
                 setDiscountAmount(0);
-                setDeliveryCharge(deliveryChargeSettings?.outsideDhaka || 150);
+                setDeliveryCharge(null);
                 setDeliveryAddress('');
                 setProductSearchTerm('');
                 setShowConfirmModal(false);
+                setShowBlockedModal(false);
 
                 // Navigate to order details page immediately
                 if (response.data && response.data._id) {
@@ -799,100 +837,101 @@ export default function ManualOrderCreation() {
         <div className="flex flex-col lg:flex-row gap-6 min-h-[calc(100vh-6rem)]">
             {/* Left Column - POS System & Cart (65%) */}
             <div className="w-full lg:w-[65%] flex flex-col space-y-4">
-                
+
                 {/* POS Header */}
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex justify-between items-center">
                     <h1 className="text-xl font-bold text-gray-900">POS System</h1>
                     <div className="flex space-x-2">
-                        
+
                     </div>
                 </div>
 
                 {/* Product Search */}
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 relative z-20">
                     <div className="mb-0">
-                    <div className="relative">
                         <div className="relative">
-                            {searchingProducts ? (
-                                <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                                </div>
-                            ) : (
-                                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                            )}
-                            <input
-                                type="text"
-                                value={productSearchTerm}
-                                onChange={(e) => {
-                                    const value = e.target.value;
-                                    setProductSearchTerm(value);
+                            <div className="relative">
+                                {searchingProducts ? (
+                                    <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                                    </div>
+                                ) : (
+                                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                                )}
+                                <input
+                                    type="text"
+                                    value={productSearchTerm}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        setProductSearchTerm(value);
 
-                                    // If it looks like a SKU (short, alphanumeric), try immediate search
-                                    if (value.length >= 3 && /^[a-zA-Z0-9]+$/.test(value)) {
-                                        // This will trigger the debounced search
-                                        setShowProductDropdown(true);
-                                    }
-                                }}
-                                onFocus={() => setShowProductDropdown(true)}
-                                onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                    }
-                                }}
-                                className="w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
-                                placeholder="Scan Barcode or Search by Name/SKU..."
-                                autoFocus
-                            />
-                        </div>
+                                        // If it looks like a SKU (short, alphanumeric), try immediate search
+                                        if (value.length >= 3 && /^[a-zA-Z0-9]+$/.test(value)) {
+                                            // This will trigger the debounced search
+                                            setShowProductDropdown(true);
+                                        }
+                                    }}
+                                    onFocus={() => setShowProductDropdown(true)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            e.preventDefault();
+                                        }
+                                    }}
+                                    className="w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                    placeholder="Scan Barcode or Search by Name/SKU..."
+                                    autoFocus
+                                />
+                            </div>
 
-                        {showProductDropdown && productResults.length > 0 && (
-                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                                {productResults.map((product) => {
-                                    // Check if product has any variant with stock > 0
-                                    const hasStock = product.variants?.some(v => (v.stockQuantity || 0) > 0);
-                                    
-                                    return (
-                                        <div
-                                            key={product._id}
-                                            onClick={() => {
-                                                if (hasStock) {
-                                                    handleProductSelect(product);
-                                                } else {
-                                                    toast.error(`Stock out! "${product.title}" is out of stock.`);
-                                                }
-                                            }}
-                                            className={`px-4 py-3 border-b border-gray-100 last:border-b-0 ${
-                                                hasStock 
-                                                    ? 'hover:bg-gray-50 cursor-pointer' 
+                            {showProductDropdown && productResults.length > 0 && (
+                                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                    {productResults.map((product) => {
+                                        // Check if product has any variant with stock > 0
+                                        const hasStock = product.variants?.some(v => (v.stockQuantity || 0) > 0);
+
+                                        return (
+                                            <div
+                                                key={product._id}
+                                                onClick={() => {
+                                                    if (hasStock) {
+                                                        handleProductSelect(product);
+                                                    } else {
+                                                        toast.error(`Stock out! "${product.title}" is out of stock.`);
+                                                    }
+                                                }}
+                                                className={`px-4 py-3 border-b border-gray-100 last:border-b-0 ${hasStock
+                                                    ? 'hover:bg-gray-50 cursor-pointer'
                                                     : 'bg-gray-100 opacity-60 cursor-not-allowed'
-                                            }`}
-                                        >
-                                            <div className="flex items-center space-x-3">
-                                                <img
-                                                    src={product.featuredImage || '/images/placeholder.png'}
-                                                    alt={product.title}
-                                                    className="w-10 h-10 rounded object-cover"
-                                                    onError={(e) => {
-                                                        e.target.src = '/images/placeholder.png';
-                                                    }}
-                                                />
-                                                <div className="flex-1">
-                                                    <h4 className={`text-sm font-medium ${hasStock ? 'text-gray-900' : 'text-gray-500'}`}>
-                                                        {product.title}
-                                                    </h4>
-                                                    <p className="text-xs text-gray-500">
-                                                        {product.variants?.length || 0} variants available
-                                                        {!hasStock && <span className="text-red-500 ml-2">(Stock Out)</span>}
-                                                    </p>
+                                                    }`}
+                                            >
+                                                <div className="flex items-center space-x-3">
+                                                    <img
+                                                        src={product.featuredImage || '/images/placeholder.png'}
+                                                        alt={product.title}
+                                                        className="w-10 h-10 rounded object-cover"
+                                                        onMouseEnter={() => setHoveredImage(product.featuredImage || '/images/placeholder.png')}
+                                                        onMouseLeave={() => setHoveredImage(null)}
+                                                        onError={(e) => {
+                                                            e.target.src = '/images/placeholder.png';
+                                                        }}
+                                                    />
+                                                    <div className="flex-1">
+                                                        <h4 className={`text-sm font-medium ${hasStock ? 'text-gray-900' : 'text-gray-500'}`}>
+                                                            {product.title}
+                                                        </h4>
+                                                        <p className="text-xs text-gray-500">
+                                                            {product.variants?.length || 0} variants available
+                                                            {!hasStock && <span className="text-red-500 ml-2">(Stock Out)</span>}
+                                                        </p>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
                     </div>
-                </div>
                 </div>
 
                 {/* Product Selection Details */}
@@ -904,6 +943,8 @@ export default function ManualOrderCreation() {
                                     src={currentProduct.featuredImage || '/images/placeholder.png'}
                                     alt={currentProduct.title}
                                     className="w-16 h-16 rounded object-cover"
+                                    onMouseEnter={() => setHoveredImage(currentProduct.featuredImage || '/images/placeholder.png')}
+                                    onMouseLeave={() => setHoveredImage(null)}
                                     onError={(e) => {
                                         e.target.src = '/images/placeholder.png';
                                     }}
@@ -934,20 +975,20 @@ export default function ManualOrderCreation() {
                                 </label>
                                 <div className="flex flex-wrap gap-2">
                                     {uniqueSizes.map((size) => (
-                                                <button
+                                        <button
                                             key={size}
                                             onClick={() => handleSizeChange(size)}
                                             className={`px-3 py-1 rounded-md text-sm font-medium transition-colors cursor-pointer ${selectedSize === size
-                                                    ? 'bg-blue-500 text-white'
-                                                    : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                                                ? 'bg-blue-500 text-white'
+                                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
                                                 }`}
                                         >
                                             {size}
-                                                </button>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Color Selection */}
                         {availableColors.length > 0 && (
@@ -991,13 +1032,12 @@ export default function ManualOrderCreation() {
                                 placeholder="Enter quantity"
                             />
                             {selectedVariant && (
-                                <p className={`text-xs mt-1 ${
-                                    (selectedVariant.stockQuantity || 0) <= 0 
-                                        ? 'text-red-600 font-semibold' 
-                                        : 'text-gray-500'
-                                }`}>
-                                    {selectedVariant.stockQuantity <= 0 
-                                        ? 'Stock Out!' 
+                                <p className={`text-xs mt-1 ${(selectedVariant.stockQuantity || 0) <= 0
+                                    ? 'text-red-600 font-semibold'
+                                    : 'text-gray-500'
+                                    }`}>
+                                    {selectedVariant.stockQuantity <= 0
+                                        ? 'Stock Out!'
                                         : `Max: ${selectedVariant.stockQuantity} available`
                                     }
                                 </p>
@@ -1019,8 +1059,8 @@ export default function ManualOrderCreation() {
                             disabled={!selectedVariant || quantity < 1 || (selectedVariant?.stockQuantity || 0) <= 0}
                             className="w-full bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed cursor-pointer"
                         >
-                            {selectedVariant && (selectedVariant.stockQuantity || 0) <= 0 
-                                ? 'Stock Out' 
+                            {selectedVariant && (selectedVariant.stockQuantity || 0) <= 0
+                                ? 'Stock Out'
                                 : 'Add to Order'
                             }
                         </button>
@@ -1040,293 +1080,301 @@ export default function ManualOrderCreation() {
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
                                     <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Product
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Variant
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Price
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Quantity
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Total
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                {orderItems.map((item, index) => (
-                                    <tr key={index}>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="flex items-center">
-                                                <img
-                                                    src={item.product.featuredImage || '/images/placeholder.png'}
-                                                    alt={item.product.title}
-                                                    className="h-10 w-10 rounded-lg object-cover"
-                                                    onError={(e) => {
-                                                        e.target.src = '/images/placeholder.png';
-                                                    }}
-                                                />
-                                                <div className="ml-4">
-                                                    <div className="text-sm font-medium text-gray-900">
-                                                        {item.product.title}
-                                                    </div>
-                                                    <div className="text-sm text-gray-500">
-                                                        SKU: {item.variant.sku}
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Product
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Variant
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Price
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Quantity
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Total
+                                        </th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                            Actions
+                                        </th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {orderItems.map((item, index) => (
+                                        <tr key={index}>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="flex items-center">
+                                                    <img
+                                                        src={item.product.featuredImage || '/images/placeholder.png'}
+                                                        alt={item.product.title}
+                                                        className="h-10 w-10 rounded-lg object-cover"
+                                                        onMouseEnter={() => setHoveredImage(item.product.featuredImage || '/images/placeholder.png')}
+                                                        onMouseLeave={() => setHoveredImage(null)}
+                                                        onError={(e) => {
+                                                            e.target.src = '/images/placeholder.png';
+                                                        }}
+                                                    />
+                                                    <div className="ml-4">
+                                                        <div className="text-sm font-medium text-gray-900">
+                                                            {item.product.title}
+                                                        </div>
+                                                        <div className="text-sm text-gray-500">
+                                                            SKU: {item.variant.sku}
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm text-gray-900">
-                                                {item.variant.size && (
-                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2">
-                                                        {item.variant.size}
-                                                    </span>
-                                                )}
-                                                {item.variant.color && (
-                                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                                        {item.variant.color}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="flex items-center space-x-1">
-                                                <span className="text-sm font-bold text-gray-900">৳</span>
-                                                <input
-                                                    type="text"
-                                                    value={item.editedPrice !== undefined ? item.editedPrice : item.price}
-                                                    onChange={(e) => {
-                                                        const val = e.target.value;
-                                                        if (val === '' || /^\d+$/.test(val)) {
-                                                            handleUpdateItemPrice(index, val);
-                                                        }
-                                                    }}
-                                                    onBlur={(e) => {
-                                                        if (e.target.value === '') {
-                                                            handleUpdateItemPrice(index, 0);
-                                                        }
-                                                    }}
-                                                    className="w-20 px-2 py-1 border border-gray-300 rounded focus:border-blue-500 focus:outline-none text-sm font-medium text-gray-900"
-                                                />
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="flex items-center space-x-2">
-                                                <button
-                                                    onClick={() => handleUpdateQuantity(index, (item.quantity === '' ? 0 : item.quantity) - 1)}
-                                                    className="p-1 rounded-md text-gray-500 hover:bg-gray-100 cursor-pointer"
-                                                >
-                                                    <Minus className="h-4 w-4" />
-                                                </button>
-                                                <input
-                                                    type="text"
-                                                    value={item.quantity}
-                                                    onChange={(e) => {
-                                                        const val = e.target.value;
-                                                        if (val === '' || /^\d+$/.test(val)) {
-                                                            handleUpdateQuantity(index, val);
-                                                        }
-                                                    }}
-                                                    onBlur={(e) => {
-                                                        if (e.target.value === '' || e.target.value === '0') {
-                                                            handleUpdateQuantity(index, 1);
-                                                        }
-                                                    }}
-                                                    className="w-16 text-center px-2 py-1 border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
-                                                />
-                                                <button
-                                                    onClick={() => handleUpdateQuantity(index, (item.quantity === '' ? 0 : item.quantity) + 1)}
-                                                    className="p-1 rounded-md text-gray-500 hover:bg-gray-100 cursor-pointer"
-                                                >
-                                                    <Plus className="h-4 w-4" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="text-sm font-bold text-gray-900">
-                                                ৳{item.editedTotal !== undefined ? item.editedTotal : item.total}
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                            <div className="flex items-center space-x-3">
-                                                {item.editedPrice !== undefined && item.editedPrice !== '' && item.editedPrice < item.price && (
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="text-sm text-gray-900">
+                                                    {item.variant.size && (
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 mr-2">
+                                                            {item.variant.size}
+                                                        </span>
+                                                    )}
+                                                    {item.variant.color && (
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                            {item.variant.color}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="flex items-center space-x-1">
+                                                    <span className="text-sm font-bold text-gray-900">৳</span>
+                                                    <input
+                                                        type="text"
+                                                        value={item.editedPrice !== undefined ? item.editedPrice : item.price}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            if (val === '' || /^\d+$/.test(val)) {
+                                                                handleUpdateItemPrice(index, val);
+                                                            }
+                                                        }}
+                                                        onBlur={(e) => {
+                                                            if (e.target.value === '') {
+                                                                handleUpdateItemPrice(index, 0);
+                                                            }
+                                                        }}
+                                                        className="w-20 px-2 py-1 border border-gray-300 rounded focus:border-blue-500 focus:outline-none text-sm font-medium text-gray-900"
+                                                    />
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="flex items-center space-x-2">
                                                     <button
-                                                        onClick={() => handleResetItemPrice(index)}
-                                                        className="text-blue-600 hover:text-blue-900 cursor-pointer flex items-center"
-                                                        title="Reset to original price"
+                                                        onClick={() => handleUpdateQuantity(index, (item.quantity === '' ? 0 : item.quantity) - 1)}
+                                                        className="p-1 rounded-md text-gray-500 hover:bg-gray-100 cursor-pointer"
                                                     >
-                                                        <RefreshCw className="h-4 w-4" />
+                                                        <Minus className="h-4 w-4" />
                                                     </button>
-                                                )}
-                                                <button
-                                                    onClick={() => removeItemFromOrder(index)}
-                                                    className="text-red-600 hover:text-red-900 cursor-pointer"
-                                                    title="Remove item"
-                                                >
-                                                    <Trash2 className="h-4 w-4" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
-            {/* End Left Column */}
+                                                    <input
+                                                        type="text"
+                                                        value={item.quantity}
+                                                        onChange={(e) => {
+                                                            const val = e.target.value;
+                                                            if (val === '' || /^\d+$/.test(val)) {
+                                                                handleUpdateQuantity(index, val);
+                                                            }
+                                                        }}
+                                                        onBlur={(e) => {
+                                                            if (e.target.value === '' || e.target.value === '0') {
+                                                                handleUpdateQuantity(index, 1);
+                                                            }
+                                                        }}
+                                                        className="w-16 text-center px-2 py-1 border border-gray-300 rounded focus:border-blue-500 focus:outline-none"
+                                                    />
+                                                    <button
+                                                        onClick={() => handleUpdateQuantity(index, (item.quantity === '' ? 0 : item.quantity) + 1)}
+                                                        className="p-1 rounded-md text-gray-500 hover:bg-gray-100 cursor-pointer"
+                                                    >
+                                                        <Plus className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <div className="text-sm font-bold text-gray-900">
+                                                    ৳{item.editedTotal !== undefined ? item.editedTotal : item.total}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                <div className="flex items-center space-x-3">
+                                                    {item.editedPrice !== undefined && item.editedPrice !== '' && item.editedPrice < item.price && (
+                                                        <button
+                                                            onClick={() => handleResetItemPrice(index)}
+                                                            className="text-blue-600 hover:text-blue-900 cursor-pointer flex items-center"
+                                                            title="Reset to original price"
+                                                        >
+                                                            <RefreshCw className="h-4 w-4" />
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => removeItemFromOrder(index)}
+                                                        className="text-red-600 hover:text-red-900 cursor-pointer"
+                                                        title="Remove item"
+                                                    >
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+                {/* End Left Column */}
             </div>
 
             {/* Right Column - Customer Info & Summary (35%) */}
             <div className="w-full lg:w-[35%] flex flex-col space-y-4">
-                
+
                 {/* Customer Info Card */}
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                <div className="flex items-center mb-4 text-gray-900">
-                    <User className="w-5 h-5 mr-2 text-blue-600" />
-                    <h2 className="text-lg font-semibold">Customer Info</h2>
-                </div>
-
-                {/* Order Source */}
-                <div className="mb-5">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Order Source <span className="text-red-500">*</span>
-                    </label>
-                    <select
-                        value={orderSource}
-                        onChange={(e) => setOrderSource(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
-                        required
-                    >
-                        <option value="">Select order source</option>
-                        <option value="website">Website</option>
-                        <option value="facebook">Facebook</option>
-                        <option value="whatsapp">WhatsApp</option>
-                        <option value="phone">Phone Call</option>
-                        <option value="email">Email</option>
-                        <option value="walk-in">Walk-in</option>
-                        <option value="instagram">Instagram</option>
-                        <option value="manual">Manual</option>
-                        <option value="other">Other</option>
-                    </select>
-                </div>
-
-                {/* Unified Customer Search */}
-                <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Customer Phone / Email <span className="text-red-500">*</span>
-                    </label>
-                    <div className="relative">
-                        {customerStatus === 'searching' ? (
-                            <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
-                            </div>
-                        ) : (
-                            <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                        )}
-                        <input
-                            type="text"
-                            value={customerIdentifier}
-                            onChange={(e) => setCustomerIdentifier(e.target.value)}
-                            className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                            placeholder="Enter 11 digit phone or valid email..."
-                            required
-                        />
+                    <div className="flex items-center mb-4 text-gray-900">
+                        <User className="w-5 h-5 mr-2 text-blue-600" />
+                        <h2 className="text-lg font-semibold">Customer Info</h2>
                     </div>
-                    {/* Status badge */}
-                    {customerStatus === 'found_existing' && (
-                        <span className="inline-block mt-2 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-md">Existing Registered Customer</span>
-                    )}
-                    {customerStatus === 'found_guest' && (
-                        <span className="inline-block mt-2 px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-md">Returning Guest</span>
-                    )}
-                    {customerStatus === 'not_found' && customerIdentifier.length > 0 && (
-                        <span className="inline-block mt-2 px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-md">New Guest</span>
-                    )}
-                </div>
 
-                {/* Name and Address Fields (Shown if searching found something, or if not found) */}
-                {(customerStatus === 'found_existing' || customerStatus === 'found_guest' || customerStatus === 'not_found') && (
-                    <div className="space-y-4 mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Customer Name <span className="text-red-500">*</span>
-                            </label>
+                    {/* Order Source */}
+                    <div className="mb-5">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Order Source <span className="text-red-500">*</span>
+                        </label>
+                        <select
+                            value={orderSource}
+                            onChange={(e) => setOrderSource(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                            required
+                        >
+                            <option value="">Select order source</option>
+                            <option value="website">Website</option>
+                            <option value="facebook">Facebook</option>
+                            <option value="whatsapp">WhatsApp</option>
+                            <option value="phone">Phone Call</option>
+                            <option value="email">Email</option>
+                            <option value="walk-in">Walk-in</option>
+                            <option value="instagram">Instagram</option>
+                            <option value="manual">Manual</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+
+                    {/* Unified Customer Search */}
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Customer Phone / Email <span className="text-red-500">*</span>
+                        </label>
+                        <div className="relative">
+                            {customerStatus === 'searching' ? (
+                                <div className="absolute left-3 top-1/2 transform -translate-y-1/2">
+                                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                                </div>
+                            ) : (
+                                <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                            )}
                             <input
                                 type="text"
-                                value={customerInfo.name}
-                                onChange={(e) => setCustomerInfo(prev => ({ ...prev, name: e.target.value }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
-                                placeholder="Enter customer name"
+                                value={customerIdentifier}
+                                onChange={(e) => setCustomerIdentifier(e.target.value)}
+                                className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                                placeholder="Enter 11 digit phone or valid email..."
                                 required
                             />
                         </div>
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">
-                                Delivery Address <span className="text-red-500">*</span>
-                            </label>
-                            <textarea
-                                value={customerInfo.address}
-                                onChange={(e) => setCustomerInfo(prev => ({ ...prev, address: e.target.value }))}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
-                                rows={3}
-                                placeholder="Enter delivery address"
-                                required
-                            />
-                        </div>
+                        {/* Status badge */}
+                        {customerStatus === 'found_existing' && (
+                            <span className="inline-block mt-2 px-2 py-1 bg-green-100 text-green-700 text-xs rounded-md">Existing Registered Customer</span>
+                        )}
+                        {customerStatus === 'found_guest' && (
+                            <span className="inline-block mt-2 px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-md">Returning Guest</span>
+                        )}
+                        {customerStatus === 'not_found' && customerIdentifier.length > 0 && (
+                            <span className="inline-block mt-2 px-2 py-1 bg-yellow-100 text-yellow-700 text-xs rounded-md">New Guest</span>
+                        )}
                     </div>
-                )}
+
+                    {/* Name and Address Fields (Shown if searching found something, or if not found) */}
+                    {(customerStatus === 'found_existing' || customerStatus === 'found_guest' || customerStatus === 'not_found') && (
+                        <div className="space-y-4 mb-6 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Customer Name <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    value={customerInfo.name}
+                                    onChange={(e) => setCustomerInfo(prev => ({ ...prev, name: e.target.value }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
+                                    placeholder="Enter customer name"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Delivery Address <span className="text-red-500">*</span>
+                                </label>
+                                <textarea
+                                    value={customerInfo.address}
+                                    onChange={(e) => setCustomerInfo(prev => ({ ...prev, address: e.target.value }))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 bg-white"
+                                    rows={3}
+                                    placeholder="Enter delivery address"
+                                    required
+                                />
+                            </div>
+                        </div>
+                    )}
 
 
-                {/* Order Notes */}
-                <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Order Notes
-                    </label>
-                    <textarea
-                        value={orderNotes}
-                        onChange={(e) => setOrderNotes(e.target.value)}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                        rows={3}
-                        placeholder="Add any special instructions or notes"
-                    />
-                </div>
+                    {/* Order Notes */}
+                    <div className="mb-6">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Order Notes
+                        </label>
+                        <textarea
+                            value={orderNotes}
+                            onChange={(e) => setOrderNotes(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                            rows={3}
+                            placeholder="Add any special instructions or notes"
+                        />
+                    </div>
 
                 </div>
 
                 {/* Payment Summary */}
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-5 mt-auto flex-1 flex flex-col justify-end">
                     <h3 className="font-bold text-gray-900 mb-4 pb-2 border-b border-gray-100">Payment Details</h3>
-                    
+
                     <div className="space-y-3 mb-6">
                         <div className="flex justify-between items-center">
                             <span className="text-sm text-gray-600">Subtotal</span>
                             <span className="text-sm font-medium text-gray-900">৳{calculateSubtotal()}</span>
                         </div>
-                        
-                        <div className="flex items-center justify-between">
-                            <span className="text-sm text-gray-600 w-1/2">Delivery Charge</span>
-                            <div className="w-1/2 flex items-center justify-end">
-                                <span className="text-sm text-gray-500 mr-1">৳</span>
-                                <input
-                                    type="text"
-                                    value={deliveryCharge}
-                                    onChange={(e) => {
-                                        const value = e.target.value;
-                                        if (value === '' || /^\d+$/.test(value)) {
-                                            setDeliveryCharge(value === '' ? 0 : parseInt(value) || 0);
-                                        }
-                                    }}
-                                    className="w-20 text-right px-2 py-1 border border-gray-300 rounded text-sm focus:border-blue-500 focus:outline-none"
-                                />
+
+                        <div className="flex justify-between items-center font-medium text-gray-900 border-b border-gray-100 pb-4 mt-5">
+                            <span>Delivery Charge <span className="text-red-500">*</span></span>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setDeliveryCharge(80)}
+                                    className={`px-4 py-1.5 rounded-md text-base font-bold transition-all duration-200 ${deliveryCharge === 80 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30 ring-2 ring-blue-600 ring-offset-1' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-blue-300'}`}
+                                >
+                                    ৳ 80
+                                </button>
+                                <button
+                                    onClick={() => setDeliveryCharge(120)}
+                                    className={`px-4 py-1.5 rounded-md text-base font-bold transition-all duration-200 ${deliveryCharge === 120 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30 ring-2 ring-blue-600 ring-offset-1' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-blue-300'}`}
+                                >
+                                    ৳ 120
+                                </button>
+                                <button
+                                    onClick={() => setDeliveryCharge(150)}
+                                    className={`px-4 py-1.5 rounded-md text-base font-bold transition-all duration-200 ${deliveryCharge === 150 ? 'bg-blue-600 text-white shadow-md shadow-blue-500/30 ring-2 ring-blue-600 ring-offset-1' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:border-blue-300'}`}
+                                >
+                                    ৳ 150
+                                </button>
                             </div>
                         </div>
 
@@ -1358,10 +1406,11 @@ export default function ManualOrderCreation() {
                         </div>
                     </div>
 
+                    {/* Complete Order Button */}
                     <button
-                        onClick={() => setShowConfirmModal(true)}
-                        disabled={saving || orderItems.length === 0}
-                        className={`w-full py-4 rounded-lg font-bold text-lg text-center transition-all ${orderItems.length > 0 ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
+                        onClick={createManualOrder}
+                        disabled={saving || orderItems.length === 0 || deliveryCharge === null || deliveryCharge === '' || (!customerInfo.phone && !customerIdentifier)}
+                        className={`w-full py-4 rounded-lg font-bold text-lg text-center transition-all ${orderItems.length > 0 && deliveryCharge !== null && deliveryCharge !== '' && (customerInfo.phone || customerIdentifier) ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-md hover:shadow-lg' : 'bg-gray-200 text-gray-400 cursor-not-allowed'}`}
                     >
                         {saving ? 'Processing...' : 'Complete Order'}
                     </button>
@@ -1394,6 +1443,78 @@ export default function ManualOrderCreation() {
                                 {saving ? 'Creating...' : 'Create Order'}
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+            {/* Blocked Customer Modal */}
+            {showBlockedModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden transform transition-all">
+                        <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-red-50">
+                            <div className="flex items-center gap-3 text-red-600">
+                                <AlertTriangle className="h-6 w-6" />
+                                <h3 className="text-lg font-bold">Blocked Customer</h3>
+                            </div>
+                            <button
+                                onClick={() => setShowBlockedModal(false)}
+                                className="text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                                <X className="h-5 w-5" />
+                            </button>
+                        </div>
+                        <div className="p-6">
+                            <p className="text-gray-600 mb-4">
+                                This customer's phone number is on the blocklist.
+                            </p>
+                            <div className="bg-red-50 p-4 rounded-lg border border-red-100 mb-6 space-y-3">
+                                <div>
+                                    <p className="text-xs font-bold text-red-800 uppercase tracking-wider">Internal Reason:</p>
+                                    <p className="text-sm text-red-700 mt-0.5">{customerInfo.blockReason || 'No reason provided'}</p>
+                                </div>
+                                {customerInfo.blockMessage && (
+                                    <div className="pt-3 border-t border-red-200">
+                                        <p className="text-xs font-bold text-red-800 uppercase tracking-wider">Customer Facing Response:</p>
+                                        <p className="text-sm text-red-700 mt-0.5">{customerInfo.blockMessage}</p>
+                                    </div>
+                                )}
+                            </div>
+                            <p className="text-sm text-gray-500 mb-6 font-medium">
+                                Do you still want to proceed and create an order for this customer?
+                            </p>
+                            <div className="flex items-center justify-end gap-3 mt-6">
+                                <button
+                                    onClick={() => {
+                                        // Reset customer identifier and close modal (they decided not to order)
+                                        setCustomerIdentifier('');
+                                        setShowBlockedModal(false);
+                                    }}
+                                    className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowBlockedModal(false);
+                                    }}
+                                    className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium shadow-sm transition-colors flex items-center gap-2"
+                                >
+                                    Proceed Anyway
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Hover Image Modal */}
+            {hoveredImage && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none bg-black/10 backdrop-blur-[2px] transition-all duration-300">
+                    <div className="bg-white p-3 rounded-2xl shadow-2xl animate-fade-in">
+                        <img 
+                            src={hoveredImage} 
+                            alt="Product Preview" 
+                            className="max-w-[80vw] max-h-[80vh] w-auto h-auto object-contain rounded-lg"
+                        />
                     </div>
                 </div>
             )}

@@ -60,7 +60,6 @@ export default function OrderDetailsPage() {
     const [returnQuantities, setReturnQuantities] = useState({});
     const [selectedItems, setSelectedItems] = useState(new Set());
     const [hoveredImage, setHoveredImage] = useState(null);
-    const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
     const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
     const printRef = useRef();
 
@@ -279,28 +278,6 @@ export default function OrderDetailsPage() {
 
     const clearAllItems = () => {
         setSelectedItems(new Set());
-    };
-
-    // Image zoom handlers
-    const handleImageMouseEnter = (e, imageUrl) => {
-        setHoveredImage(imageUrl);
-        updateImagePosition(e);
-    };
-
-    const handleImageMouseMove = (e) => {
-        if (hoveredImage) {
-            updateImagePosition(e);
-        }
-    };
-
-    const handleImageMouseLeave = () => {
-        setHoveredImage(null);
-    };
-
-    const updateImagePosition = (e) => {
-        const x = e.clientX;
-        const y = e.clientY;
-        setImagePosition({ x, y });
     };
 
     // Get available status options based on current status
@@ -904,9 +881,8 @@ export default function OrderDetailsPage() {
 
                                                 <div
                                                     className="relative"
-                                                    onMouseEnter={(e) => handleImageMouseEnter(e, item.image)}
-                                                    onMouseMove={handleImageMouseMove}
-                                                    onMouseLeave={handleImageMouseLeave}
+                                                    onMouseEnter={() => setHoveredImage(item.image)}
+                                                    onMouseLeave={() => setHoveredImage(null)}
                                                 >
                                                     <img
                                                         src={item.image}
@@ -917,26 +893,6 @@ export default function OrderDetailsPage() {
                                                         }`}>
                                                         {item.quantity}
                                                     </div>
-                                                    {/* Zoom Popup */}
-                                                    {hoveredImage === item.image && (
-                                                        <div
-                                                            className="fixed z-[9999] bg-white border-2 border-gray-300 rounded-lg shadow-2xl overflow-hidden pointer-events-none"
-                                                            style={{
-                                                                width: '400px',
-                                                                height: '400px',
-                                                                left: `${imagePosition.x + 20}px`,
-                                                                top: `${imagePosition.y - 200}px`,
-                                                                maxWidth: 'calc(100vw - 40px)',
-                                                                maxHeight: 'calc(100vh - 40px)'
-                                                            }}
-                                                        >
-                                                            <img
-                                                                src={item.image}
-                                                                alt={item.name}
-                                                                className="w-full h-full object-contain"
-                                                            />
-                                                        </div>
-                                                    )}
                                                 </div>
 
                                                 <div className="flex-1 min-w-0">
@@ -1195,22 +1151,43 @@ export default function OrderDetailsPage() {
                             </div>
                         </div>
 
-                        {/* Shipping Address */}
+                        {/* Shipping Details */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
                             <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center">
                                 <MapPin className="h-6 w-6 mr-3 text-red-600" />
-                                Shipping Address
+                                Shipping Details
                             </h2>
                             <div className="bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl p-6 border border-slate-200">
-                                <div className="flex items-start">
-                                    <div className="p-2 bg-red-100 rounded-lg">
-                                        <MapPin className="h-5 w-5 text-red-600" />
+                                <div className="space-y-4">
+                                    <div className="flex items-center">
+                                        <div className="p-2 bg-red-100 rounded-lg">
+                                            <User className="h-4 w-4 text-red-600" />
+                                        </div>
+                                        <div className="ml-4">
+                                            <p className="font-semibold text-slate-900">{order.shippingAddress?.name || 'N/A'}</p>
+                                            <p className="text-xs text-slate-500 font-medium">Recipient Name</p>
+                                        </div>
                                     </div>
-                                    <div className="ml-4">
-                                        <div className="space-y-1">
-                                            <p className="font-bold text-slate-900">{order.shippingAddress?.street}</p>
-                                            <p className="text-slate-700 font-medium">{order.shippingAddress?.city}, {order.shippingAddress?.state}</p>
-                                            <p className="text-slate-600">{order.shippingAddress?.country}</p>
+                                    <div className="flex items-center">
+                                        <div className="p-2 bg-red-100 rounded-lg">
+                                            <Phone className="h-4 w-4 text-red-600" />
+                                        </div>
+                                        <div className="ml-4">
+                                            <p className="font-semibold text-slate-900">{order.shippingAddress?.phone || 'N/A'}</p>
+                                            <p className="text-xs text-slate-500 font-medium">Recipient Phone</p>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-start">
+                                        <div className="p-2 bg-red-100 rounded-lg">
+                                            <MapPin className="h-4 w-4 text-red-600" />
+                                        </div>
+                                        <div className="ml-4">
+                                            <div className="space-y-1">
+                                                <p className="font-semibold text-slate-900">{order.shippingAddress?.street}</p>
+                                                <p className="text-slate-700 text-sm font-medium">{order.shippingAddress?.city}, {order.shippingAddress?.state}</p>
+                                                <p className="text-slate-600 text-sm">{order.shippingAddress?.country}</p>
+                                            </div>
+                                            <p className="text-xs text-slate-500 font-medium mt-1">Delivery Address</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1838,6 +1815,19 @@ export default function OrderDetailsPage() {
                                 Print Now
                             </button>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Hover Image Modal */}
+            {hoveredImage && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none bg-black/10 backdrop-blur-[2px] transition-all duration-300">
+                    <div className="bg-white p-3 rounded-2xl shadow-2xl animate-fade-in">
+                        <img 
+                            src={hoveredImage} 
+                            alt="Product Preview" 
+                            className="max-w-[80vw] max-h-[80vh] w-auto h-auto object-contain rounded-lg"
+                        />
                     </div>
                 </div>
             )}

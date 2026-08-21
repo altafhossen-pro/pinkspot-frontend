@@ -19,12 +19,14 @@ import {
     Star,
     Eye,
     Save,
-    X
+    X,
+    Key
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { userAPI, orderAPI } from '@/services/api'
 import { getCookie } from 'cookies-next'
 import LoyaltyPointsSection from '@/components/Admin/LoyaltyPointsSection'
+import ChangePasswordModal from '@/components/Admin/ChangePasswordModal'
 import { useAppContext } from '@/context/AppContext'
 import PermissionDenied from '@/components/Common/PermissionDenied'
 
@@ -45,6 +47,7 @@ export default function CustomerDetailPage() {
     const [checkingPermission, setCheckingPermission] = useState(true)
     const [hasReadPermission, setHasReadPermission] = useState(false)
     const [permissionError, setPermissionError] = useState(null)
+    const [showPasswordModal, setShowPasswordModal] = useState(false)
     const [ordersPagination, setOrdersPagination] = useState({
         currentPage: 1,
         totalPages: 1,
@@ -337,12 +340,22 @@ export default function CustomerDetailPage() {
                         <div className="flex items-center space-x-3">
                             {!isEditing ? (
                                 hasPermission('user','update') && (
-                                    <Link href={`/admin/dashboard/customers/${customerId}/edit`}
-                                        className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                                    >
-                                        <Edit className="h-4 w-4 mr-2" />
-                                        Edit Customer
-                                    </Link>
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPasswordModal(true)}
+                                            className="inline-flex items-center px-4 py-2 bg-white border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 hover:bg-gray-50 transition-colors duration-200"
+                                        >
+                                            <Key className="h-4 w-4 mr-2 text-blue-600" />
+                                            Change Password
+                                        </button>
+                                        <Link href={`/admin/dashboard/customers/${customerId}/edit`}
+                                            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                                        >
+                                            <Edit className="h-4 w-4 mr-2" />
+                                            Edit Customer
+                                        </Link>
+                                    </>
                                 )
                             ) : (
                                 <div className="flex space-x-2">
@@ -685,6 +698,13 @@ export default function CustomerDetailPage() {
                     />
                 </div>
             </div>
+
+            <ChangePasswordModal
+                isOpen={showPasswordModal}
+                onClose={() => setShowPasswordModal(false)}
+                userId={customerId}
+                userName={customer?.name}
+            />
         </div>
     )
 }

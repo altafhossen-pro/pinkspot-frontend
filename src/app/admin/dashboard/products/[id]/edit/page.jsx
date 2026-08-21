@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Save, Share2 } from 'lucide-react'
+import { ArrowLeft, Save, Share2, Eye } from 'lucide-react'
 import ShareModal from '@/components/Common/ShareModal'
 import toast from 'react-hot-toast'
 import { productAPI, categoryAPI } from '@/services/api'
@@ -596,6 +596,14 @@ export default function EditProductPage() {
                         </div>
                     </div>
                     <div className="flex items-center space-x-3">
+                        <Link
+                            href={`/product/${formData.slug}`}
+                            target="_blank"
+                            className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-lg text-gray-700 bg-white hover:bg-gray-50 transition-colors duration-200 cursor-pointer"
+                        >
+                            <Eye className="h-4 w-4 mr-2" />
+                            View
+                        </Link>
                         <button
                             type="button"
                             onClick={() => setShowShareModal(true)}
@@ -713,7 +721,8 @@ export default function EditProductPage() {
             <ShareModal
                 isOpen={showShareModal}
                 onClose={() => setShowShareModal(false)}
-                productUrl={typeof window !== 'undefined' ? `${window.location.origin}/product/${formData.slug}` : ''}
+                url={`/product/${formData.slug}`}
+                title="Share Product"
             />
 
             <StockManagementModal
