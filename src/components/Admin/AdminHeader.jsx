@@ -29,9 +29,9 @@ export const RollingNumber = ({ value }) => {
                 const num = parseInt(char);
                 if (isNaN(num)) return <span key={i} className="h-[1em] flex items-center">{char}</span>;
                 return (
-                    <div 
-                        key={i} 
-                        className="flex flex-col transition-transform duration-500 ease-in-out" 
+                    <div
+                        key={i}
+                        className="flex flex-col transition-transform duration-500 ease-in-out"
                         style={{ transform: `translateY(-${num * 100}%)` }}
                     >
                         {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((n) => (
@@ -100,7 +100,7 @@ export default function AdminHeader({ onMobileMenuToggle }) {
     useEffect(() => {
         const handleNotificationRead = (event) => {
             const orderId = event.detail;
-            
+
             // Re-calculate unread count based on the updated notifications array
             // Since we can't reliably know if it was ALREADY read in this context's state before the event,
             // we safely decrement it, but ensure it doesn't go below 0. 
@@ -177,14 +177,14 @@ export default function AdminHeader({ onMobileMenuToggle }) {
             if (!order.isReadByAdmin) {
                 const token = getCookie('token');
                 await orderAPI.markNotificationRead(order._id, token);
-                
+
                 // Update local state to mark as read without removing
-                setNotifications(prev => prev.map(o => 
+                setNotifications(prev => prev.map(o =>
                     o._id === order._id ? { ...o, isReadByAdmin: true } : o
                 ));
                 setUnreadCount(prev => Math.max(0, prev - 1));
             }
-            
+
             setIsNotificationsOpen(false);
             // Navigate to order details
             router.push(`/admin/dashboard/orders/${order._id}`);
@@ -265,40 +265,41 @@ export default function AdminHeader({ onMobileMenuToggle }) {
                                     {notifications.length > 0 ? (
                                         <>
                                             {notifications.map((order) => {
-                                                const totalWithShipping = order.total + (order.shippingCost || 0);
+                                                const totalWithShipping = order.total ? order.total : 0;
                                                 const customerPhone = order.phone || (order.user?.phone || order.guestInfo?.phone || '');
                                                 return (
-                                                <div
-                                                    key={order._id}
-                                                    onClick={() => handleNotificationClick(order)}
-                                                    className={`px-4 py-3 border-b border-gray-100 cursor-pointer transition-colors relative ${order.isReadByAdmin ? 'hover:bg-gray-50' : 'bg-blue-50/50 hover:bg-blue-100'}`}
-                                                >
-                                                    {!order.isReadByAdmin && (
-                                                        <div className="absolute top-4 right-4 w-2 h-2 bg-pink-500 rounded-full"></div>
-                                                    )}
-                                                    <div className="flex items-start gap-3">
-                                                        <div className={`p-2 rounded-full ${order.isReadByAdmin ? 'bg-gray-100 text-gray-500' : 'bg-blue-100 text-blue-600'}`}>
-                                                            <Package className="h-4 w-4" />
-                                                        </div>
-                                                        <div className="flex-1 pr-4">
-                                                            <p className={`text-sm font-medium ${order.isReadByAdmin ? 'text-gray-600' : 'text-gray-800'}`}>New Order #{order.orderId}</p>
-                                                            <p className="text-xs text-gray-500 mt-1 truncate">
-                                                                From: {order.customerName || (order.user?.name || order.guestInfo?.name || 'Customer')}
-                                                            </p>
-                                                            {customerPhone && (
-                                                                <p className="text-xs text-gray-400 mt-0.5">{customerPhone}</p>
-                                                            )}
-                                                            <p className={`text-xs font-semibold mt-1 ${order.isReadByAdmin ? 'text-gray-500' : 'text-blue-600'}`}>
-                                                                ৳{totalWithShipping}
-                                                            </p>
+                                                    <div
+                                                        key={order._id}
+                                                        onClick={() => handleNotificationClick(order)}
+                                                        className={`px-4 py-3 border-b border-gray-100 cursor-pointer transition-colors relative ${order.isReadByAdmin ? 'hover:bg-gray-50' : 'bg-blue-50/50 hover:bg-blue-100'}`}
+                                                    >
+                                                        {!order.isReadByAdmin && (
+                                                            <div className="absolute top-4 right-4 w-2 h-2 bg-pink-500 rounded-full"></div>
+                                                        )}
+                                                        <div className="flex items-start gap-3">
+                                                            <div className={`p-2 rounded-full ${order.isReadByAdmin ? 'bg-gray-100 text-gray-500' : 'bg-blue-100 text-blue-600'}`}>
+                                                                <Package className="h-4 w-4" />
+                                                            </div>
+                                                            <div className="flex-1 pr-4">
+                                                                <p className={`text-sm font-medium ${order.isReadByAdmin ? 'text-gray-600' : 'text-gray-800'}`}>New Order #{order.orderId}</p>
+                                                                <p className="text-xs text-gray-500 mt-1 truncate">
+                                                                    From: {order.customerName || (order.user?.name || order.guestInfo?.name || 'Customer')}
+                                                                </p>
+                                                                {customerPhone && (
+                                                                    <p className="text-xs text-gray-400 mt-0.5">{customerPhone}</p>
+                                                                )}
+                                                                <p className={`text-xs font-semibold mt-1 ${order.isReadByAdmin ? 'text-gray-500' : 'text-blue-600'}`}>
+                                                                    ৳{totalWithShipping}
+                                                                </p>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            )})}
-                                            
+                                                )
+                                            })}
+
                                             {hasMore && (
                                                 <div className="p-3 text-center border-t border-gray-100 bg-gray-50">
-                                                    <button 
+                                                    <button
                                                         onClick={() => fetchNotifications(page + 1)}
                                                         disabled={loadingNotifications}
                                                         className="text-xs text-blue-600 font-medium hover:text-blue-800 disabled:opacity-50"
