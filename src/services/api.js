@@ -895,9 +895,13 @@ export const transformProductData = (product) => {
         finalPrice = basePrice - (basePrice * (discountObj.percentage / 100));
     }
 
+    const activeSubtitle = product.isGlobalSubtitleOn && product.globalSubtitle 
+        ? product.globalSubtitle 
+        : product.customSubtitle;
+
     return {
         id: product._id,
-        name: product.title,
+        name: activeSubtitle ? `${product.title} ${activeSubtitle}` : product.title,
         price: Number(finalPrice.toFixed(2)),
         originalPrice: originalPrice ? Number(Number(originalPrice).toFixed(2)) : null,
         rating: product.averageRating || 0,
@@ -1598,6 +1602,17 @@ export const settingsAPI = {
     },
 
     // Update site settings only (Admin only)
+    updateGlobalProductSubtitle: (data, token) => {
+        return apiCall('/settings/global-subtitle', {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data),
+        });
+    },
+
     updateSiteSettings: (siteData, token) => {
         return apiCall('/settings/site-settings', {
             method: 'PUT',

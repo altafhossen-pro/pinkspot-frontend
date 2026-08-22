@@ -31,6 +31,8 @@ export default function CreateProductPage() {
 
     const [formData, setFormData] = useState({
         title: '',
+        customSubtitle: '',
+        isGlobalSubtitleOn: true,
         shortDescription: '',
         description: '',
         category: '',

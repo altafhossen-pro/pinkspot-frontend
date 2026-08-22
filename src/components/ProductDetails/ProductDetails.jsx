@@ -385,8 +385,13 @@ export default function ProductDetails({ productSlug }) {
         } : null;
 
         // If no variant is selected, we should still pass the discounted price to product
+        const activeSubtitle = product.isGlobalSubtitleOn && product.globalSubtitle 
+            ? product.globalSubtitle 
+            : product.customSubtitle;
+
         const productToAdd = {
             ...product,
+            name: activeSubtitle ? `${product.title} ${activeSubtitle}` : product.title,
             price: Number(finalPrice.toFixed(2)),
             originalPrice: finalOriginalPrice ? Number(Number(finalOriginalPrice).toFixed(2)) : null,
             categoryDiscountApplied: !!(product?.category?.categoryDiscount?.isActive && !product.excludeFromCategoryDiscount)
@@ -425,8 +430,13 @@ export default function ProductDetails({ productSlug }) {
         } : null;
 
         // If no variant is selected, we should still pass the discounted price to product
+        const activeSubtitle = product.isGlobalSubtitleOn && product.globalSubtitle 
+            ? product.globalSubtitle 
+            : product.customSubtitle;
+
         const productToAdd = {
             ...product,
+            name: activeSubtitle ? `${product.title} ${activeSubtitle}` : product.title,
             price: Number(finalPrice.toFixed(2)),
             originalPrice: finalOriginalPrice ? Number(Number(finalOriginalPrice).toFixed(2)) : null,
             categoryDiscountApplied: !!(product?.category?.categoryDiscount?.isActive && !product.excludeFromCategoryDiscount)
@@ -738,6 +748,11 @@ export default function ProductDetails({ productSlug }) {
                                 )}
                                 <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
                                     {product.title}
+                                    {(product.isGlobalSubtitleOn && product.globalSubtitle)
+                                        ? ` ${product.globalSubtitle}`
+                                        : product.customSubtitle
+                                            ? ` ${product.customSubtitle}`
+                                            : ''}
                                 </h1>
                             </div>
 

@@ -64,10 +64,18 @@ export const addProductToCart = (product, addToCart, quantity = 1) => {
       };
     }
 
+    const activeSubtitle = product.isGlobalSubtitleOn && product.globalSubtitle 
+        ? product.globalSubtitle 
+        : product.customSubtitle;
+
     // Create a proper product object for cart
     const cartProduct = {
-      _id: product._id,
+      _id: product._id || product.id,
       title: product.title || product.name,
+      customSubtitle: product.customSubtitle,
+      globalSubtitle: product.globalSubtitle,
+      isGlobalSubtitleOn: product.isGlobalSubtitleOn,
+      name: product.name || (activeSubtitle ? `${product.title} ${activeSubtitle}` : product.title),
       slug: product.slug,
       featuredImage: product.featuredImage || product.image,
       basePrice: product.price,

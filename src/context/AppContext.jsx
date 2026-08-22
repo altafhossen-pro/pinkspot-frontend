@@ -84,6 +84,10 @@ export const AppProvider = ({ children }) => {
             return parts.length > 0 ? parts.join(', ') : 'Default';
         })() : 'Default';
 
+        const activeSubtitle = product.isGlobalSubtitleOn && product.globalSubtitle
+            ? product.globalSubtitle
+            : product.customSubtitle;
+
         const cartItem = {
             id: Date.now(), // Unique cart item ID
             productId: product._id,
@@ -95,7 +99,7 @@ export const AppProvider = ({ children }) => {
                 category: product.category
             },
             variantKey: variantKey,
-            name: product.title,
+            name: product.name || (activeSubtitle ? `${product.title} ${activeSubtitle}` : product.title),
             variant: variantDisplay,
             price: selectedVariant?.currentPrice || product.basePrice || 0,
             originalPrice: selectedVariant?.originalPrice || null,
@@ -179,6 +183,10 @@ export const AppProvider = ({ children }) => {
                 return parts.length > 0 ? parts.join(', ') : 'Default';
             })() : 'Default';
 
+            const batchActiveSubtitle = product.isGlobalSubtitleOn && product.globalSubtitle
+                ? product.globalSubtitle
+                : product.customSubtitle;
+
             const cartItem = {
                 id: Date.now() + Math.random(), // Unique cart item ID
                 productId: product._id,
@@ -190,7 +198,7 @@ export const AppProvider = ({ children }) => {
                     category: product.category
                 },
                 variantKey: variantKey,
-                name: product.title,
+                name: product.name || (batchActiveSubtitle ? `${product.title} ${batchActiveSubtitle}` : product.title),
                 variant: variantDisplay,
                 price: selectedVariant?.currentPrice || product.basePrice || 0,
                 originalPrice: selectedVariant?.originalPrice || null,

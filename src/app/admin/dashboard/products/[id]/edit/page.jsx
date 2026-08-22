@@ -40,6 +40,8 @@ export default function EditProductPage() {
 
     const [formData, setFormData] = useState({
         title: '',
+        customSubtitle: '',
+        isGlobalSubtitleOn: true,
         shortDescription: '',
         description: '',
         category: '',
@@ -125,6 +127,8 @@ export default function EditProductPage() {
                 const product = data.data
                 setFormData({
                     title: product.title || '',
+                    customSubtitle: product.customSubtitle || '',
+                    isGlobalSubtitleOn: product.isGlobalSubtitleOn !== undefined ? product.isGlobalSubtitleOn : true,
                     shortDescription: product.shortDescription || '',
                     description: product.description || '',
                     category: product.category?._id || product.category || '',

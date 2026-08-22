@@ -34,7 +34,9 @@ import {
     Coins,
     RotateCcw,
     CheckSquare,
-    Square
+    Square,
+    ScanBarcode,
+    XCircle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDateForTable } from '@/utils/formatDate';
@@ -60,6 +62,21 @@ export default function OrderDetailsPage() {
     const [returnQuantities, setReturnQuantities] = useState({});
     const [selectedItems, setSelectedItems] = useState(new Set());
     const [hoveredImage, setHoveredImage] = useState(null);
+    const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
+
+    const handleImageMouseEnter = (e, imageUrl) => {
+        setHoveredImage(imageUrl);
+        setImagePosition({ x: e.clientX, y: e.clientY });
+    };
+
+    const handleImageMouseMove = (e) => {
+        setImagePosition({ x: e.clientX, y: e.clientY });
+    };
+
+    const handleImageMouseLeave = () => {
+        setHoveredImage(null);
+    };
+
     const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
     const printRef = useRef();
 
@@ -71,6 +88,78 @@ export default function OrderDetailsPage() {
     const [apiError, setApiError] = useState(null);
     const [trackingHistory, setTrackingHistory] = useState([]);
     const [isNextStatusModalOpen, setIsNextStatusModalOpen] = useState(false);
+
+    // Scan Barcode States
+    const [scanInputValue, setScanInputValue] = useState('');
+    const [scanResult, setScanResult] = useState(null);
+    const scanTimeoutRef = useRef(null);
+    const scanInputRef = useRef(null);
+
+    // Auto focus the scan input on load
+    useEffect(() => {
+        if (!contextLoading && order && scanInputRef.current) {
+            scanInputRef.current.focus();
+        }
+    }, [contextLoading, order]);
+
+    const handleScanInputChange = (e) => {
+        const value = e.target.value;
+        setScanInputValue(value);
+        
+        if (value.trim().length > 0 && order && order.items) {
+            const scan = value.trim().toLowerCase();
+            const foundIndex = order.items.findIndex(item => {
+                return (item.variant && item.variant.sku && String(item.variant.sku).toLowerCase() === scan) || 
+                       (item.productInfo && item.productInfo.slug && String(item.productInfo.slug).toLowerCase() === scan) ||
+                       (item.sku && String(item.sku).toLowerCase() === scan);
+            });
+
+            if (foundIndex !== -1) {
+                const foundItem = order.items[foundIndex];
+                
+                // Auto-select for packing
+                setSelectedItems(prev => {
+                    const newSet = new Set(prev);
+                    newSet.add(foundIndex);
+                    return newSet;
+                });
+
+                setScanResult({
+                    status: 'success',
+                    message: 'Product Found in Order!',
+                    sku: value,
+                    itemName: foundItem.name
+                });
+                setScanInputValue('');
+                
+                if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
+                scanTimeoutRef.current = setTimeout(() => {
+                    setScanResult(null);
+                }, 1000);
+            }
+        }
+    };
+
+    const handleScanInputKeyDown = (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const value = e.target.value.trim();
+            if (value.length > 0) {
+                // If enter is pressed and we still have a value, it means it didn't match anything during typing
+                setScanResult({
+                    status: 'error',
+                    message: 'Product Not Found in Order',
+                    sku: value
+                });
+                setScanInputValue('');
+                
+                if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
+                scanTimeoutRef.current = setTimeout(() => {
+                    setScanResult(null);
+                }, 3000);
+            }
+        }
+    };
 
     useEffect(() => {
         // Check permission first
@@ -759,8 +848,8 @@ export default function OrderDetailsPage() {
                                     {getStatusTimeline(order.status).map((step, index) => (
                                         <div key={step.step} className="relative flex items-start">
                                             <div className={`relative z-10 flex items-center justify-center w-10 h-10 rounded-full border-4 ${step.completed
-                                                    ? 'bg-emerald-500 border-emerald-500'
-                                                    : 'bg-white border-slate-300'
+                                                ? 'bg-emerald-500 border-emerald-500'
+                                                : 'bg-white border-slate-300'
                                                 }`}>
                                                 {step.completed ? (
                                                     <CheckCircle className="h-5 w-5 text-white" />
@@ -793,6 +882,23 @@ export default function OrderDetailsPage() {
                                     Order Items
                                 </h2>
                                 <div className="flex items-center space-x-3">
+                                    <div className="bg-indigo-50 border-2 border-indigo-200 pl-4 pr-5 py-2.5 rounded-xl flex items-center shadow-md">
+                                        <ScanBarcode className="h-6 w-6 text-indigo-600 mr-3 shrink-0" />
+                                        <input
+                                            ref={scanInputRef}
+                                            type="text"
+                                            value={scanInputValue}
+                                            onChange={handleScanInputChange}
+                                            onKeyDown={handleScanInputKeyDown}
+                                            placeholder="Scan barcode..."
+                                            className="bg-transparent border-none outline-none focus:ring-0 text-lg font-bold text-indigo-900 w-64 placeholder-indigo-300 p-0"
+                                            autoFocus
+                                        />
+                                        <div className="relative flex h-3 w-3 ml-3 shrink-0">
+                                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                                          <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
+                                        </div>
+                                    </div>
                                     <div className="bg-slate-100 px-4 py-2 rounded-xl">
                                         <span className="text-sm font-semibold text-slate-700">
                                             {order.items.length} item{order.items.length > 1 ? 's' : ''}
@@ -831,10 +937,10 @@ export default function OrderDetailsPage() {
                                         <div className="flex items-center justify-between">
                                             <span className="text-xs font-medium text-slate-600">Packed Items:</span>
                                             <span className={`text-sm font-bold ${selectedItems.size === order.items.length
-                                                    ? 'text-emerald-600'
-                                                    : selectedItems.size > 0
-                                                        ? 'text-blue-600'
-                                                        : 'text-slate-400'
+                                                ? 'text-emerald-600'
+                                                : selectedItems.size > 0
+                                                    ? 'text-blue-600'
+                                                    : 'text-slate-400'
                                                 }`}>
                                                 {selectedItems.size} / {order.items.length}
                                             </span>
@@ -842,8 +948,8 @@ export default function OrderDetailsPage() {
                                         <div className="mt-1 w-full bg-slate-200 rounded-full h-2">
                                             <div
                                                 className={`h-2 rounded-full transition-all duration-300 ${selectedItems.size === order.items.length
-                                                        ? 'bg-emerald-500'
-                                                        : 'bg-blue-500'
+                                                    ? 'bg-emerald-500'
+                                                    : 'bg-blue-500'
                                                     }`}
                                                 style={{ width: `${(selectedItems.size / order.items.length) * 100}%` }}
                                             ></div>
@@ -860,16 +966,16 @@ export default function OrderDetailsPage() {
                                             key={index}
                                             onClick={() => toggleItemSelection(index)}
                                             className={`group relative rounded-2xl p-6 transition-all duration-300 border-2 cursor-pointer ${isSelected
-                                                    ? 'bg-emerald-50 border-emerald-300 hover:bg-emerald-100'
-                                                    : 'bg-slate-50 border-slate-100 hover:bg-slate-100'
+                                                ? 'bg-emerald-50 border-emerald-300 hover:bg-emerald-100'
+                                                : 'bg-slate-50 border-slate-100 hover:bg-slate-100'
                                                 }`}
                                         >
                                             <div className="flex items-center space-x-6">
                                                 {/* Selection Checkbox */}
                                                 <div className="flex-shrink-0">
                                                     <div className={`w-8 h-8 rounded-lg border-2 flex items-center justify-center transition-all ${isSelected
-                                                            ? 'bg-emerald-500 border-emerald-600'
-                                                            : 'bg-white border-slate-300 group-hover:border-blue-400'
+                                                        ? 'bg-emerald-500 border-emerald-600'
+                                                        : 'bg-white border-slate-300 group-hover:border-blue-400'
                                                         }`}>
                                                         {isSelected ? (
                                                             <CheckSquare className="h-5 w-5 text-white" />
@@ -1255,15 +1361,27 @@ export default function OrderDetailsPage() {
                             <h2 className="text-xl font-bold text-slate-900 mb-6">Quick Actions</h2>
                             <div className="grid grid-cols-1 gap-4">
                                 {hasPermission('order', 'update') && getNextStatus(order.status) && (
-                                    <button
-                                        onClick={openNextStatusModal}
-                                        className="group flex items-center justify-center px-6 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-xl hover:from-blue-700 hover:to-blue-800 transition-all duration-200 shadow-lg hover:shadow-xl cursor-pointer"
-                                    >
-                                        <CheckCircle className="h-5 w-5 mr-3 group-hover:scale-110 transition-transform" />
-                                        <span className="font-semibold">
-                                            Move to Next Status ({getNextStatus(order.status).charAt(0).toUpperCase() + getNextStatus(order.status).slice(1)})
-                                        </span>
-                                    </button>
+                                    <>
+                                        <button
+                                            onClick={openNextStatusModal}
+                                            disabled={order.status === 'confirmed' && selectedItems.size !== order.items.length}
+                                            className={`group flex items-center justify-center px-6 py-3 rounded-xl transition-all duration-200 shadow-lg ${
+                                                order.status === 'confirmed' && selectedItems.size !== order.items.length
+                                                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                                                    : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 hover:shadow-xl cursor-pointer'
+                                            }`}
+                                        >
+                                            <CheckCircle className={`h-5 w-5 mr-3 ${order.status === 'confirmed' && selectedItems.size !== order.items.length ? '' : 'group-hover:scale-110 transition-transform'}`} />
+                                            <span className="font-semibold">
+                                                Move to Next Status ({getNextStatus(order.status).charAt(0).toUpperCase() + getNextStatus(order.status).slice(1)})
+                                            </span>
+                                        </button>
+                                        {order.status === 'confirmed' && selectedItems.size !== order.items.length && (
+                                            <p className="text-xs text-red-500 font-medium text-center mt-2">
+                                                Please pack all items ({selectedItems.size}/{order.items.length}) before processing the order.
+                                            </p>
+                                        )}
+                                    </>
                                 )}
                                 {hasPermission('order', 'update') && !getNextStatus(order.status) && (
                                     <div className="text-center p-4 bg-gray-50 rounded-xl border border-gray-200 text-gray-500 text-sm">
@@ -1388,8 +1506,8 @@ export default function OrderDetailsPage() {
                                 }}
                                 disabled={updatingStatus || newStatus === order.status}
                                 className={`px-4 py-2 rounded-md text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${updatingStatus || newStatus === order.status
-                                        ? 'bg-gray-400 cursor-not-allowed'
-                                        : 'bg-blue-600 hover:bg-blue-700'
+                                    ? 'bg-gray-400 cursor-not-allowed'
+                                    : 'bg-blue-600 hover:bg-blue-700'
                                     }`}
                             >
                                 {updatingStatus ? 'Updating...' : 'Update Status'}
@@ -1632,8 +1750,8 @@ export default function OrderDetailsPage() {
                                         onClick={handleReturnSubmit}
                                         disabled={updatingStatus}
                                         className={`w-full sm:w-auto px-4 py-1.5 rounded-md text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-600 transition-colors ${updatingStatus
-                                                ? 'bg-gray-400 cursor-not-allowed'
-                                                : 'bg-gradient-to-r from-pink-600 to-red-500 hover:from-pink-600 hover:to-red-600 shadow-lg'
+                                            ? 'bg-gray-400 cursor-not-allowed'
+                                            : 'bg-gradient-to-r from-pink-600 to-red-500 hover:from-pink-600 hover:to-red-600 shadow-lg'
                                             }`}
                                     >
                                         {updatingStatus ? (
@@ -1823,11 +1941,50 @@ export default function OrderDetailsPage() {
             {hoveredImage && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none bg-black/10 backdrop-blur-[2px] transition-all duration-300">
                     <div className="bg-white p-3 rounded-2xl shadow-2xl animate-fade-in">
-                        <img 
-                            src={hoveredImage} 
-                            alt="Product Preview" 
+                        <img
+                            src={hoveredImage}
+                            alt="Product Preview"
                             className="max-w-[80vw] max-h-[80vh] w-auto h-auto object-contain rounded-lg"
                         />
+                    </div>
+                </div>
+            )}
+
+            {/* Barcode Scan Result Modal */}
+            {scanResult && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm transition-all duration-300">
+                    <div className="bg-white rounded-3xl shadow-2xl overflow-hidden max-w-md w-full transform scale-100 animate-in fade-in zoom-in duration-200">
+                        <div className={`h-2 w-full ${scanResult.status === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
+                        <div className="p-8 text-center">
+                            <div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full mb-6 shadow-inner ${
+                                scanResult.status === 'success' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'
+                            }`}>
+                                {scanResult.status === 'success' ? (
+                                    <CheckCircle className="h-10 w-10" />
+                                ) : (
+                                    <XCircle className="h-10 w-10" />
+                                )}
+                            </div>
+                            <h3 className={`text-2xl font-bold mb-2 ${
+                                scanResult.status === 'success' ? 'text-emerald-600' : 'text-red-600'
+                            }`}>
+                                {scanResult.message}
+                            </h3>
+                            <div className="bg-slate-50 rounded-2xl p-5 mt-6 border border-slate-100 shadow-sm text-left relative overflow-hidden">
+                                <div className={`absolute top-0 right-0 w-16 h-16 transform translate-x-8 -translate-y-8 rounded-full ${
+                                    scanResult.status === 'success' ? 'bg-emerald-100/50' : 'bg-red-100/50'
+                                }`}></div>
+                                <p className="text-xs text-slate-400 font-bold mb-1 uppercase tracking-wider relative z-10">Scanned SKU / Barcode</p>
+                                <p className="text-xl font-mono font-bold text-slate-800 break-all relative z-10">{scanResult.sku}</p>
+                                
+                                {scanResult.itemName && (
+                                    <div className="mt-4 pt-4 border-t border-slate-200 relative z-10">
+                                        <p className="text-xs text-slate-400 font-bold mb-1 uppercase tracking-wider">Matched Item in Order</p>
+                                        <p className="text-base font-semibold text-slate-700 leading-tight">{scanResult.itemName}</p>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 </div>
             )}
