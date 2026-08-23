@@ -23,8 +23,14 @@ export default function EmailSMSSettingsPage() {
   const router = useRouter();
   const { hasPermission, contextLoading } = useAppContext();
   const [settings, setSettings] = useState({
-    isSendOrderConfirmationEmail: true,
-    isSendGuestOrderConfirmationSMS: true,
+    isSendGuestOrderEmail: true,
+    isSendGuestOrderSMS: true,
+    isSendUserOrderEmail: true,
+    isSendUserOrderSMS: true,
+    isSendManualOrderEmail: true,
+    isSendManualOrderSMS: true,
+    isSendOrderStatusConfirmedEmail: true,
+    isSendOrderStatusConfirmedSMS: true,
     smtpHost: '',
     smtpPort: 587,
     smtpUser: '',
@@ -420,7 +426,7 @@ export default function EmailSMSSettingsPage() {
             </div>
           </div>
 
-          {/* Email Confirmation Setting */}
+          {/* Guest Checkout Notifications Setting */}
           <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
             <div className="flex items-start justify-between">
               <div className="flex-1">
@@ -429,81 +435,165 @@ export default function EmailSMSSettingsPage() {
                     <Mail className="h-5 w-5 text-blue-600" />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900">
-                    Order Confirmation Email
+                    Guest Checkout Notifications
                   </h3>
                 </div>
                 <p className="text-sm text-gray-600 ml-11 mb-4">
-                  Send order confirmation emails to logged-in users when they place an order.
+                  Send notifications to guest users when they place an order.
                 </p>
-                <div className="ml-11">
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <AlertCircle className="h-4 w-4" />
-                    <span>This applies to registered users only. Guest orders will not receive emails.</span>
+                <div className="ml-11 flex flex-col gap-4">
+                  <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                    <span className="text-sm font-medium text-gray-700">Email Notification</span>
+                    <button
+                      type="button"
+                      onClick={() => handleToggle('isSendGuestOrderEmail')}
+                      disabled={!hasUpdatePermission || saving}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.isSendGuestOrderEmail ? 'bg-green-500' : 'bg-gray-300'} ${!hasUpdatePermission ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.isSendGuestOrderEmail ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                    <span className="text-sm font-medium text-gray-700">SMS Notification</span>
+                    <button
+                      type="button"
+                      onClick={() => handleToggle('isSendGuestOrderSMS')}
+                      disabled={!hasUpdatePermission || saving}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.isSendGuestOrderSMS ? 'bg-green-500' : 'bg-gray-300'} ${!hasUpdatePermission ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.isSendGuestOrderSMS ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
                   </div>
                 </div>
-              </div>
-              <div className="ml-4">
-                <button
-                  type="button"
-                  onClick={() => handleToggle('isSendOrderConfirmationEmail')}
-                  disabled={!hasUpdatePermission || saving}
-                  className={`
-                    relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                    ${settings.isSendOrderConfirmationEmail ? 'bg-green-500' : 'bg-gray-300'}
-                    ${!hasUpdatePermission ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-                  `}
-                >
-                  <span
-                    className={`
-                      inline-block h-4 w-4 transform rounded-full bg-white transition-transform
-                      ${settings.isSendOrderConfirmationEmail ? 'translate-x-6' : 'translate-x-1'}
-                    `}
-                  />
-                </button>
               </div>
             </div>
           </div>
 
-          {/* SMS Confirmation Setting */}
+          {/* Registered User Checkout Notifications Setting */}
           <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
                   <div className="p-2 bg-green-100 rounded-lg">
-                    <MessageSquare className="h-5 w-5 text-green-600" />
+                    <Mail className="h-5 w-5 text-green-600" />
                   </div>
                   <h3 className="text-lg font-semibold text-gray-900">
-                    Guest Order Confirmation SMS
+                    Registered User Notifications
                   </h3>
                 </div>
                 <p className="text-sm text-gray-600 ml-11 mb-4">
-                  Send order confirmation SMS to guest users when they place an order.
+                  Send notifications to logged-in users when they place an order.
                 </p>
-                <div className="ml-11">
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <AlertCircle className="h-4 w-4" />
-                    <span>This applies to guest orders only. Registered users receive email confirmations.</span>
+                <div className="ml-11 flex flex-col gap-4">
+                  <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                    <span className="text-sm font-medium text-gray-700">Email Notification</span>
+                    <button
+                      type="button"
+                      onClick={() => handleToggle('isSendUserOrderEmail')}
+                      disabled={!hasUpdatePermission || saving}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.isSendUserOrderEmail ? 'bg-green-500' : 'bg-gray-300'} ${!hasUpdatePermission ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.isSendUserOrderEmail ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                    <span className="text-sm font-medium text-gray-700">SMS Notification</span>
+                    <button
+                      type="button"
+                      onClick={() => handleToggle('isSendUserOrderSMS')}
+                      disabled={!hasUpdatePermission || saving}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.isSendUserOrderSMS ? 'bg-green-500' : 'bg-gray-300'} ${!hasUpdatePermission ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.isSendUserOrderSMS ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
                   </div>
                 </div>
               </div>
-              <div className="ml-4">
-                <button
-                  type="button"
-                  onClick={() => handleToggle('isSendGuestOrderConfirmationSMS')}
-                  disabled={!hasUpdatePermission || saving}
-                  className={`
-                    relative inline-flex h-6 w-11 items-center rounded-full transition-colors
-                    ${settings.isSendGuestOrderConfirmationSMS ? 'bg-green-500' : 'bg-gray-300'}
-                    ${!hasUpdatePermission ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
-                  `}
-                >
-                  <span
-                    className={`
-                      inline-block h-4 w-4 transform rounded-full bg-white transition-transform
-                      ${settings.isSendGuestOrderConfirmationSMS ? 'translate-x-6' : 'translate-x-1'}
-                    `}
-                  />
-                </button>
+            </div>
+          </div>
+
+          {/* Manual Order Notifications Setting */}
+          <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-purple-100 rounded-lg">
+                    <Mail className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Manual Order Notifications
+                  </h3>
+                </div>
+                <p className="text-sm text-gray-600 ml-11 mb-4">
+                  Send notifications when an admin creates a manual order.
+                </p>
+                <div className="ml-11 flex flex-col gap-4">
+                  <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                    <span className="text-sm font-medium text-gray-700">Email Notification</span>
+                    <button
+                      type="button"
+                      onClick={() => handleToggle('isSendManualOrderEmail')}
+                      disabled={!hasUpdatePermission || saving}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.isSendManualOrderEmail ? 'bg-green-500' : 'bg-gray-300'} ${!hasUpdatePermission ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.isSendManualOrderEmail ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                    <span className="text-sm font-medium text-gray-700">SMS Notification</span>
+                    <button
+                      type="button"
+                      onClick={() => handleToggle('isSendManualOrderSMS')}
+                      disabled={!hasUpdatePermission || saving}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.isSendManualOrderSMS ? 'bg-green-500' : 'bg-gray-300'} ${!hasUpdatePermission ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.isSendManualOrderSMS ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Order Confirmed Notifications Setting */}
+          <div className="bg-white rounded-lg shadow-md border border-gray-200 p-6">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-2">
+                  <div className="p-2 bg-yellow-100 rounded-lg">
+                    <MessageSquare className="h-5 w-5 text-yellow-600" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-gray-900">
+                    Order Confirmed Notifications
+                  </h3>
+                </div>
+                <p className="text-sm text-gray-600 ml-11 mb-4">
+                  Send notifications when an order status is changed to 'Confirmed'.
+                </p>
+                <div className="ml-11 flex flex-col gap-4">
+                  <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                    <span className="text-sm font-medium text-gray-700">Email Notification</span>
+                    <button
+                      type="button"
+                      onClick={() => handleToggle('isSendOrderStatusConfirmedEmail')}
+                      disabled={!hasUpdatePermission || saving}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.isSendOrderStatusConfirmedEmail ? 'bg-green-500' : 'bg-gray-300'} ${!hasUpdatePermission ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.isSendOrderStatusConfirmedEmail ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
+                    <span className="text-sm font-medium text-gray-700">SMS Notification</span>
+                    <button
+                      type="button"
+                      onClick={() => handleToggle('isSendOrderStatusConfirmedSMS')}
+                      disabled={!hasUpdatePermission || saving}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${settings.isSendOrderStatusConfirmedSMS ? 'bg-green-500' : 'bg-gray-300'} ${!hasUpdatePermission ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${settings.isSendOrderStatusConfirmedSMS ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -543,10 +633,10 @@ export default function EmailSMSSettingsPage() {
             <div>
               <h4 className="text-sm font-semibold text-blue-900 mb-1">How it works</h4>
               <ul className="text-xs text-blue-800 space-y-1">
-                <li>• <strong>Email Confirmation:</strong> Sent to registered users after order creation</li>
-                <li>• <strong>SMS Confirmation:</strong> Sent to guest users (checkout or manual orders) after order creation</li>
-                <li>• Changes take effect immediately for new orders</li>
-                <li>• Existing orders are not affected by these settings</li>
+                <li>• <strong>Guest Orders:</strong> Triggered when unauthenticated users checkout.</li>
+                <li>• <strong>Registered Users:</strong> Triggered when logged-in users checkout.</li>
+                <li>• <strong>Manual Orders:</strong> Triggered when an admin creates a manual order.</li>
+                <li>• <strong>Order Confirmed:</strong> Triggered only when an order status is changed to 'Confirmed'.</li>
               </ul>
             </div>
           </div>

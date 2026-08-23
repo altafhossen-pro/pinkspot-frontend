@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import { formatDateForTable } from '@/utils/formatDate';
 import { orderAPI, settingsAPI } from '@/services/api';
 import { getCookie } from 'cookies-next';
+import { io } from 'socket.io-client';
 import PermissionDenied from '@/components/Common/PermissionDenied';
 import { useAppContext } from '@/context/AppContext';
 import DeleteConfirmationModal from '@/components/Common/DeleteConfirmationModal';
@@ -45,6 +46,7 @@ export default function AdminOrdersPage() {
     const [settings, setSettings] = useState(null);
     const [showColorModal, setShowColorModal] = useState(false);
     const [orderSourceColors, setOrderSourceColors] = useState({});
+    const [ordersPresence, setOrdersPresence] = useState({}); // orderId -> Array of active viewers
 
     // Filter states
     const [filters, setFilters] = useState({
@@ -94,6 +96,34 @@ export default function AdminOrdersPage() {
             console.error('Error fetching settings:', error);
         }
     };
+
+    // Setup socket connection for order presence
+    useEffect(() => {
+        const socketUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1').replace('/api/v1', '');
+        const newSocket = io(socketUrl, {
+            withCredentials: true,
+            transports: ['websocket', 'polling']
+        });
+
+        newSocket.on('connect', () => {
+            newSocket.emit('get_all_orders_presence');
+        });
+
+        newSocket.on('all_orders_presence', (data) => {
+            setOrdersPresence(data);
+        });
+
+        newSocket.on('order_presence_update', (data) => {
+            setOrdersPresence(prev => ({
+                ...prev,
+                [data.orderId]: data.viewers
+            }));
+        });
+
+        return () => {
+            newSocket.disconnect();
+        };
+    }, []);
 
     // Refetch orders when filters or pagination changes (debounced)
     // This single useEffect handles all data fetching to prevent duplicate calls
@@ -1162,6 +1192,9 @@ export default function AdminOrdersPage() {
                                         Status
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                        Active Staff
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                         Payment
                                     </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1287,6 +1320,23 @@ export default function AdminOrdersPage() {
                                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                                                 {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                                             </span>
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap">
+                                            {ordersPresence[order._id] && ordersPresence[order._id].length > 0 ? (
+                                                <div className="flex flex-col gap-1.5">
+                                                    {ordersPresence[order._id].map((viewer, idx) => (
+                                                        <span key={idx} className="inline-flex items-center text-xs font-medium text-red-700 bg-red-100 px-2 py-1 rounded-md border border-red-200 shadow-sm">
+                                                            <div className="w-1.5 h-1.5 rounded-full bg-red-500 mr-2 animate-pulse"></div>
+                                                            Working: {viewer.name.split(' ')[0]}
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <span className="inline-flex items-center text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-100 shadow-sm">
+                                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2"></div>
+                                                    Available
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <div className="flex flex-col space-y-1">

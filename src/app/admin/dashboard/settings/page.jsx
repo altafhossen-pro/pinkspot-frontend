@@ -10,6 +10,7 @@ import {
   Mail,
   Users,
   Truck,
+  Box,
 } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import PermissionDenied from '@/components/Common/PermissionDenied';
@@ -36,6 +37,14 @@ export default function AdminSettingsPage() {
       icon: Coins,
       color: 'bg-pink-100 text-pink-600',
       href: '/admin/dashboard/settings/loyalty'
+    },
+    {
+      id: 'delivery',
+      title: 'Delivery Settings',
+      description: 'Charges & free shipping',
+      icon: Box,
+      color: 'bg-teal-100 text-teal-600',
+      href: '/admin/dashboard/settings/delivery'
     },
     {
       id: 'menu',

@@ -541,7 +541,8 @@ export default function EditProductPage() {
             }
         } catch (error) {
             console.error('Error updating product:', error)
-            toast.error('Error updating product')
+            const msg = error.response?.data?.message || error.message || 'Error updating product'
+            toast.error(msg)
         } finally {
             setLoading(false)
         }

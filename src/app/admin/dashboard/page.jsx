@@ -370,7 +370,7 @@ export default function DashboardPage() {
     return (
         <div className="space-y-6">
             {/* Page Header */}
-            <div className="flex justify-between items-center">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
                     <p className="text-gray-600">Welcome back! Here's what's happening with your store.</p>

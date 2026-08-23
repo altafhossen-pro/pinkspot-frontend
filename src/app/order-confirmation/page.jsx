@@ -109,20 +109,20 @@ function OrderConfirmation() {
                                         Since you placed this order as a guest, please save your Order ID and tracking link for future reference.
                                     </p>
                                     <div className="space-y-2">
-                                        <div className="bg-white rounded p-3 border border-blue-200">
-                                            <div className="flex items-center justify-between">
+                                        <div className="bg-white rounded p-3 border border-blue-200 overflow-hidden">
+                                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
                                                 <p className="text-xs text-blue-600 font-medium">Order ID:</p>
-                                                <p className="font-mono text-sm font-bold text-blue-800">{orderId}</p>
+                                                <p className="font-mono text-xs sm:text-sm font-bold text-blue-800 break-all">{orderId}</p>
                                             </div>
                                         </div>
-                                        <div className="bg-white rounded p-3 border border-blue-200">
-                                            <div className="flex items-center justify-between">
+                                        <div className="bg-white rounded p-3 border border-blue-200 overflow-hidden">
+                                            <div className="flex flex-col gap-1.5">
                                                 <p className="text-xs text-blue-600 font-medium">Tracking Link:</p>
-                                                <div className="flex items-center gap-2">
-                                                    <p className="font-mono text-xs text-blue-800 break-all max-w-xs truncate">{getTrackingUrl()}</p>
+                                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                                                    <p className="font-mono text-[10px] sm:text-xs text-blue-800 break-all leading-relaxed">{getTrackingUrl()}</p>
                                                     <button
                                                         onClick={copyTrackingUrl}
-                                                        className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors flex-shrink-0 cursor-pointer"
+                                                        className="flex items-center justify-center gap-1 px-3 py-1.5 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors flex-shrink-0 cursor-pointer whitespace-nowrap w-full sm:w-auto"
                                                     >
                                                         <Copy className="w-3 h-3" />
                                                         Copy

@@ -22,7 +22,7 @@ export default function ManualOrderCreation() {
 
     // Form states
     const [orderType, setOrderType] = useState('guest'); // 'existing' or 'guest'
-    const [orderSource, setOrderSource] = useState(''); // no default, user must select
+    const [orderSource, setOrderSource] = useState('facebook'); // default to facebook
 
     // Unified Customer State
     const [customerIdentifier, setCustomerIdentifier] = useState('');
@@ -771,7 +771,7 @@ export default function ManualOrderCreation() {
 
                 // Navigate to order details page immediately
                 if (response.data && response.data._id) {
-                    router.push(`/admin/dashboard/orders/${response.data._id}`);
+                    router.push(`/admin/dashboard/orders/${response.data._id}?ref=manual`);
                 } else {
                     router.push('/admin/dashboard/orders');
                 }

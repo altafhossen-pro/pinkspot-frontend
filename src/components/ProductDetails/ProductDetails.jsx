@@ -381,13 +381,16 @@ export default function ProductDetails({ productSlug }) {
             hexCode: selectedVariant.attributes.find(attr => attr.name === 'Color')?.hexCode,
             sku: selectedVariant.sku,
             stockQuantity: selectedVariant.stockQuantity,
-            stockStatus: selectedVariant.stockStatus
+            stockStatus: selectedVariant.stockStatus,
+            image: selectedVariant.images?.[0]?.url || null
         } : null;
 
         // If no variant is selected, we should still pass the discounted price to product
-        const activeSubtitle = product.isGlobalSubtitleOn && product.globalSubtitle 
+        const activeSubtitle = (product.isGlobalSubtitleOn && product.globalSubtitle) 
             ? product.globalSubtitle 
-            : product.customSubtitle;
+            : (!product.isGlobalSubtitleOn && product.customSubtitle && !product.customSubtitle.startsWith('$'))
+                ? product.customSubtitle
+                : null;
 
         const productToAdd = {
             ...product,
@@ -426,13 +429,16 @@ export default function ProductDetails({ productSlug }) {
             hexCode: selectedVariant.attributes.find(attr => attr.name === 'Color')?.hexCode,
             sku: selectedVariant.sku,
             stockQuantity: selectedVariant.stockQuantity,
-            stockStatus: selectedVariant.stockStatus
+            stockStatus: selectedVariant.stockStatus,
+            image: selectedVariant.images?.[0]?.url || null
         } : null;
 
         // If no variant is selected, we should still pass the discounted price to product
-        const activeSubtitle = product.isGlobalSubtitleOn && product.globalSubtitle 
+        const activeSubtitle = (product.isGlobalSubtitleOn && product.globalSubtitle) 
             ? product.globalSubtitle 
-            : product.customSubtitle;
+            : (!product.isGlobalSubtitleOn && product.customSubtitle && !product.customSubtitle.startsWith('$'))
+                ? product.customSubtitle
+                : null;
 
         const productToAdd = {
             ...product,

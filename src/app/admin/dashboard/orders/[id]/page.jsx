@@ -36,7 +36,8 @@ import {
     CheckSquare,
     Square,
     ScanBarcode,
-    XCircle
+    XCircle,
+    AlertTriangle
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDateForTable } from '@/utils/formatDate';
@@ -45,16 +46,20 @@ import OrderUpdateHistory from '@/components/Admin/OrderUpdateHistory';
 import PermissionDenied from '@/components/Common/PermissionDenied';
 import { useAppContext } from '@/context/AppContext';
 import { getCookie } from 'cookies-next';
+import { io } from 'socket.io-client';
 
 export default function OrderDetailsPage() {
     const params = useParams();
     const router = useRouter();
     const orderId = params.id;
-    const { hasPermission, loading: contextLoading } = useAppContext();
+    const { hasPermission, loading: contextLoading, user, roleDetails } = useAppContext();
 
     const [order, setOrder] = useState(null);
     const [loading, setLoading] = useState(true);
     const [permissionError, setPermissionError] = useState(null);
+    const [allActiveUsers, setAllActiveUsers] = useState([]);
+    const [otherActiveUsers, setOtherActiveUsers] = useState([]);
+    const [showPresenceWarning, setShowPresenceWarning] = useState(false);
     const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
     const [newStatus, setNewStatus] = useState('');
     const [updatingStatus, setUpdatingStatus] = useState(false);
@@ -79,6 +84,20 @@ export default function OrderDetailsPage() {
 
     const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
     const printRef = useRef();
+
+    const handleClosePrintModal = () => {
+        setIsPrintModalOpen(false);
+        if (typeof window !== 'undefined') {
+            const searchParams = new URLSearchParams(window.location.search);
+            if (searchParams.get('ref') === 'manual') {
+                router.push('/admin/dashboard/manual-orders');
+            } else {
+                router.push('/admin/dashboard/orders');
+            }
+        } else {
+            router.push('/admin/dashboard/orders');
+        }
+    };
 
     const handlePrint = useReactToPrint({
         contentRef: printRef,
@@ -175,6 +194,44 @@ export default function OrderDetailsPage() {
             }
         }
     }, [contextLoading, hasPermission, orderId]);
+
+    // Setup socket connection for order presence
+    useEffect(() => {
+        if (!user || !orderId) return;
+
+        const socketUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1').replace('/api/v1', '');
+        const newSocket = io(socketUrl, {
+            withCredentials: true,
+            transports: ['websocket', 'polling']
+        });
+
+        newSocket.on('connect', () => {
+            newSocket.emit('join_order_room', {
+                orderId,
+                user: {
+                    userId: user._id,
+                    name: user.name || user.email,
+                    role: user.role
+                }
+            });
+        });
+
+        newSocket.on('order_presence_update', (data) => {
+            if (data.orderId === orderId) {
+                setAllActiveUsers(data.viewers);
+                const others = data.viewers.filter(v => v.socketId !== newSocket.id);
+                setOtherActiveUsers(others);
+                if (others.length > 0) {
+                    setShowPresenceWarning(true);
+                }
+            }
+        });
+
+        return () => {
+            newSocket.emit('leave_order_room', { orderId });
+            newSocket.disconnect();
+        };
+    }, [orderId, user]);
 
     // Load selected items from localStorage when order loads
     useEffect(() => {
@@ -480,6 +537,9 @@ export default function OrderDetailsPage() {
                 const updatedOrder = responseOrder || { ...order, status: newStatus };
                 setOrder({ ...order, ...updatedOrder });
                 closeStatusModal();
+                if (newStatus === 'shipped' || (responseOrder && responseOrder.status === 'shipped')) {
+                    setIsPrintModalOpen(true);
+                }
             } else {
                 setApiError({
                     title: 'Update Failed',
@@ -533,6 +593,9 @@ export default function OrderDetailsPage() {
                 const updatedOrder = responseOrder || { ...order, status: nextStatus };
                 setOrder({ ...order, ...updatedOrder });
                 closeNextStatusModal();
+                if (nextStatus === 'shipped' || (responseOrder && responseOrder.status === 'shipped')) {
+                    setIsPrintModalOpen(true);
+                }
             } else {
                 setApiError({
                     title: 'Update Failed',
@@ -567,6 +630,7 @@ export default function OrderDetailsPage() {
                 const responseOrder = response.data?.order || response.data;
                 const updatedOrder = responseOrder || { ...order, status: 'shipped' };
                 setOrder({ ...order, ...updatedOrder });
+                setIsPrintModalOpen(true);
             } else {
                 setApiError({
                     title: 'Steadfast Integration Error',
@@ -677,39 +741,57 @@ export default function OrderDetailsPage() {
             {/* Top Header Bar */}
             <div className="bg-white border shadow rounded-lg border-slate-300  z-10">
                 <div className=" mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-16">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between py-4 sm:py-0 sm:h-16 gap-4 sm:gap-0">
                         <div className="flex items-center space-x-4">
                             <Link
                                 href="/admin/dashboard/orders"
-                                className="inline-flex items-center px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all duration-200"
+                                className="inline-flex items-center px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all duration-200 shrink-0"
                             >
-                                <ArrowLeft className="h-4 w-4 mr-2" />
-                                Orders
+                                <ArrowLeft className="h-4 w-4 mr-1 sm:mr-2" />
+                                <span className="hidden sm:inline">Orders</span>
                             </Link>
                             <div className="h-6 w-px bg-slate-300"></div>
                             <div>
-                                <h1 className="text-xl font-bold text-slate-900 flex items-center">
+                                <h1 className="text-base sm:text-xl font-bold text-slate-900 flex items-center flex-wrap gap-1">
                                     Order #{order?.orderId || "Order ID not found"}
                                     <button
                                         onClick={copyOrderId}
-                                        className="ml-2 p-1 hover:bg-slate-100 rounded transition-colors cursor-pointer"
+                                        className="p-1 hover:bg-slate-100 rounded transition-colors cursor-pointer"
                                         title="Copy Order ID"
                                     >
                                         <Copy className="h-4 w-4 text-slate-500" />
                                     </button>
                                 </h1>
-                                <p className="text-sm text-slate-500">
+                                <p className="text-xs sm:text-sm text-slate-500">
                                     {formatDateForTable(order.createdAt)}
                                 </p>
                             </div>
                         </div>
 
-                        <div className="flex items-center space-x-3">
-                            <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold ${getStatusColor(order.status)}`}>
-                                {getStatusIcon(order.status)}
-                                <span className="ml-2">{order.status.charAt(0).toUpperCase() + order.status.slice(1)}</span>
-                            </span>
-                            <div className="flex items-center space-x-2">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                            <div className="flex items-center gap-2">
+                                <span className={`inline-flex items-center px-3 py-1.5 rounded-full text-sm font-semibold ${getStatusColor(order.status)}`}>
+                                    {getStatusIcon(order.status)}
+                                    <span className="ml-2">{order.status.charAt(0).toUpperCase() + order.status.slice(1)}</span>
+                                </span>
+                            
+                            {allActiveUsers.length > 0 && (
+                                <div className="flex items-center -space-x-2 mr-2 pl-2 border-l border-slate-300" title="Active Viewers">
+                                    {allActiveUsers.map((viewer, idx) => (
+                                        <div 
+                                            key={idx} 
+                                            className="h-8 w-8 rounded-full border-2 border-white flex items-center justify-center bg-blue-100 text-blue-700 text-xs font-bold relative group shadow-sm ring-1 ring-blue-200"
+                                        >
+                                            {viewer.name ? viewer.name.charAt(0).toUpperCase() : '?'}
+                                            <div className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-50 pointer-events-none transition-opacity">
+                                                {viewer.name}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
                                 {order.status === 'processing' && !order.isAddedIntoSteadfast && hasPermission('order', 'update') && (
                                     <button
                                         onClick={handleAddToSteadfast}
@@ -734,7 +816,7 @@ export default function OrderDetailsPage() {
                                 )}
                                 {hasPermission('order', 'update') && (
                                     <>
-                                        {order.status !== 'returned' && order.status !== 'cancelled' ? (
+                                        {order.status !== 'returned' && (order.status !== 'cancelled' || roleDetails?.isSuperAdmin) ? (
                                             <Link
                                                 href={`/admin/dashboard/orders/${orderId}/edit`}
                                                 className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium"
@@ -876,13 +958,13 @@ export default function OrderDetailsPage() {
 
                         {/* Order Items */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-                            <div className="flex items-center justify-between mb-6">
+                            <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 lg:gap-0">
                                 <h2 className="text-xl font-bold text-slate-900 flex items-center">
                                     <ShoppingBag className="h-6 w-6 mr-3 text-blue-600" />
                                     Order Items
                                 </h2>
-                                <div className="flex items-center space-x-3">
-                                    <div className="bg-indigo-50 border-2 border-indigo-200 pl-4 pr-5 py-2.5 rounded-xl flex items-center shadow-md">
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                                    <div className="bg-indigo-50 border-2 border-indigo-200 pl-4 pr-5 py-2.5 rounded-xl flex items-center shadow-md w-full sm:w-auto">
                                         <ScanBarcode className="h-6 w-6 text-indigo-600 mr-3 shrink-0" />
                                         <input
                                             ref={scanInputRef}
@@ -891,7 +973,7 @@ export default function OrderDetailsPage() {
                                             onChange={handleScanInputChange}
                                             onKeyDown={handleScanInputKeyDown}
                                             placeholder="Scan barcode..."
-                                            className="bg-transparent border-none outline-none focus:ring-0 text-lg font-bold text-indigo-900 w-64 placeholder-indigo-300 p-0"
+                                            className="bg-transparent border-none outline-none focus:ring-0 text-lg font-bold text-indigo-900 w-full sm:w-64 placeholder-indigo-300 p-0 min-w-0"
                                             autoFocus
                                         />
                                         <div className="relative flex h-3 w-3 ml-3 shrink-0">
@@ -899,7 +981,7 @@ export default function OrderDetailsPage() {
                                           <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
                                         </div>
                                     </div>
-                                    <div className="bg-slate-100 px-4 py-2 rounded-xl">
+                                    <div className="bg-slate-100 px-4 py-2 rounded-xl w-fit">
                                         <span className="text-sm font-semibold text-slate-700">
                                             {order.items.length} item{order.items.length > 1 ? 's' : ''}
                                         </span>
@@ -961,6 +1043,18 @@ export default function OrderDetailsPage() {
                             <div className="space-y-6">
                                 {order.items.map((item, index) => {
                                     const isSelected = selectedItems.has(index);
+                                    
+                                    // Determine if there is a variant image
+                                    let variantImage = null;
+                                    if (item.product && item.product.variants && item.variant?.sku) {
+                                        const matchedVariant = item.product.variants.find(v => v.sku === item.variant.sku);
+                                        if (matchedVariant) {
+                                            variantImage = matchedVariant.images?.[0]?.url || matchedVariant.attributes?.find(a => a.image)?.image;
+                                        }
+                                    }
+                                    const displayImage = variantImage || item.image;
+                                    const imageType = variantImage ? 'Variant Image' : 'Featured Image';
+
                                     return (
                                         <div
                                             key={index}
@@ -985,20 +1079,25 @@ export default function OrderDetailsPage() {
                                                     </div>
                                                 </div>
 
-                                                <div
-                                                    className="relative"
-                                                    onMouseEnter={() => setHoveredImage(item.image)}
-                                                    onMouseLeave={() => setHoveredImage(null)}
-                                                >
-                                                    <img
-                                                        src={item.image}
-                                                        alt={item.name}
-                                                        className="h-24 w-24 rounded-xl object-cover border-2 border-white shadow-lg cursor-zoom-in"
-                                                    />
-                                                    <div className={`absolute -top-2 -right-2 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center z-10 ${isSelected ? 'bg-emerald-600' : 'bg-blue-600'
-                                                        }`}>
-                                                        {item.quantity}
+                                                <div className="flex flex-col items-center flex-shrink-0">
+                                                    <div
+                                                        className="relative"
+                                                        onMouseEnter={() => setHoveredImage(displayImage)}
+                                                        onMouseLeave={() => setHoveredImage(null)}
+                                                    >
+                                                        <img
+                                                            src={displayImage}
+                                                            alt={item.name}
+                                                            className="h-24 w-24 rounded-xl object-cover border-2 border-white shadow-lg cursor-zoom-in"
+                                                        />
+                                                        <div className={`absolute -top-2 -right-2 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center z-10 ${isSelected ? 'bg-emerald-600' : 'bg-blue-600'
+                                                            }`}>
+                                                            {item.quantity}
+                                                        </div>
                                                     </div>
+                                                    <span className="mt-2 text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                                                        {imageType}
+                                                    </span>
                                                 </div>
 
                                                 <div className="flex-1 min-w-0">
@@ -1357,6 +1456,7 @@ export default function OrderDetailsPage() {
                         )}
 
                         {/* Quick Actions */}
+                        {order.status !== 'shipped' && (
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
                             <h2 className="text-xl font-bold text-slate-900 mb-6">Quick Actions</h2>
                             <div className="grid grid-cols-1 gap-4">
@@ -1390,6 +1490,7 @@ export default function OrderDetailsPage() {
                                 )}
                             </div>
                         </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -1815,7 +1916,7 @@ export default function OrderDetailsPage() {
                         <div className="flex items-center justify-between mb-6">
                             <h3 className="text-lg font-bold text-gray-900">Print Shipping Label</h3>
                             <button
-                                onClick={() => setIsPrintModalOpen(false)}
+                                onClick={handleClosePrintModal}
                                 className="text-gray-400 hover:text-gray-600 cursor-pointer"
                             >
                                 <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -1920,7 +2021,7 @@ export default function OrderDetailsPage() {
 
                         <div className="flex justify-end space-x-3">
                             <button
-                                onClick={() => setIsPrintModalOpen(false)}
+                                onClick={handleClosePrintModal}
                                 className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer"
                             >
                                 Close
@@ -1984,6 +2085,49 @@ export default function OrderDetailsPage() {
                                     </div>
                                 )}
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Presence Warning Modal */}
+            {showPresenceWarning && otherActiveUsers.length > 0 && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1.5 bg-yellow-400"></div>
+                        <div className="flex items-start mb-5">
+                            <div className="flex-shrink-0 bg-yellow-100 rounded-full p-3 mr-4">
+                                <AlertTriangle className="h-6 w-6 text-yellow-600" />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-900 mb-1">Staff Currently Viewing</h3>
+                                <p className="text-sm text-gray-600 leading-relaxed">
+                                    The following staff members are also currently viewing this order page:
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div className="bg-slate-50 rounded-xl p-4 mb-6 border border-slate-100">
+                            <ul className="space-y-3">
+                                {otherActiveUsers.map((activeUser, idx) => (
+                                    <li key={idx} className="flex items-center text-sm font-medium text-slate-800">
+                                        <div className="w-2 h-2 rounded-full bg-yellow-500 mr-3 animate-pulse"></div>
+                                        {activeUser.name} <span className="ml-2 px-2 py-0.5 rounded text-xs bg-slate-200 text-slate-600 capitalize">{activeUser.role}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                            <p className="text-xs text-red-500 mt-4 font-semibold italic flex items-center">
+                                <Info className="w-3 h-3 mr-1" />
+                                Please coordinate to avoid conflicting updates!
+                            </p>
+                        </div>
+                        
+                        <div className="flex justify-end">
+                            <button
+                                onClick={() => setShowPresenceWarning(false)}
+                                className="px-5 py-2.5 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 transition-colors shadow-sm cursor-pointer"
+                            >
+                                Close & View Anyway
+                            </button>
                         </div>
                     </div>
                 </div>

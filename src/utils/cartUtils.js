@@ -1,4 +1,5 @@
 import { toast } from 'react-hot-toast';
+import { formatProductName } from './productUtils';
 
 /**
  * Common utility function to add a product to cart with its first variant
@@ -40,7 +41,8 @@ export const addProductToCart = (product, addToCart, quantity = 1) => {
         originalPrice: selectedVariantData.originalPrice || product.originalPrice,
         sku: selectedVariantData.sku,
         stockQuantity: selectedVariantData.stockQuantity || 0,
-        stockStatus: selectedVariantData.stockStatus || 'in_stock'
+        stockStatus: selectedVariantData.stockStatus || 'in_stock',
+        image: selectedVariantData.images?.[0]?.url || null
       };
     } else {
       // If no variants, create a default variant
@@ -64,9 +66,11 @@ export const addProductToCart = (product, addToCart, quantity = 1) => {
       };
     }
 
-    const activeSubtitle = product.isGlobalSubtitleOn && product.globalSubtitle 
-        ? product.globalSubtitle 
-        : product.customSubtitle;
+    const activeSubtitle = (product.isGlobalSubtitleOn && product.globalSubtitle)
+        ? product.globalSubtitle
+        : (!product.isGlobalSubtitleOn && product.customSubtitle && !product.customSubtitle.startsWith('$'))
+            ? product.customSubtitle
+            : null;
 
     // Create a proper product object for cart
     const cartProduct = {
@@ -75,7 +79,7 @@ export const addProductToCart = (product, addToCart, quantity = 1) => {
       customSubtitle: product.customSubtitle,
       globalSubtitle: product.globalSubtitle,
       isGlobalSubtitleOn: product.isGlobalSubtitleOn,
-      name: product.name || (activeSubtitle ? `${product.title} ${activeSubtitle}` : product.title),
+      name: product.name || formatProductName(product.title, activeSubtitle),
       slug: product.slug,
       featuredImage: product.featuredImage || product.image,
       basePrice: product.price,

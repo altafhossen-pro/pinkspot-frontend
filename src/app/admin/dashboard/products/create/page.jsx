@@ -448,7 +448,7 @@ export default function CreateProductPage() {
             console.error('Error creating product:', error)
             const msg = error.response?.data?.message || error.message || 'Error creating product'
             setErrorMessage(msg)
-            toast.error('Error creating product')
+            toast.error(msg)
         } finally {
             setLoading(false)
         }

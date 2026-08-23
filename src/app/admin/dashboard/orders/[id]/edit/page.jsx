@@ -33,8 +33,10 @@ import toast from 'react-hot-toast';
 import { formatDateForTable } from '@/utils/formatDate';
 import { orderAPI, productAPI } from '@/services/api';
 import { getCookie } from 'cookies-next';
+import { useAppContext } from '@/context/AppContext';
 
 export default function OrderEditPage() {
+    const { roleDetails } = useAppContext();
     const params = useParams();
     const router = useRouter();
     const orderId = params.id;
@@ -328,7 +330,7 @@ export default function OrderEditPage() {
     }
 
     // Check if order can be edited (not returned or cancelled)
-    if (order.status === 'returned' || order.status === 'cancelled') {
+    if (order.status === 'returned' || (order.status === 'cancelled' && !roleDetails?.isSuperAdmin)) {
         return (
             <div className="min-h-screen bg-white ">
                 <div className="max-w-3xl mx-auto text-center   p-6">

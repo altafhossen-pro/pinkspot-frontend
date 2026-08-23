@@ -181,9 +181,11 @@ export default function AdminStaffPage() {
         // If user has roleId, they are staff (admin with custom role)
         const displayRole = roleId ? 'admin' : role
         const config = roleConfig[displayRole] || roleConfig.customer
+        const label = (roleId && roleId.name) ? roleId.name : config.label;
+        
         return (
             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.bg} ${config.text}`}>
-                {config.label}
+                {label}
             </span>
         )
     }

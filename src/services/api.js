@@ -895,9 +895,16 @@ export const transformProductData = (product) => {
         finalPrice = basePrice - (basePrice * (discountObj.percentage / 100));
     }
 
-    const activeSubtitle = product.isGlobalSubtitleOn && product.globalSubtitle 
-        ? product.globalSubtitle 
-        : product.customSubtitle;
+    // Resolve the active subtitle:
+    // - If global subtitle is enabled AND has a real text, use it
+    // - Otherwise, use customSubtitle ONLY if it's not a placeholder like '$subtitleName'
+    const resolvedGlobalSubtitle = (product.isGlobalSubtitleOn && product.globalSubtitle)
+        ? product.globalSubtitle
+        : null;
+    const resolvedCustomSubtitle = (!product.isGlobalSubtitleOn && product.customSubtitle && !product.customSubtitle.startsWith('$'))
+        ? product.customSubtitle
+        : null;
+    const activeSubtitle = resolvedGlobalSubtitle || resolvedCustomSubtitle || null;
 
     return {
         id: product._id,
@@ -1457,6 +1464,26 @@ export const loyaltyAPI = {
             body: JSON.stringify({ userId, points, coins, description }),
         });
     },
+};
+
+// Delivery Rule API functions
+export const deliveryRuleAPI = {
+    // Get current delivery rules
+    getRules: () => {
+        return apiCall('/delivery-rule');
+    },
+
+    // Update delivery rules (Admin only)
+    updateRules: (ruleData, token) => {
+        return apiCall('/delivery-rule', {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(ruleData),
+        });
+    }
 };
 
 // Settings API functions

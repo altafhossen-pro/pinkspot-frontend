@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft, ArrowRight, MessageCircle, Minus, Plus, Trash2, Check, AlertTriangle } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
-import { orderAPI, productAPI, loyaltyAPI, couponAPI, addressAPI, upsellAPI, settingsAPI, affiliateAPI } from '@/services/api';
+import { orderAPI, productAPI, loyaltyAPI, couponAPI, addressAPI, upsellAPI, settingsAPI, affiliateAPI, deliveryRuleAPI } from '@/services/api';
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 import { getCookie, setCookie, deleteCookie } from 'cookies-next';
@@ -71,7 +71,9 @@ export default function Checkout() {
     const [checkoutLoading, setCheckoutLoading] = useState(false);
     const [couponLoading, setCouponLoading] = useState(false);
     const [blockMessage, setBlockMessage] = useState('');
+    const [termsAccepted, setTermsAccepted] = useState(false);
     const [couponError, setCouponError] = useState('');
+    const [excludedCategoriesForFreeShipping, setExcludedCategoriesForFreeShipping] = useState([]);
 
     // Upsell discount state
     const [upsellDiscount, setUpsellDiscount] = useState(0);
@@ -112,8 +114,8 @@ export default function Checkout() {
             setShowCheckoutModal(false);
             setIsGuestCheckout(true);
         }
-        // If user is loaded and has email, hide modal and use authenticated checkout
-        else if (user && user.email) {
+        // If user is loaded, hide modal and use authenticated checkout
+        else if (user) {
             setIsCheckingAuth(false);
             setShowCheckoutModal(false);
             setIsGuestCheckout(false);
@@ -146,6 +148,19 @@ export default function Checkout() {
         if (cart.length > 0) {
             checkStockAvailability();
             calculateUpsellDiscount();
+            
+            // If cart now has a category discount, remove conflicting benefits
+            const hasCatDiscount = cart.some(item => item.categoryDiscountApplied);
+            if (hasCatDiscount) {
+                if (appliedCoupon) {
+                    setAppliedCoupon(null);
+                    setCouponDiscount(0);
+                }
+                if (useLoyaltyPoints) {
+                    setUseLoyaltyPoints(false);
+                    setLoyaltyDiscount(0);
+                }
+            }
         } else {
             setStockData({});
             setOutOfStockItems([]);
@@ -234,6 +249,21 @@ export default function Checkout() {
         loadAffiliateCodeFromCookie();
     }, []);
 
+    // Fetch delivery rules
+    useEffect(() => {
+        const fetchDeliveryRules = async () => {
+            try {
+                const response = await deliveryRuleAPI.getRules();
+                if (response.success && response.data) {
+                    setExcludedCategoriesForFreeShipping(response.data.excludedCategoriesForFreeShipping || []);
+                }
+            } catch (error) {
+                console.error('Error fetching delivery rules:', error);
+            }
+        };
+        fetchDeliveryRules();
+    }, []);
+
     // Reload affiliate code when it changes
     useEffect(() => {
         if (isAvailableAffiliateCode && affiliateCode) {
@@ -299,7 +329,7 @@ export default function Checkout() {
         updateTimer();
         const interval = setInterval(updateTimer, 1000);
 
-        return () => clearInterval(interval);
+        return () => clearTimeout(interval);
     }, [affiliateExpireTime]);
 
     // Fetch loyalty data when user is available
@@ -675,23 +705,54 @@ export default function Checkout() {
 
     // Calculate subtotal (needed for calculations)
     const subtotal = cartTotal;
+    const hasCategoryDiscount = cart.some(item => item.categoryDiscountApplied);
+    const freeShippingThreshold = deliveryChargeSettings?.shippingFreeRequiredAmount || 1500;
+    const excludedCategories = excludedCategoriesForFreeShipping;
+    
+    // Calculate total of products that are eligible to contribute to free shipping threshold
+    // (i.e. NOT in excluded categories AND NO category discount applied)
+    const eligibleSubtotal = cart.reduce((total, item) => {
+        let itemCategory = 'other';
+        const categoryData = item.productInfo?.category;
+        if (categoryData) {
+            itemCategory = String(typeof categoryData === 'object' ? (categoryData.name || categoryData.slug || '') : categoryData).toLowerCase();
+        }
+        
+        const isExcludedCategory = excludedCategories.includes(itemCategory);
+        const hasDiscount = item.categoryDiscountApplied;
+
+        if (!isExcludedCategory && !hasDiscount) {
+            return total + item.total;
+        }
+        return total;
+    }, 0);
+
+    const isEligibleForFreeShipping = eligibleSubtotal >= freeShippingThreshold;
 
     // Dynamic delivery charge calculation based on delivery type
     const calculateDeliveryCharge = () => {
-        if (!deliveryChargeSettings || !formData.deliveryType) return 0;
+        // Fallback to default values to prevent 0 shipping cost if API hasn't loaded yet
+        const settings = deliveryChargeSettings || {
+            insideDhaka: 80,
+            subDhaka: 120,
+            outsideDhaka: 150,
+            shippingFreeRequiredAmount: 1500
+        };
 
-        // Check if cart total meets free shipping requirement
-        if (subtotal >= deliveryChargeSettings.shippingFreeRequiredAmount) {
+        if (!formData.deliveryType) return 0;
+
+        // Check if cart meets all free shipping requirements
+        if (isEligibleForFreeShipping) {
             return 0; // Free shipping
         }
 
         // Check delivery type for delivery charge
         if (formData.deliveryType === 'insideDhaka') {
-            return deliveryChargeSettings.insideDhaka;
+            return settings.insideDhaka;
         } else if (formData.deliveryType === 'subDhaka') {
-            return deliveryChargeSettings.subDhaka;
+            return settings.subDhaka;
         } else if (formData.deliveryType === 'outsideDhaka') {
-            return deliveryChargeSettings.outsideDhaka;
+            return settings.outsideDhaka;
         }
 
         return 0;
@@ -738,6 +799,12 @@ export default function Checkout() {
             return;
         }
 
+        if (hasCategoryDiscount) {
+            setUseLoyaltyPoints(false);
+            setLoyaltyDiscount(0);
+            return;
+        }
+
         // Check minimum redeem amount (based on subtotal, not including shipping)
         const minRedeemAmount = loyaltySettings?.minRedeemAmount || 1;
         if (subtotal < minRedeemAmount) {
@@ -777,6 +844,9 @@ export default function Checkout() {
     // Coupon functions
     const applyCoupon = async () => {
 
+        if (hasCategoryDiscount) {
+            return;
+        }
 
         if (!couponCode.trim()) {
             setCouponError('Please enter a coupon code');
@@ -1458,8 +1528,17 @@ export default function Checkout() {
                                     />
                                     <div>
                                         <div className="font-medium text-gray-900">Inside Dhaka</div>
-                                        <div className="text-sm text-gray-600">
-                                            {deliveryChargeSettings ? `${deliveryChargeSettings.insideDhaka} ৳` : '80 ৳'}
+                                        <div className="text-sm text-gray-600 flex items-center space-x-2">
+                                            {isEligibleForFreeShipping ? (
+                                                <>
+                                                    <span className="line-through text-gray-400">
+                                                        {deliveryChargeSettings ? `${deliveryChargeSettings.insideDhaka} ৳` : '80 ৳'}
+                                                    </span>
+                                                    <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded">Free</span>
+                                                </>
+                                            ) : (
+                                                <span>{deliveryChargeSettings ? `${deliveryChargeSettings.insideDhaka} ৳` : '80 ৳'}</span>
+                                            )}
                                         </div>
                                     </div>
                                 </label>
@@ -1478,8 +1557,17 @@ export default function Checkout() {
                                     />
                                     <div>
                                         <div className="font-medium text-gray-900">Sub Dhaka</div>
-                                        <div className="text-sm text-gray-600">
-                                            {deliveryChargeSettings ? `${deliveryChargeSettings.subDhaka} ৳` : '120 ৳'}
+                                        <div className="text-sm text-gray-600 flex items-center space-x-2">
+                                            {isEligibleForFreeShipping ? (
+                                                <>
+                                                    <span className="line-through text-gray-400">
+                                                        {deliveryChargeSettings ? `${deliveryChargeSettings.subDhaka} ৳` : '120 ৳'}
+                                                    </span>
+                                                    <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded">Free</span>
+                                                </>
+                                            ) : (
+                                                <span>{deliveryChargeSettings ? `${deliveryChargeSettings.subDhaka} ৳` : '120 ৳'}</span>
+                                            )}
                                         </div>
                                     </div>
                                 </label>
@@ -1498,8 +1586,17 @@ export default function Checkout() {
                                     />
                                     <div>
                                         <div className="font-medium text-gray-900">Outside Dhaka</div>
-                                        <div className="text-sm text-gray-600">
-                                            {deliveryChargeSettings ? `${deliveryChargeSettings.outsideDhaka} ৳` : '150 ৳'}
+                                        <div className="text-sm text-gray-600 flex items-center space-x-2">
+                                            {isEligibleForFreeShipping ? (
+                                                <>
+                                                    <span className="line-through text-gray-400">
+                                                        {deliveryChargeSettings ? `${deliveryChargeSettings.outsideDhaka} ৳` : '150 ৳'}
+                                                    </span>
+                                                    <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded">Free</span>
+                                                </>
+                                            ) : (
+                                                <span>{deliveryChargeSettings ? `${deliveryChargeSettings.outsideDhaka} ৳` : '150 ৳'}</span>
+                                            )}
                                         </div>
                                     </div>
                                 </label>
@@ -1640,12 +1737,18 @@ export default function Checkout() {
                                                             id="useLoyaltyPoints"
                                                             checked={useLoyaltyPoints}
                                                             onChange={(e) => setUseLoyaltyPoints(e.target.checked)}
-                                                            className="w-4 h-4 text-pink-500 cursor-pointer"
+                                                            disabled={hasCategoryDiscount}
+                                                            className="w-4 h-4 text-pink-500 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                                                         />
                                                         <label htmlFor="useLoyaltyPoints" className="text-sm font-medium text-gray-700 cursor-pointer">
                                                             Pay with {coinsNeeded} coins (৳{subtotal})
                                                         </label>
                                                     </div>
+                                                    {hasCategoryDiscount && (
+                                                        <div className="mt-2 text-xs text-red-600 bg-red-50 p-2 rounded border border-red-100">
+                                                            Loyalty points cannot be used with category-discounted products.
+                                                        </div>
+                                                    )}
 
 
                                                     {useLoyaltyPoints && loyaltyData && (
@@ -1894,12 +1997,14 @@ export default function Checkout() {
                         <div className="mt-6">
                             <label className="block text-sm font-medium text-gray-700 mb-2">ENTER YOUR COUPON CODE</label>
 
-                            {(useLoyaltyPoints || isGuestCheckout) && (
+                            {(useLoyaltyPoints || isGuestCheckout || hasCategoryDiscount) && (
                                 <div className="mb-3 p-2 bg-yellow-50 border border-yellow-200 rounded">
                                     <div className="flex items-center space-x-2">
                                         <AlertTriangle className="h-3 w-3 text-yellow-600" />
                                         <span className="text-xs text-yellow-800">
-                                            {isGuestCheckout
+                                            {hasCategoryDiscount 
+                                                ? 'Coupons cannot be used with category-discounted products.'
+                                                : isGuestCheckout
                                                 ? 'Coupon feature is available for registered users only'
                                                 : 'Coupon cannot be used when paying with loyalty points'
                                             }
@@ -1914,13 +2019,13 @@ export default function Checkout() {
                                     value={couponCode}
                                     onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
                                     placeholder="ENTER YOUR COUPON CODE"
-                                    disabled={useLoyaltyPoints || isGuestCheckout}
+                                    disabled={useLoyaltyPoints || isGuestCheckout || hasCategoryDiscount}
                                     className="flex-1 px-3 py-2 border border-gray-300 rounded focus:ring-1 focus:ring-pink-500 focus:border-pink-500 text-sm disabled:bg-gray-100 disabled:cursor-not-allowed"
-                                    onKeyPress={(e) => e.key === 'Enter' && !useLoyaltyPoints && !isGuestCheckout && handleApplyCoupon()}
+                                    onKeyPress={(e) => e.key === 'Enter' && !useLoyaltyPoints && !isGuestCheckout && !hasCategoryDiscount && handleApplyCoupon()}
                                 />
                                 <button
                                     onClick={handleApplyCoupon}
-                                    disabled={couponLoading || !couponCode.trim() || useLoyaltyPoints || isGuestCheckout}
+                                    disabled={couponLoading || !couponCode.trim() || useLoyaltyPoints || isGuestCheckout || hasCategoryDiscount}
                                     className="w-full sm:w-auto px-4 py-2 bg-pink-500 text-white rounded hover:bg-pink-600 disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium flex items-center justify-center"
                                 >
                                     {couponLoading ? (

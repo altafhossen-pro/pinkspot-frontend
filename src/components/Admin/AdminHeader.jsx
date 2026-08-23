@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAppContext } from '@/context/AppContext'
 import { io } from 'socket.io-client'
-import { orderAPI } from '@/services/api'
+import { orderAPI, userAPI } from '@/services/api'
 import { getCookie } from 'cookies-next'
 import {
     Search,
@@ -48,6 +49,11 @@ export const RollingNumber = ({ value }) => {
 
 export default function AdminHeader({ onMobileMenuToggle }) {
     const [isSearchFocused, setIsSearchFocused] = useState(false)
+    const [searchQuery, setSearchQuery] = useState('')
+    const [searchResults, setSearchResults] = useState({ orders: [], users: [] })
+    const [isSearching, setIsSearching] = useState(false)
+    const searchDropdownRef = useRef(null)
+
     const [isProfileOpen, setIsProfileOpen] = useState(false)
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
     const [notifications, setNotifications] = useState([])
@@ -163,6 +169,9 @@ export default function AdminHeader({ onMobileMenuToggle }) {
             if (notificationDropdownRef.current && !notificationDropdownRef.current.contains(event.target)) {
                 setIsNotificationsOpen(false)
             }
+            if (searchDropdownRef.current && !searchDropdownRef.current.contains(event.target)) {
+                setIsSearchFocused(false)
+            }
         }
 
         document.addEventListener('mousedown', handleClickOutside)
@@ -170,6 +179,39 @@ export default function AdminHeader({ onMobileMenuToggle }) {
             document.removeEventListener('mousedown', handleClickOutside)
         }
     }, [])
+
+    // Global Search debounced logic
+    useEffect(() => {
+        const fetchSearchResults = async () => {
+            if (!searchQuery || searchQuery.trim().length < 2) {
+                setSearchResults({ orders: [], users: [] });
+                return;
+            }
+
+            try {
+                setIsSearching(true);
+                const token = getCookie('token');
+                const orderParams = new URLSearchParams({ search: searchQuery.trim(), limit: 5 }).toString();
+                
+                const [ordersRes, usersRes] = await Promise.all([
+                    orderAPI.getAdminOrders(token, orderParams),
+                    userAPI.getUsers({ search: searchQuery.trim(), limit: 5 }, token)
+                ]);
+                
+                setSearchResults({
+                    orders: (ordersRes?.success && Array.isArray(ordersRes.data)) ? ordersRes.data : [],
+                    users: (usersRes?.success && Array.isArray(usersRes.data)) ? usersRes.data : []
+                });
+            } catch (err) {
+                console.error('Search failed:', err);
+            } finally {
+                setIsSearching(false);
+            }
+        };
+
+        const timeoutId = setTimeout(fetchSearchResults, 400);
+        return () => clearTimeout(timeoutId);
+    }, [searchQuery]);
 
     const handleNotificationClick = async (order) => {
         try {
@@ -209,7 +251,7 @@ export default function AdminHeader({ onMobileMenuToggle }) {
 
                     {/* Search Bar */}
                     <div className="max-w-lg mx-4 w-full">
-                        <div className="relative">
+                        <div className="relative" ref={searchDropdownRef}>
                             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                                 <Search className={`h-5 w-5 transition-colors ${isSearchFocused ? 'text-blue-500' : 'text-gray-400'
                                     }`} />
@@ -220,10 +262,91 @@ export default function AdminHeader({ onMobileMenuToggle }) {
                                     ? 'border-blue-300 ring-2 ring-blue-100'
                                     : 'border-gray-300 hover:border-gray-400'
                                     } focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100`}
-                                placeholder="Search products, orders, customers..."
+                                placeholder="Search orders, customers, phone, consignment ID..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
                                 onFocus={() => setIsSearchFocused(true)}
-                                onBlur={() => setIsSearchFocused(false)}
+                                onClick={() => setIsSearchFocused(true)}
                             />
+
+                            {/* Search Dropdown */}
+                            {isSearchFocused && searchQuery.trim().length >= 2 && (
+                                <div className="absolute left-0 right-0 mt-2 bg-white border border-gray-200 rounded-lg shadow-xl z-[100] max-h-96 overflow-y-auto">
+                                    {isSearching ? (
+                                        <div className="p-4 text-center text-sm text-gray-500">Searching...</div>
+                                    ) : searchResults.orders.length === 0 && searchResults.users.length === 0 ? (
+                                        <div className="p-4 text-center text-sm text-gray-500">No results found</div>
+                                    ) : (
+                                        <div className="py-2">
+                                            {/* Orders Section */}
+                                            {searchResults.orders.length > 0 && (
+                                                <div className="mb-2">
+                                                    <div className="px-4 py-1 bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                                        Orders
+                                                    </div>
+                                                    {searchResults.orders.map(order => (
+                                                        <Link 
+                                                            key={`order-${order._id}`}
+                                                            href={`/admin/dashboard/orders/${order._id}`}
+                                                            onClick={() => {
+                                                                setIsSearchFocused(false);
+                                                                setSearchQuery('');
+                                                            }}
+                                                            className="block px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors"
+                                                        >
+                                                            <div className="flex items-center justify-between">
+                                                                <div>
+                                                                    <p className="text-sm font-medium text-gray-900">Order #{order.orderId}</p>
+                                                                    <p className="text-xs text-gray-500">
+                                                                        {order.customerName || order.user?.name || order.guestInfo?.name || 'Guest'}
+                                                                        {(order.user?.phone || order.guestInfo?.phone) && ` • ${order.user?.phone || order.guestInfo?.phone}`}
+                                                                    </p>
+                                                                </div>
+                                                                <span className="text-xs font-semibold text-blue-600">৳{order.total}</span>
+                                                            </div>
+                                                        </Link>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            
+                                            {/* Users Section */}
+                                            {searchResults.users.length > 0 && (
+                                                <div>
+                                                    <div className="px-4 py-1 bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                                                        Customers
+                                                    </div>
+                                                    {searchResults.users.map(u => (
+                                                        <Link 
+                                                            key={`user-${u._id}`}
+                                                            href={`/admin/dashboard/customers/${u._id}`}
+                                                            onClick={() => {
+                                                                setIsSearchFocused(false);
+                                                                setSearchQuery('');
+                                                            }}
+                                                            className="block px-4 py-2 hover:bg-blue-50 cursor-pointer transition-colors"
+                                                        >
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center gap-2">
+                                                                    <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold text-xs">
+                                                                        {u.name?.charAt(0)?.toUpperCase() || 'U'}
+                                                                    </div>
+                                                                    <div>
+                                                                        <p className="text-sm font-medium text-gray-900">{u.name}</p>
+                                                                        <p className="text-xs text-gray-500">{u.phone} {u.email && `• ${u.email}`}</p>
+                                                                    </div>
+                                                                </div>
+                                                                <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 capitalize">
+                                                                    {u.role || 'customer'}
+                                                                </span>
+                                                            </div>
+                                                        </Link>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>

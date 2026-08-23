@@ -5,7 +5,7 @@ import { X, Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { productAPI, upsellAPI } from '@/services/api';
+import { productAPI, upsellAPI, deliveryRuleAPI } from '@/services/api';
 import toast from 'react-hot-toast';
     
 export default function CartModal({ isOpen, onClose }) {
@@ -22,6 +22,23 @@ export default function CartModal({ isOpen, onClose }) {
         discounts: []
     });
     const [discountLoading, setDiscountLoading] = useState(false);
+    
+    const [excludedCategoriesForFreeShipping, setExcludedCategoriesForFreeShipping] = useState([]);
+
+    // Fetch delivery rules on mount
+    useEffect(() => {
+        const fetchDeliveryRules = async () => {
+            try {
+                const response = await deliveryRuleAPI.getRules();
+                if (response.success && response.data) {
+                    setExcludedCategoriesForFreeShipping(response.data.excludedCategoriesForFreeShipping || []);
+                }
+            } catch (error) {
+                console.error('Error fetching delivery rules:', error);
+            }
+        };
+        fetchDeliveryRules();
+    }, []);
 
     // Check stock availability when cart changes or modal opens
     useEffect(() => {
@@ -194,6 +211,28 @@ export default function CartModal({ isOpen, onClose }) {
             }
         };
     }, [isOpen]);
+
+    // Free shipping logic
+    const hasCategoryDiscount = cart.some(item => item.categoryDiscountApplied);
+    const freeShippingThreshold = deliveryChargeSettings?.shippingFreeRequiredAmount || 1500;
+    
+    const eligibleSubtotal = cart.reduce((total, item) => {
+        let itemCategory = 'other';
+        const categoryData = item.productInfo?.category;
+        if (categoryData) {
+            itemCategory = String(typeof categoryData === 'object' ? (categoryData.name || categoryData.slug || '') : categoryData).toLowerCase();
+        }
+        
+        const isExcludedCategory = excludedCategoriesForFreeShipping.includes(itemCategory);
+        const hasDiscount = item.categoryDiscountApplied;
+
+        if (!isExcludedCategory && !hasDiscount) {
+            return total + item.total;
+        }
+        return total;
+    }, 0);
+
+    const isEligibleForFreeShipping = eligibleSubtotal >= freeShippingThreshold;
 
     return (
         <>
@@ -431,18 +470,31 @@ export default function CartModal({ isOpen, onClose }) {
                                     </div>
                                 )}
 
+                                {/* Free Shipping Notification */}
+                                {isEligibleForFreeShipping && (
+                                    <div className="mb-3 text-center">
+                                        <span className="text-sm font-bold text-green-600 bg-green-100 px-3 py-1.5 rounded-lg animate-pulse inline-block w-full">
+                                            Congratulations! You got free shipping
+                                        </span>
+                                    </div>
+                                )}
+
                                 {/* Delivery Charge Display */}
                                 {deliveryChargeSettings && (
                                     <div className="mb-3 bg-gray-50 rounded-lg p-3">
                                         <h4 className="text-sm font-semibold text-gray-700 mb-2">Delivery Charges</h4>
                                         <div className="space-y-1">
-                                            <p className="text-sm text-gray-600 flex justify-between">
+                                            <p className="text-sm text-gray-600 flex justify-between items-center">
                                                 <span>Inside Dhaka:</span>
-                                                <span className="font-medium text-[#EF3D6A]">{deliveryChargeSettings.insideDhaka} ৳</span>
+                                                <span className={`font-medium ${isEligibleForFreeShipping ? 'text-gray-400 line-through' : 'text-[#EF3D6A]'}`}>
+                                                    {isEligibleForFreeShipping ? 'Free' : `${deliveryChargeSettings.insideDhaka} ৳`}
+                                                </span>
                                             </p>
-                                            <p className="text-sm text-gray-600 flex justify-between">
+                                            <p className="text-sm text-gray-600 flex justify-between items-center">
                                                 <span>Outside Dhaka:</span>
-                                                <span className="font-medium text-[#EF3D6A]">{deliveryChargeSettings.outsideDhaka} ৳</span>
+                                                <span className={`font-medium ${isEligibleForFreeShipping ? 'text-gray-400 line-through' : 'text-[#EF3D6A]'}`}>
+                                                    {isEligibleForFreeShipping ? 'Free' : `${deliveryChargeSettings.outsideDhaka} ৳`}
+                                                </span>
                                             </p>
                                         </div>
                                     </div>

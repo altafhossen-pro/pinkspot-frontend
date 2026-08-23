@@ -84,9 +84,11 @@ export const AppProvider = ({ children }) => {
             return parts.length > 0 ? parts.join(', ') : 'Default';
         })() : 'Default';
 
-        const activeSubtitle = product.isGlobalSubtitleOn && product.globalSubtitle
+        const activeSubtitle = (product.isGlobalSubtitleOn && product.globalSubtitle)
             ? product.globalSubtitle
-            : product.customSubtitle;
+            : (!product.isGlobalSubtitleOn && product.customSubtitle && !product.customSubtitle.startsWith('$'))
+                ? product.customSubtitle
+                : null;
 
         const cartItem = {
             id: Date.now(), // Unique cart item ID
@@ -104,7 +106,7 @@ export const AppProvider = ({ children }) => {
             price: selectedVariant?.currentPrice || product.basePrice || 0,
             originalPrice: selectedVariant?.originalPrice || null,
             categoryDiscountApplied: product.categoryDiscountApplied || false,
-            image: product.featuredImage || '/images/placeholder.png',
+            image: selectedVariant?.image || product.featuredImage || '/images/placeholder.png',
             quantity,
             total: (selectedVariant?.currentPrice || product.basePrice || 0) * quantity,
             size: selectedVariant?.size || null,
@@ -183,9 +185,11 @@ export const AppProvider = ({ children }) => {
                 return parts.length > 0 ? parts.join(', ') : 'Default';
             })() : 'Default';
 
-            const batchActiveSubtitle = product.isGlobalSubtitleOn && product.globalSubtitle
+            const batchActiveSubtitle = (product.isGlobalSubtitleOn && product.globalSubtitle)
                 ? product.globalSubtitle
-                : product.customSubtitle;
+                : (!product.isGlobalSubtitleOn && product.customSubtitle && !product.customSubtitle.startsWith('$'))
+                    ? product.customSubtitle
+                    : null;
 
             const cartItem = {
                 id: Date.now() + Math.random(), // Unique cart item ID
