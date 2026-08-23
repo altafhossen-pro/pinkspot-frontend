@@ -64,17 +64,25 @@ export default function ProductForYou() {
         return () => window.removeEventListener('beforeunload', handleBeforeUnload);
     }, []);
 
-    const fetchProducts = useCallback(async (pageNumber) => {
+    const fetchProducts = useCallback(async (pageNumber, currentProducts = products) => {
         try {
             setLoading(true);
             setError(null);
 
             const limit = 10;
-            const response = await productAPI.getProducts({
+            const params = {
                 page: pageNumber,
                 limit,
-                isActive: true
-            });
+                isActive: true,
+                isRandom: true
+            };
+
+            // If not the first page, exclude already fetched products to avoid duplicates
+            if (pageNumber > 1 && currentProducts.length > 0) {
+                params.excludeIds = currentProducts.map(p => p.id).join(',');
+            }
+
+            const response = await productAPI.getProducts(params);
 
             if (response.success && response.data) {
                 const fetchedProducts = response.data.map(transformProductData);
@@ -155,7 +163,7 @@ export default function ProductForYou() {
             timeoutId = setTimeout(() => {
                 setPage(prev => {
                     const nextPage = prev + 1;
-                    fetchProducts(nextPage);
+                    fetchProducts(nextPage, products);
                     return nextPage;
                 });
             }, 100);
@@ -163,7 +171,7 @@ export default function ProductForYou() {
         return () => {
             if (timeoutId) clearTimeout(timeoutId);
         };
-    }, [inView, loading, hasMore, initialLoad, products.length, autoLoadLimit, fetchProducts]);
+    }, [inView, loading, hasMore, initialLoad, products.length, autoLoadLimit, fetchProducts, products]);
 
     if (error && products.length === 0) {
         return (
@@ -234,7 +242,7 @@ export default function ProductForYou() {
                                     setAutoLoadLimit(prev => prev + 50);
                                     setPage(prev => {
                                         const nextPage = prev + 1;
-                                        fetchProducts(nextPage);
+                                        fetchProducts(nextPage, products);
                                         return nextPage;
                                     });
                                 }}

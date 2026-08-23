@@ -576,8 +576,30 @@ function ShopPageContent() {
                         <div className="flex-1">
                             {/* Sorting Bar */}
                             <div className="mb-6">
-                                <div className="bg-white rounded-lg shadow-sm border border-gray-300 p-4">
-                                    <div className="flex flex-wrap items-center gap-3">
+                                <div className="bg-white rounded-lg shadow-sm border border-gray-300 p-3 md:p-4">
+                                    {/* Mobile Dropdown */}
+                                    <div className="flex md:hidden items-center justify-between">
+                                        <span className="text-sm font-medium text-gray-700">Sort by:</span>
+                                        <div className="relative flex-1 ml-3">
+                                            <select
+                                                value={sortBy}
+                                                onChange={(e) => handleSortChange(e.target.value)}
+                                                className="w-full appearance-none bg-gray-100 border border-gray-200 text-gray-700 py-2 pl-3 pr-8 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-transparent font-medium"
+                                            >
+                                                {sortingOptions.map((option) => (
+                                                    <option key={option.value} value={option.value}>
+                                                        {option.label}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                                                <ChevronDown className="w-4 h-4" />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Desktop Pills */}
+                                    <div className="hidden md:flex flex-wrap items-center gap-3">
                                         <span className="text-sm font-medium text-gray-700 mr-2">Sort by:</span>
                                         {sortingOptions.map((option) => {
                                             const IconComponent = option.icon;
