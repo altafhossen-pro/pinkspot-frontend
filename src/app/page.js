@@ -13,6 +13,8 @@ import Footer from "@/components/Footer/Footer";
 import HeroBanner from "@/components/Homepage/HeroBanner/HeroBanner";
 import StoreFeatures from "@/components/Homepage/StoreFeatures/StoreFeatures";
 
+import FloatingContact from "@/components/Common/FloatingContact";
+
 export default function Home() {
   return (
     <div className="min-h-screen bg-gray-50">
@@ -30,6 +32,9 @@ export default function Home() {
       {/* <FactsSection /> */}
       <CustomerTestimonial />
       <Footer />
+      
+      {/* Floating Contact Button */}
+      <FloatingContact />
     </div>
   );
 }

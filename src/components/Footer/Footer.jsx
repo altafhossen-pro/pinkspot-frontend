@@ -98,7 +98,7 @@ export default function Footer() {
               <Link className='' href="/">
                 <Image
                   src={logoUrl || "/images/logo.svg"}
-                  alt="FORPINK.COM"
+                  alt="Pinkspot.bd"
                   width={190}
                   height={80}
                   className="w-36 sm:w-40 "
@@ -320,10 +320,10 @@ export default function Footer() {
                     <div className="flex items-center space-x-3">
                       <Phone className="w-4 h-4 text-gray-900 flex-shrink-0" />
                       <a
-                        href={`tel:${footerData.contact?.phone || '+8801XXXXXXXXX'}`}
+                        href={`tel:${footerData.contact?.phone || '+8801519181818'}`}
                         className="text-gray-900 text-sm hover:text-pink-400 transition-colors duration-300"
                       >
-                        Phone: {footerData.contact?.phone || '+8801XXXXXXXXX'}
+                        Phone: {footerData.contact?.phone || '+8801519181818'}
                       </a>
                     </div>
 
@@ -331,10 +331,10 @@ export default function Footer() {
                     <div className="flex items-center space-x-3">
                       <Mail className="w-4 h-4 text-gray-900 flex-shrink-0" />
                       <a
-                        href={`mailto:${footerData.contact?.email || 'forpink@gmail.com'}`}
+                        href={`mailto:${footerData.contact?.email || 'info@pinkspot.bd'}`}
                         className="text-gray-900 text-sm hover:text-pink-400 transition-colors duration-300"
                       >
-                        Email: {footerData.contact?.email || 'forpink@gmail.com'}
+                        Email: {footerData.contact?.email || 'info@pinkspot.bd'}
                       </a>
                     </div>
 

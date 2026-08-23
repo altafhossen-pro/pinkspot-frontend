@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Menu, Home, ShoppingCart, User } from 'lucide-react';
+import { Menu, Home, ShoppingCart, User, Phone } from 'lucide-react';
+import { settingsAPI } from '@/services/api';
 import { useAppContext } from '@/context/AppContext';
 import CategorySidebar from './CategorySidebar';
 
@@ -12,6 +13,21 @@ export default function MobileBottomNavigation() {
   const router = useRouter();
   const { cartCount, user, isCartOpen, setIsCartOpen } = useAppContext();
   const [isCategorySidebarOpen, setIsCategorySidebarOpen] = useState(false);
+  const [phoneNumber, setPhoneNumber] = useState('+8801519181818');
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await settingsAPI.getSiteSettings();
+        if (response?.success && response?.data?.contact?.phone) {
+          setPhoneNumber(response.data.contact.phone);
+        }
+      } catch (error) {
+        console.error('Failed to load contact for mobile nav', error);
+      }
+    };
+    fetchSettings();
+  }, []);
   
   // Routes that should not show bottom navigation
   const noNavRoutes = [
@@ -62,40 +78,50 @@ export default function MobileBottomNavigation() {
   };
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 lg:hidden">
-      <div className="flex items-center justify-around px-2 py-2">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 lg:hidden pb-safe">
+      <div className="flex items-center justify-between px-2 py-2">
+        {/* Call Button */}
+        <a
+          href={`tel:${phoneNumber}`}
+          className="flex flex-col items-center justify-center px-2 sm:px-4 py-2 rounded-lg transition-colors text-gray-600 hover:text-[#EF3D6A]"
+          aria-label="Call Us"
+        >
+          <Phone className="w-5 h-5 mb-1" />
+          <span className="text-[10px] sm:text-xs font-medium">Call</span>
+        </a>
+
         {/* Category Menu */}
         <button
           onClick={handleCategoryClick}
-          className={`flex flex-col items-center justify-center px-4 py-2 rounded-lg transition-colors ${
+          className={`flex flex-col items-center justify-center px-2 sm:px-4 py-2 rounded-lg transition-colors ${
             isCategorySidebarOpen
               ? 'text-[#EF3D6A]'
               : 'text-gray-600 hover:text-[#EF3D6A]'
           }`}
           aria-label="Categories"
         >
-          <Menu className="w-6 h-6 mb-1" />
-          <span className="text-xs font-medium">Category</span>
+          <Menu className="w-5 h-5 mb-1" />
+          <span className="text-[10px] sm:text-xs font-medium">Category</span>
         </button>
 
         {/* Home */}
         <Link
           href="/"
-          className={`flex flex-col items-center justify-center px-4 py-2 rounded-lg transition-colors ${
+          className={`flex flex-col items-center justify-center px-2 sm:px-4 py-2 rounded-lg transition-colors ${
             isActive('/')
               ? 'text-[#EF3D6A]'
               : 'text-gray-600 hover:text-[#EF3D6A]'
           }`}
           aria-label="Home"
         >
-          <Home className="w-6 h-6 mb-1" />
-          <span className="text-xs font-medium">Home</span>
+          <Home className="w-5 h-5 mb-1" />
+          <span className="text-[10px] sm:text-xs font-medium">Home</span>
         </Link>
 
         {/* Cart */}
         <button
           onClick={handleCartClick}
-          className={`flex flex-col items-center justify-center px-4 py-2 rounded-lg transition-colors relative ${
+          className={`flex flex-col items-center justify-center px-2 sm:px-4 py-2 rounded-lg transition-colors relative ${
             isCartOpen
               ? 'text-[#EF3D6A]'
               : 'text-gray-600 hover:text-[#EF3D6A]'
@@ -103,28 +129,28 @@ export default function MobileBottomNavigation() {
           aria-label="Shopping Cart"
         >
           <div className="relative">
-            <ShoppingCart className="w-6 h-6 mb-1" />
+            <ShoppingCart className="w-5 h-5 mb-1" />
             {cartCount > 0 && (
-              <span className="absolute -top-1 -right-1 bg-[#EF3D6A] text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+              <span className="absolute -top-2 -right-2 bg-[#EF3D6A] text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
                 {cartCount > 9 ? '9+' : cartCount}
               </span>
             )}
           </div>
-          <span className="text-xs font-medium">Cart</span>
+          <span className="text-[10px] sm:text-xs font-medium">Cart</span>
         </button>
 
         {/* Profile */}
         <button
           onClick={handleProfileClick}
-          className={`flex flex-col items-center justify-center px-4 py-2 rounded-lg transition-colors ${
+          className={`flex flex-col items-center justify-center px-2 sm:px-4 py-2 rounded-lg transition-colors ${
             isActive('/dashboard')
               ? 'text-[#EF3D6A]'
               : 'text-gray-600 hover:text-[#EF3D6A]'
           }`}
           aria-label={user ? 'Profile' : 'Login'}
         >
-          <User className="w-6 h-6 mb-1" />
-          <span className="text-xs font-medium">{user ? 'Profile' : 'Login'}</span>
+          <User className="w-5 h-5 mb-1" />
+          <span className="text-[10px] sm:text-xs font-medium">{user ? 'Profile' : 'Login'}</span>
         </button>
       </div>
 

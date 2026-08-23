@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Star, Heart, Minus, Plus, ShoppingCart, Package, ChevronDown, ChevronUp } from 'lucide-react';
+import { Star, Heart, Minus, Plus, ShoppingCart, Package, ChevronDown, ChevronUp, Share2 } from 'lucide-react';
 import CountdownTimer from '@/components/Common/CountdownTimer';
 import UpsellProducts from './UpsellProducts';
 import SimilarProducts from './SimilarProducts';
@@ -15,6 +15,7 @@ import { useAppContext } from '@/context/AppContext';
 import { useRouter } from 'next/navigation';
 import { addProductToWishlist } from '@/utils/wishlistUtils';
 import ProductNotFound from '@/components/Common/ProductNotFound';
+import ProductShareModal from './ProductShareModal';
 
 
 
@@ -39,6 +40,7 @@ export default function ProductDetails({ productSlug }) {
     const [hasManuallySelectedVariant, setHasManuallySelectedVariant] = useState(false);
     const [selectedVariantSku, setSelectedVariantSku] = useState(null);
     const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
+    const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
     // Fetch product data
     useEffect(() => {
@@ -763,16 +765,27 @@ export default function ProductDetails({ productSlug }) {
                             </div>
 
                             {/* Reviews Count - Above Price */}
-                            <div className="flex items-center gap-2">
-                                <div className="flex items-center gap-1">
-                                    {[...Array(5)].map((_, i) => (
-                                        <Star
-                                            key={i}
-                                            className="w-5 h-5 fill-yellow-400 text-yellow-400"
-                                        />
-                                    ))}
+                            <div className="flex items-center justify-between w-full">
+                                <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-1">
+                                        {[...Array(5)].map((_, i) => (
+                                            <Star
+                                                key={i}
+                                                className="w-5 h-5 fill-yellow-400 text-yellow-400"
+                                            />
+                                        ))}
+                                    </div>
+                                    <span className="text-red-500 font-medium">{product.totalReviews || 0} Reviews</span>
                                 </div>
-                                <span className="text-red-500 font-medium">{product.totalReviews || 0} Reviews</span>
+                                
+                                {/* Mobile Share Button */}
+                                <button 
+                                    onClick={() => setIsShareModalOpen(true)}
+                                    className="sm:hidden flex items-center justify-center w-8 h-8 rounded-full bg-pink-50 text-pink-600 border border-pink-100 shadow-sm shrink-0"
+                                    aria-label="Share product"
+                                >
+                                    <Share2 className="w-4 h-4" />
+                                </button>
                             </div>
 
                             {/* Price */}
@@ -1023,6 +1036,18 @@ export default function ProductDetails({ productSlug }) {
                                     </p>
                                 </div>
                             )}
+
+                            {/* Desktop Share Section */}
+                            <div className="hidden sm:flex items-center justify-start gap-3 mt-5 pt-5 border-t border-gray-200">
+                                <span className="text-sm font-medium text-gray-500">Share this product:</span>
+                                <button
+                                    onClick={() => setIsShareModalOpen(true)}
+                                    className="flex items-center justify-center w-10 h-10 rounded-full bg-pink-50 text-pink-600 border border-pink-100 hover:bg-pink-100 hover:scale-105 transition-all shadow-sm cursor-pointer"
+                                    aria-label="Share product"
+                                >
+                                    <Share2 className="w-4 h-4" />
+                                </button>
+                            </div>
                         </div>
 
                         {/* Right Part - Delivery Options */}
@@ -1544,6 +1569,13 @@ export default function ProductDetails({ productSlug }) {
                     border: 1.5px solid #EF3D6A;
                 }
             `}</style>
+            
+            <ProductShareModal 
+                isOpen={isShareModalOpen} 
+                onClose={() => setIsShareModalOpen(false)} 
+                url={`/product/${productSlug}`}
+                productName={product?.title || ''}
+            />
         </div>
     );
 }

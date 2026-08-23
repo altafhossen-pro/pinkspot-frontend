@@ -20,8 +20,14 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata = generateStaticMetadata('home');
 export const viewport = generateViewport();
+
+export async function generateMetadata() {
+  const siteSettings = await getSiteSettings();
+  const ogImage = siteSettings?.ogImage || '';
+
+  return generateStaticMetadata('home', { image: ogImage });
+}
 
 async function getSiteSettings() {
   try {
@@ -44,20 +50,56 @@ export default async function RootLayout({ children }) {
   return (
     <html lang="en">
       <head>
+        {/* Structured Data (JSON-LD) for SEO */}
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              "name": "Pinkspot",
+              "url": "https://pinkspot.bd",
+              "logo": logoUrl || "https://pinkspot.bd/images/logo.png",
+              "contactPoint": {
+                "@type": "ContactPoint",
+                "telephone": "+8801519181818",
+                "contactType": "customer service",
+                "email": "info@pinkspot.bd",
+                "availableLanguage": ["English", "Bengali"]
+              },
+              "sameAs": [
+                "https://www.facebook.com/pinkspot"
+              ]
+            })
+          }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "WebSite",
+              "name": "Pinkspot",
+              "url": "https://pinkspot.bd",
+              "potentialAction": {
+                "@type": "SearchAction",
+                "target": "https://pinkspot.bd/shop?search={search_term_string}",
+                "query-input": "required name=search_term_string"
+              }
+            })
+          }}
+        />
         {/* tag manager script here  */}
         <Script
           id="gtm-script"
           strategy="afterInteractive"
           dangerouslySetInnerHTML={{
             __html: `
-              (function(w,d,s,l,i){w[l]=w[l]||[];
-              w[l].push({'gtm.start': new Date().getTime(),event:'gtm.js'});
-              var f=d.getElementsByTagName(s)[0],
-              j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';
-              j.async=true;j.src=
-              'https://www.googletagmanager.com/gtm.js?id='+i+dl;
-              f.parentNode.insertBefore(j,f);
-              })(window,document,'script','dataLayer','GTM-WZBVXD9D');
+              (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+              new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+              j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+              'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+              })(window,document,'script','dataLayer','GTM-PSBHRW9D');
             `,
           }}
         />
@@ -67,7 +109,7 @@ export default async function RootLayout({ children }) {
       >
         <noscript>
           <iframe
-            src="https://www.googletagmanager.com/ns.html?id=GTM-WZBVXD9D"
+            src="https://www.googletagmanager.com/ns.html?id=GTM-PSBHRW9D"
             height="0"
             width="0"
             style={{ display: "none", visibility: "hidden" }}

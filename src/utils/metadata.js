@@ -52,12 +52,7 @@ export const generateMetadata = (pageKey, dynamicData = {}) => {
       icon: siteConfig.defaults.favicon,
       shortcut: siteConfig.defaults.favicon,
       apple: siteConfig.defaults.favicon,
-    },
-    verification: {
-      google: 'your-google-verification-code',
-      yandex: 'your-yandex-verification-code',
-      yahoo: 'your-yahoo-verification-code',
-    },
+    }
   };
 };
 
@@ -67,8 +62,8 @@ export const generateDynamicMetadata = (pageKey, dynamicData = {}) => {
 };
 
 // Generate metadata for static pages
-export const generateStaticMetadata = (pageKey) => {
-  return generateMetadata(pageKey);
+export const generateStaticMetadata = (pageKey, dynamicData = {}) => {
+  return generateMetadata(pageKey, dynamicData);
 };
 
 // Generate viewport configuration

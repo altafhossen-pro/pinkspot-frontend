@@ -392,44 +392,44 @@ export default function OrderEditPage() {
             {/* Top Header Bar */}
             <div className="bg-white border-b border-slate-200 sticky top-0 z-10">
                 <div className="xl:2xl:max-w-7xl xl:max-w-6xl max-w-xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <div className="flex items-center justify-between h-16">
-                        <div className="flex items-center space-x-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between py-4 gap-4 sm:gap-0">
+                        <div className="flex items-center space-x-2 sm:space-x-4">
                             <Link
                                 href={`/admin/dashboard/orders/${orderId}`}
-                                className="inline-flex items-center px-3 py-2 text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all duration-200"
+                                className="inline-flex items-center px-2 sm:px-3 py-2 text-xs sm:text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all duration-200 shrink-0"
                             >
-                                <ArrowLeft className="h-4 w-4 mr-2" />
-                                Back to Order
+                                <ArrowLeft className="h-4 w-4 sm:mr-2" />
+                                <span className="hidden sm:inline">Back to Order</span>
                             </Link>
-                            <div className="h-6 w-px bg-slate-300"></div>
-                            <div>
-                                <h1 className="text-xl font-bold text-slate-900 flex items-center">
-                                    <Edit3 className="h-5 w-5 mr-2" />
-                                    Edit Order #{order._id.slice(-8).toUpperCase()}
+                            <div className="hidden sm:block h-6 w-px bg-slate-300"></div>
+                            <div className="min-w-0">
+                                <h1 className="text-base sm:text-xl font-bold text-slate-900 flex items-center flex-wrap">
+                                    <Edit3 className="h-4 w-4 sm:h-5 sm:w-5 mr-1 sm:mr-2 shrink-0" />
+                                    <span className="truncate">Edit Order #{order._id.slice(-8).toUpperCase()}</span>
                                 </h1>
-                                <p className="text-sm text-slate-500">
+                                <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
                                     {formatDateForTable(order.createdAt)}
                                 </p>
                             </div>
                         </div>
 
-                        <div className="flex items-center space-x-3">
+                        <div className="flex items-center gap-2 sm:space-x-3 w-full sm:w-auto mt-2 sm:mt-0">
                             <Link
                                 href={`/admin/dashboard/orders/${orderId}`}
-                                className="inline-flex items-center px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors text-sm font-medium"
+                                className="flex-1 sm:flex-none inline-flex items-center justify-center px-3 sm:px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors text-xs sm:text-sm font-medium"
                             >
-                                <Eye className="h-4 w-4 mr-2" />
+                                <Eye className="h-4 w-4 mr-1 sm:mr-2" />
                                 View Order
                             </Link>
                             <button
                                 onClick={handleSave}
                                 disabled={saving}
-                                className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors ${saving
+                                className={`flex-1 sm:flex-none inline-flex items-center justify-center px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${saving
                                         ? 'bg-gray-400 cursor-not-allowed text-white'
                                         : 'bg-blue-600 hover:bg-blue-700 text-white'
                                     }`}
                             >
-                                <Save className="h-4 w-4 mr-2" />
+                                <Save className="h-4 w-4 mr-1 sm:mr-2" />
                                 {saving ? 'Saving...' : 'Save Changes'}
                             </button>
                         </div>
@@ -438,12 +438,12 @@ export default function OrderEditPage() {
             </div>
 
             {/* Main Content */}
-            <div className="xl:2xl:max-w-7xl xl:max-w-6xl max-w-xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+            <div className="xl:2xl:max-w-7xl xl:max-w-6xl max-w-xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
+                <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 sm:gap-8">
                     {/* Left Column - Order Items */}
                     <div className="xl:col-span-2 space-y-8">
                         {/* Order Items */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 lg:p-8">
                             <div className="flex items-center justify-between mb-8">
                                 <h2 className="text-xl font-bold text-slate-900 flex items-center">
                                     <ShoppingBag className="h-6 w-6 mr-3 text-blue-600" />
@@ -458,15 +458,15 @@ export default function OrderEditPage() {
                                 </button>
                             </div>
 
-                            <div className="space-y-6">
+                            <div className="space-y-4 sm:space-y-6">
                                 {formData.items.map((item, index) => (
-                                    <div key={index} className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm hover:shadow-md transition-shadow">
-                                        <div className="flex items-start space-x-6">
+                                    <div key={index} className="bg-white rounded-xl border border-gray-200 p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow">
+                                        <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
                                             <div className="relative flex-shrink-0">
                                                 <img
                                                     src={item.image}
                                                     alt={item.name}
-                                                    className="h-20 w-20 rounded-lg object-cover border border-gray-200"
+                                                    className="h-16 w-16 sm:h-20 sm:w-20 rounded-lg object-cover border border-gray-200"
                                                 />
                                                 <div className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
                                                     {item.quantity}
@@ -533,12 +533,12 @@ export default function OrderEditPage() {
                                                 )}
                                             </div>
 
-                                            <div className="flex-shrink-0 text-right">
-                                                <div className="bg-gray-50 rounded-lg p-4 mb-3">
-                                                    <p className="text-2xl font-bold text-gray-900">
+                                            <div className="flex-shrink-0 text-left sm:text-right w-full sm:w-auto">
+                                                <div className="bg-gray-50 rounded-lg p-3 sm:p-4 mb-3 flex sm:block justify-between items-center">
+                                                    <p className="text-xl sm:text-2xl font-bold text-gray-900 order-2 sm:order-1">
                                                         ৳{item.subtotal}
                                                     </p>
-                                                    <p className="text-sm text-gray-500">Subtotal</p>
+                                                    <p className="text-sm text-gray-500 order-1 sm:order-2">Subtotal</p>
                                                 </div>
                                                 <button
                                                     onClick={() => removeItem(index)}
@@ -570,8 +570,8 @@ export default function OrderEditPage() {
                         </div>
 
                         {/* Order Notes */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-                            <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center">
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 lg:p-8">
+                            <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-4 sm:mb-6 flex items-center">
                                 <FileText className="h-6 w-6 mr-3 text-blue-600" />
                                 Order Notes
                             </h2>
@@ -621,8 +621,8 @@ export default function OrderEditPage() {
                     {/* Right Column - Order Details */}
                     <div className="space-y-8">
                         {/* Order Status & Payment */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-                            <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center">
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 lg:p-8">
+                            <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-4 sm:mb-6 flex items-center">
                                 <CheckCircle className="h-6 w-6 mr-3 text-emerald-600" />
                                 Order Status & Payment
                             </h2>
@@ -696,8 +696,8 @@ export default function OrderEditPage() {
                         </div>
 
                         {/* Pricing */}
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                            <h2 className="text-lg font-semibold text-gray-900 mb-6 flex items-center">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+                            <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-4 sm:mb-6 flex items-center">
                                 <DollarSign className="h-5 w-5 mr-2 text-emerald-600" />
                                 Order Pricing
                             </h2>
@@ -790,8 +790,8 @@ export default function OrderEditPage() {
                         </div>
 
                         {/* Shipping Address */}
-                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                            <h2 className="text-lg font-semibold text-gray-900 mb-6 flex items-center">
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6">
+                            <h2 className="text-base sm:text-lg font-semibold text-gray-900 mb-4 sm:mb-6 flex items-center">
                                 <MapPin className="h-5 w-5 mr-2 text-red-600" />
                                 Shipping Address
                             </h2>

@@ -918,9 +918,9 @@ export default function OrderDetailsPage() {
                     {/* Left Column - Main Content */}
                     <div className="xl:col-span-3 space-y-8">
                         {/* Order Progress Timeline */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-                            <div className="flex items-center justify-between mb-8">
-                                <h2 className="text-xl font-bold text-slate-900">Order Progress</h2>
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-8 gap-2 sm:gap-0">
+                                <h2 className="text-lg sm:text-xl font-bold text-slate-900">Order Progress</h2>
                                 <span className="text-sm text-slate-500">Track your order status</span>
                             </div>
 
@@ -957,7 +957,7 @@ export default function OrderDetailsPage() {
                         </div>
 
                         {/* Order Items */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 lg:p-8">
                             <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-6 gap-4 lg:gap-0">
                                 <h2 className="text-xl font-bold text-slate-900 flex items-center">
                                     <ShoppingBag className="h-6 w-6 mr-3 text-blue-600" />
@@ -991,9 +991,9 @@ export default function OrderDetailsPage() {
 
                             {/* Packaging Selection Controls */}
                             <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
-                                <div className="flex items-center justify-between mb-3">
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-3 sm:gap-0">
                                     <div className="flex items-center space-x-3">
-                                        <Package className="h-5 w-5 text-blue-600" />
+                                        <Package className="h-5 w-5 text-blue-600 shrink-0" />
                                         <div>
                                             <h3 className="text-sm font-bold text-slate-900">Packaging Selection</h3>
                                             <p className="text-xs text-slate-600">Click items to mark as packed</p>
@@ -1002,15 +1002,15 @@ export default function OrderDetailsPage() {
                                     <div className="flex items-center space-x-2">
                                         <button
                                             onClick={selectAllItems}
-                                            className="px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 rounded-lg transition-colors"
+                                            className="text-xs font-semibold text-blue-700 hover:text-blue-800 bg-blue-100 hover:bg-blue-200 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
                                         >
                                             Select All
                                         </button>
                                         <button
                                             onClick={clearAllItems}
-                                            className="px-3 py-1.5 text-xs font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+                                            className="text-xs font-semibold text-slate-600 hover:text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
                                         >
-                                            Clear All
+                                            Clear
                                         </button>
                                     </div>
                                 </div>
@@ -1059,27 +1059,28 @@ export default function OrderDetailsPage() {
                                         <div
                                             key={index}
                                             onClick={() => toggleItemSelection(index)}
-                                            className={`group relative rounded-2xl p-6 transition-all duration-300 border-2 cursor-pointer ${isSelected
+                                            className={`group relative rounded-2xl p-4 sm:p-6 transition-all duration-300 border-2 cursor-pointer ${isSelected
                                                 ? 'bg-emerald-50 border-emerald-300 hover:bg-emerald-100'
                                                 : 'bg-slate-50 border-slate-100 hover:bg-slate-100'
                                                 }`}
                                         >
-                                            <div className="flex items-center space-x-6">
-                                                {/* Selection Checkbox */}
-                                                <div className="flex-shrink-0">
-                                                    <div className={`w-8 h-8 rounded-lg border-2 flex items-center justify-center transition-all ${isSelected
-                                                        ? 'bg-emerald-500 border-emerald-600'
-                                                        : 'bg-white border-slate-300 group-hover:border-blue-400'
-                                                        }`}>
-                                                        {isSelected ? (
-                                                            <CheckSquare className="h-5 w-5 text-white" />
-                                                        ) : (
-                                                            <Square className="h-5 w-5 text-slate-400" />
-                                                        )}
+                                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
+                                                <div className="flex items-center gap-4 shrink-0">
+                                                    {/* Selection Checkbox */}
+                                                    <div className="flex-shrink-0">
+                                                        <div className={`w-8 h-8 rounded-lg border-2 flex items-center justify-center transition-all ${isSelected
+                                                            ? 'bg-emerald-500 border-emerald-600'
+                                                            : 'bg-white border-slate-300 group-hover:border-blue-400'
+                                                            }`}>
+                                                            {isSelected ? (
+                                                                <CheckSquare className="h-5 w-5 text-white" />
+                                                            ) : (
+                                                                <Square className="h-5 w-5 text-slate-400" />
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                </div>
 
-                                                <div className="flex flex-col items-center flex-shrink-0">
+                                                    <div className="flex flex-col items-center flex-shrink-0">
                                                     <div
                                                         className="relative"
                                                         onMouseEnter={() => setHoveredImage(displayImage)}
@@ -1099,65 +1100,66 @@ export default function OrderDetailsPage() {
                                                         {imageType}
                                                     </span>
                                                 </div>
+                                                </div>
 
-                                                <div className="flex-1 min-w-0">
-                                                    <div className="flex items-center space-x-2 mb-2">
-                                                        <h3 className="text-lg font-bold text-slate-900">
+                                                <div className="flex-1 min-w-0 w-full">
+                                                    <div className="flex items-center space-x-2 mb-1 sm:mb-2">
+                                                        <h3 className="text-base sm:text-lg font-bold text-slate-900">
                                                             {item.name}
                                                         </h3>
                                                         {isSelected && (
-                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-500 text-white">
+                                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold bg-emerald-500 text-white">
                                                                 Packed
                                                             </span>
                                                         )}
                                                     </div>
 
-                                                    <div className="flex flex-wrap gap-3 mb-4">
-                                                        <div className="flex items-center bg-blue-100 px-4 py-2 rounded-lg">
-                                                            <span className="text-sm font-bold text-blue-800 mr-2">QTY:</span>
-                                                            <span className="text-sm font-semibold text-blue-700">{item.quantity}</span>
+                                                    <div className="flex flex-wrap gap-2 sm:gap-3 mb-2 sm:mb-4">
+                                                        <div className="flex items-center bg-blue-100 px-2 py-1 sm:px-4 sm:py-2 rounded-lg">
+                                                            <span className="text-xs sm:text-sm font-bold text-blue-800 mr-1 sm:mr-2">QTY:</span>
+                                                            <span className="text-xs sm:text-sm font-semibold text-blue-700">{item.quantity}</span>
                                                         </div>
-                                                        <div className="flex items-center bg-emerald-100 px-4 py-2 rounded-lg">
-                                                            <span className="text-sm font-bold text-emerald-800 mr-2">PRICE:</span>
-                                                            <span className="text-sm font-semibold text-emerald-700">৳{item.price}</span>
+                                                        <div className="flex items-center bg-emerald-100 px-2 py-1 sm:px-4 sm:py-2 rounded-lg">
+                                                            <span className="text-xs sm:text-sm font-bold text-emerald-800 mr-1 sm:mr-2">PRICE:</span>
+                                                            <span className="text-xs sm:text-sm font-semibold text-emerald-700">৳{item.price}</span>
                                                         </div>
                                                     </div>
 
                                                     {item.variant && (
-                                                        <div className="flex flex-wrap gap-3">
+                                                        <div className="flex flex-wrap gap-2 sm:gap-3">
                                                             {item.variant.size && (
-                                                                <div className="flex items-center bg-purple-100 px-4 py-2 rounded-lg">
-                                                                    <span className="text-sm font-bold text-purple-800 mr-2">SIZE:</span>
-                                                                    <span className="text-sm font-semibold text-purple-700">{item.variant.size}</span>
+                                                                <div className="flex items-center bg-purple-100 px-2 py-1 sm:px-4 sm:py-2 rounded-lg">
+                                                                    <span className="text-xs sm:text-sm font-bold text-purple-800 mr-1 sm:mr-2">SIZE:</span>
+                                                                    <span className="text-xs sm:text-sm font-semibold text-purple-700">{item.variant.size}</span>
                                                                 </div>
                                                             )}
                                                             {item.variant.color && (
-                                                                <div className="flex items-center bg-rose-100 px-4 py-2 rounded-lg">
-                                                                    <span className="text-sm font-bold text-rose-800 mr-2">COLOR:</span>
+                                                                <div className="flex items-center bg-rose-100 px-2 py-1 sm:px-4 sm:py-2 rounded-lg">
+                                                                    <span className="text-xs sm:text-sm font-bold text-rose-800 mr-1 sm:mr-2">COLOR:</span>
                                                                     <div
-                                                                        className="w-5 h-5 rounded-full border-2 border-white shadow-sm mr-2"
+                                                                        className="w-4 h-4 sm:w-5 sm:h-5 rounded-full border-2 border-white shadow-sm mr-1 sm:mr-2"
                                                                         style={{
                                                                             backgroundColor: item.variant.colorHexCode,
                                                                         }}
                                                                     ></div>
-                                                                    <span className="text-sm font-semibold text-rose-700">{item.variant.color}</span>
+                                                                    <span className="text-xs sm:text-sm font-semibold text-rose-700">{item.variant.color}</span>
                                                                 </div>
                                                             )}
                                                             {item.variant.sku && (
-                                                                <div className="flex items-center bg-slate-100 px-4 py-2 rounded-lg">
-                                                                    <span className="text-sm font-bold text-slate-800 mr-2">SKU:</span>
-                                                                    <span className="text-sm font-mono font-semibold text-slate-700">{item.variant.sku}</span>
+                                                                <div className="flex items-center bg-slate-100 px-2 py-1 sm:px-4 sm:py-2 rounded-lg">
+                                                                    <span className="text-xs sm:text-sm font-bold text-slate-800 mr-1 sm:mr-2">SKU:</span>
+                                                                    <span className="text-xs sm:text-sm font-mono font-semibold text-slate-700">{item.variant.sku}</span>
                                                                 </div>
                                                             )}
                                                         </div>
                                                     )}
                                                 </div>
 
-                                                <div className="text-right">
-                                                    <p className="text-2xl font-bold text-slate-900">
+                                                <div className="text-left sm:text-right mt-2 sm:mt-0">
+                                                    <p className="text-xl sm:text-2xl font-bold text-slate-900">
                                                         ৳{item.subtotal}
                                                     </p>
-                                                    <p className="text-sm text-slate-500 mt-1">Subtotal</p>
+                                                    <p className="text-xs sm:text-sm text-slate-500 sm:mt-1">Subtotal</p>
                                                 </div>
                                             </div>
                                         </div>
@@ -1168,8 +1170,8 @@ export default function OrderDetailsPage() {
 
                         {/* Order Notes */}
                         {order.orderNotes && (
-                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-                                <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center">
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 lg:p-8">
+                                <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-4 sm:mb-6 flex items-center">
                                     <MessageSquare className="h-6 w-6 mr-3 text-blue-600" />
                                     Order Notes
                                 </h2>
@@ -1191,12 +1193,12 @@ export default function OrderDetailsPage() {
                     {/* Right Column - Sidebar */}
                     <div className="space-y-8 xl:col-span-2">
                         {/* Order Summary */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-                            <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center">
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 lg:p-8">
+                            <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-4 sm:mb-6 flex items-center">
                                 <DollarSign className="h-6 w-6 mr-3 text-emerald-600" />
                                 Order Summary
                             </h2>
-                            <div className="space-y-4">
+                            <div className="space-y-3 sm:space-y-4">
                                 <div className="flex justify-between items-center py-3 border-b border-slate-100">
                                     <span className="text-slate-600 font-medium">Subtotal</span>
                                     <span className="font-bold text-slate-900">৳{order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0)}</span>
@@ -1256,13 +1258,13 @@ export default function OrderDetailsPage() {
                         </div>
 
                         {/* Customer Information */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-                            <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center">
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 lg:p-8">
+                            <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-4 sm:mb-6 flex items-center">
                                 <User className="h-6 w-6 mr-3 text-purple-600" />
                                 Customer Details
                             </h2>
-                            <div className="space-y-4">
-                                <div className="flex items-center p-4 bg-slate-50 rounded-xl">
+                            <div className="space-y-3 sm:space-y-4">
+                                <div className="flex items-center p-3 sm:p-4 bg-slate-50 rounded-xl">
                                     <div className="p-2 bg-purple-100 rounded-lg">
                                         <User className="h-4 w-4 text-purple-600" />
                                     </div>
@@ -1279,7 +1281,7 @@ export default function OrderDetailsPage() {
                                 </div>
 
                                 {(order.isGuestOrder && order.guestInfo?.email) || order.user?.email ? (
-                                    <div className="flex items-center p-4 bg-slate-50 rounded-xl">
+                                    <div className="flex items-center p-3 sm:p-4 bg-slate-50 rounded-xl">
                                         <div className="p-2 bg-blue-100 rounded-lg">
                                             <Mail className="h-4 w-4 text-blue-600" />
                                         </div>
@@ -1295,7 +1297,7 @@ export default function OrderDetailsPage() {
                                 ) : null}
 
                                 {(order.isGuestOrder && order.guestInfo?.phone) || order.user?.phone || (order.orderType === 'manual' && order.manualOrderInfo?.phone) ? (
-                                    <div className="flex items-center p-4 bg-slate-50 rounded-xl">
+                                    <div className="flex items-center p-3 sm:p-4 bg-slate-50 rounded-xl">
                                         <div className="p-2 bg-emerald-100 rounded-lg">
                                             <Phone className="h-4 w-4 text-emerald-600" />
                                         </div>
@@ -1315,13 +1317,13 @@ export default function OrderDetailsPage() {
                         </div>
 
                         {/* Payment Information */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-                            <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center">
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 lg:p-8">
+                            <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-4 sm:mb-6 flex items-center">
                                 <CreditCard className="h-6 w-6 mr-3 text-emerald-600" />
                                 Payment Info
                             </h2>
-                            <div className="space-y-4">
-                                <div className="flex items-center p-4 bg-slate-50 rounded-xl">
+                            <div className="space-y-3 sm:space-y-4">
+                                <div className="flex items-center p-3 sm:p-4 bg-slate-50 rounded-xl">
                                     <div className="p-2 bg-emerald-100 rounded-lg">
                                         <CreditCard className="h-4 w-4 text-emerald-600" />
                                     </div>
@@ -1334,7 +1336,7 @@ export default function OrderDetailsPage() {
                                 </div>
 
                                 {!!order.loyaltyPointsUsed && order.loyaltyPointsUsed > 0 && (
-                                    <div className="flex items-center p-4 bg-pink-50 rounded-xl border border-pink-200">
+                                    <div className="flex items-center p-3 sm:p-4 bg-pink-50 rounded-xl border border-pink-200">
                                         <div className="p-2 bg-pink-100 rounded-lg">
                                             <Coins className="h-4 w-4 text-pink-600" />
                                         </div>
@@ -1347,7 +1349,7 @@ export default function OrderDetailsPage() {
                                     </div>
                                 )}
 
-                                <div className="flex items-center p-4 bg-slate-50 rounded-xl">
+                                <div className="flex items-center p-3 sm:p-4 bg-slate-50 rounded-xl">
                                     <span className={`inline-flex items-center px-3 py-2 rounded-full text-sm font-bold ${getPaymentStatusColor(order.paymentStatus)}`}>
                                         <DollarSign className="h-4 w-4 mr-1" />
                                         {order.paymentStatus.charAt(0).toUpperCase() + order.paymentStatus.slice(1)}
@@ -1357,13 +1359,13 @@ export default function OrderDetailsPage() {
                         </div>
 
                         {/* Shipping Details */}
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-                            <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center">
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 lg:p-8">
+                            <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-4 sm:mb-6 flex items-center">
                                 <MapPin className="h-6 w-6 mr-3 text-red-600" />
                                 Shipping Details
                             </h2>
                             <div className="bg-gradient-to-r from-slate-50 to-slate-100 rounded-xl p-6 border border-slate-200">
-                                <div className="space-y-4">
+                                <div className="space-y-3 sm:space-y-4">
                                     <div className="flex items-center">
                                         <div className="p-2 bg-red-100 rounded-lg">
                                             <User className="h-4 w-4 text-red-600" />
@@ -1401,8 +1403,8 @@ export default function OrderDetailsPage() {
 
                         {/* Steadfast Tracking Information */}
                         {(order.status === 'shipped' || order.status === 'delivered') && order.isAddedIntoSteadfast && order.steadfastConsignmentId && (
-                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-                                <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center">
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 lg:p-8">
+                                <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-4 sm:mb-6 flex items-center">
                                     <Truck className="h-6 w-6 mr-3 text-pink-600" />
                                     Steadfast Courier Tracking
                                 </h2>
@@ -1457,8 +1459,8 @@ export default function OrderDetailsPage() {
 
                         {/* Quick Actions */}
                         {order.status !== 'shipped' && (
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
-                            <h2 className="text-xl font-bold text-slate-900 mb-6">Quick Actions</h2>
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 lg:p-8">
+                            <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-4 sm:mb-6">Quick Actions</h2>
                             <div className="grid grid-cols-1 gap-4">
                                 {hasPermission('order', 'update') && getNextStatus(order.status) && (
                                     <>

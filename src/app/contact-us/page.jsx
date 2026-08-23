@@ -1,11 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { 
-    Mail, 
-    Phone, 
-    MapPin, 
-    Clock, 
+import {
+    Mail,
+    Phone,
+    MapPin,
+    Clock,
     Send,
     User,
     MessageSquare,
@@ -36,7 +36,7 @@ export default function ContactUsPage() {
     const socialLinks = [
         {
             name: 'Facebook',
-            url: 'https://facebook.com/forpink',
+            url: 'https://facebook.com/pinkspot',
             icon: Facebook,
             color: 'bg-blue-600',
             followers: '25.2K',
@@ -44,7 +44,7 @@ export default function ContactUsPage() {
         },
         {
             name: 'Instagram',
-            url: 'https://instagram.com/forpink',
+            url: 'https://instagram.com/pinkspot',
             icon: Instagram,
             color: 'bg-pink-600',
             followers: '18.7K',
@@ -52,7 +52,7 @@ export default function ContactUsPage() {
         },
         {
             name: 'Twitter',
-            url: 'https://twitter.com/forpink',
+            url: 'https://twitter.com/pinkspot',
             icon: Twitter,
             color: 'bg-blue-400',
             followers: '12.3K',
@@ -60,7 +60,7 @@ export default function ContactUsPage() {
         },
         {
             name: 'LinkedIn',
-            url: 'https://linkedin.com/company/forpink',
+            url: 'https://linkedin.com/company/pinkspot',
             icon: Linkedin,
             color: 'bg-blue-700',
             followers: '8.9K',
@@ -68,7 +68,7 @@ export default function ContactUsPage() {
         },
         {
             name: 'YouTube',
-            url: 'https://youtube.com/forpink',
+            url: 'https://youtube.com/pinkspot',
             icon: Youtube,
             color: 'bg-red-600',
             followers: '15.6K',
@@ -76,7 +76,7 @@ export default function ContactUsPage() {
         },
         {
             name: 'GitHub',
-            url: 'https://github.com/forpink',
+            url: 'https://github.com/pinkspot',
             icon: Github,
             color: 'bg-gray-800',
             followers: '2.1K',
@@ -149,7 +149,7 @@ export default function ContactUsPage() {
 
     const handleSubmit = async (e) => {
         e.preventDefault()
-        
+
         // Validate form
         if (!validateForm()) {
             toast.error('Please fix the errors in the form')
@@ -166,7 +166,7 @@ export default function ContactUsPage() {
                 subject: formData.subject.trim(),
                 message: formData.message.trim()
             })
-            
+
             if (response.success) {
                 toast.success('Message sent successfully! We\'ll get back to you soon.')
                 setFormData({
@@ -191,7 +191,7 @@ export default function ContactUsPage() {
 
     return (
         <div className="min-h-screen bg-gray-50">
-            
+
             {/* Main Content */}
             <div className="max-w-4xl mx-auto px-4 py-12">
                 {/* Contact Form - Centered */}
@@ -199,163 +199,158 @@ export default function ContactUsPage() {
                     <h2 className="text-2xl text-center font-bold text-gray-900 mb-6">
                         Send us a message
                     </h2>
-                        
-                        <form onSubmit={handleSubmit} className="space-y-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div>
-                                    <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                                        Full Name <span className="text-red-500">*</span>
-                                    </label>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                            <User className="h-5 w-5 text-gray-400" />
-                                        </div>
-                                        <input
-                                            id="name"
-                                            name="name"
-                                            type="text"
-                                            required
-                                            value={formData.name}
-                                            onChange={handleInputChange}
-                                            className={`block w-full pl-12 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all duration-200 ${
-                                                errors.name 
-                                                    ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 
-                                                    : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
-                                            }`}
-                                            placeholder="Enter your full name"
-                                        />
-                                    </div>
-                                    {errors.name && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.name}</p>
-                                    )}
-                                </div>
 
-                                <div>
-                                    <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                                        Email Address <span className="text-red-500">*</span>
-                                    </label>
-                                    <div className="relative">
-                                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                            <Mail className="h-5 w-5 text-gray-400" />
-                                        </div>
-                                        <input
-                                            id="email"
-                                            name="email"
-                                            type="email"
-                                            required
-                                            value={formData.email}
-                                            onChange={handleInputChange}
-                                            className={`block w-full pl-12 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all duration-200 ${
-                                                errors.email 
-                                                    ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 
-                                                    : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
-                                            }`}
-                                            placeholder="Enter your email"
-                                        />
-                                    </div>
-                                    {errors.email && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.email}</p>
-                                    )}
-                                </div>
-                            </div>
-
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div>
-                                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
-                                    Phone Number <span className="text-gray-400 text-xs">(Optional)</span>
+                                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                                    Full Name <span className="text-red-500">*</span>
                                 </label>
                                 <div className="relative">
                                     <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                        <Phone className="h-5 w-5 text-gray-400" />
+                                        <User className="h-5 w-5 text-gray-400" />
                                     </div>
                                     <input
-                                        id="phone"
-                                        name="phone"
-                                        type="tel"
-                                        value={formData.phone}
+                                        id="name"
+                                        name="name"
+                                        type="text"
+                                        required
+                                        value={formData.name}
                                         onChange={handleInputChange}
-                                        className={`block w-full pl-12 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all duration-200 ${
-                                            errors.phone 
-                                                ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 
+                                        className={`block w-full pl-12 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all duration-200 ${errors.name
+                                                ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
                                                 : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
-                                        }`}
-                                        placeholder="Enter your phone number"
+                                            }`}
+                                        placeholder="Enter your full name"
                                     />
                                 </div>
-                                {errors.phone && (
-                                    <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+                                {errors.name && (
+                                    <p className="mt-1 text-sm text-red-600">{errors.name}</p>
                                 )}
                             </div>
 
                             <div>
-                                <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-2">
-                                    Subject <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    id="subject"
-                                    name="subject"
-                                    type="text"
-                                    required
-                                    value={formData.subject}
-                                    onChange={handleInputChange}
-                                    className={`block w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all duration-200 ${
-                                        errors.subject 
-                                            ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 
-                                            : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
-                                    }`}
-                                    placeholder="What is this about?"
-                                />
-                                {errors.subject && (
-                                    <p className="mt-1 text-sm text-red-600">{errors.subject}</p>
-                                )}
-                            </div>
-
-                            <div>
-                                <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
-                                    Message <span className="text-red-500">*</span>
-                                    <span className="text-gray-400 text-xs font-normal ml-2">
-                                        ({formData.message.length}/2000 characters)
-                                    </span>
+                                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                                    Email Address <span className="text-red-500">*</span>
                                 </label>
                                 <div className="relative">
-                                    <div className="absolute top-3 left-4 flex items-start pointer-events-none">
-                                        <MessageSquare className="h-5 w-5 text-gray-400" />
+                                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                        <Mail className="h-5 w-5 text-gray-400" />
                                     </div>
-                                    <textarea
-                                        id="message"
-                                        name="message"
-                                        rows={6}
+                                    <input
+                                        id="email"
+                                        name="email"
+                                        type="email"
                                         required
-                                        value={formData.message}
+                                        value={formData.email}
                                         onChange={handleInputChange}
-                                        maxLength={2000}
-                                        className={`block w-full pl-12 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all duration-200 resize-none ${
-                                            errors.message 
-                                                ? 'border-red-500 focus:ring-red-500 focus:border-red-500' 
+                                        className={`block w-full pl-12 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all duration-200 ${errors.email
+                                                ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
                                                 : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
-                                        }`}
-                                        placeholder="Tell us more about your inquiry..."
+                                            }`}
+                                        placeholder="Enter your email"
                                     />
                                 </div>
-                                {errors.message && (
-                                    <p className="mt-1 text-sm text-red-600">{errors.message}</p>
+                                {errors.email && (
+                                    <p className="mt-1 text-sm text-red-600">{errors.email}</p>
                                 )}
                             </div>
+                        </div>
 
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="w-full flex items-center justify-center py-3 px-6 border border-transparent text-sm font-medium rounded-xl text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
-                            >
-                                {loading ? (
-                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                                ) : (
-                                    <>
-                                        <Send className="mr-2 h-4 w-4" />
-                                        Send Message
-                                    </>
-                                )}
-                            </button>
-                        </form>
+                        <div>
+                            <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
+                                Phone Number <span className="text-gray-400 text-xs">(Optional)</span>
+                            </label>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                    <Phone className="h-5 w-5 text-gray-400" />
+                                </div>
+                                <input
+                                    id="phone"
+                                    name="phone"
+                                    type="tel"
+                                    value={formData.phone}
+                                    onChange={handleInputChange}
+                                    className={`block w-full pl-12 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all duration-200 ${errors.phone
+                                            ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                                            : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                                        }`}
+                                    placeholder="Enter your phone number"
+                                />
+                            </div>
+                            {errors.phone && (
+                                <p className="mt-1 text-sm text-red-600">{errors.phone}</p>
+                            )}
+                        </div>
+
+                        <div>
+                            <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-2">
+                                Subject <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                                id="subject"
+                                name="subject"
+                                type="text"
+                                required
+                                value={formData.subject}
+                                onChange={handleInputChange}
+                                className={`block w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all duration-200 ${errors.subject
+                                        ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                                        : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                                    }`}
+                                placeholder="What is this about?"
+                            />
+                            {errors.subject && (
+                                <p className="mt-1 text-sm text-red-600">{errors.subject}</p>
+                            )}
+                        </div>
+
+                        <div>
+                            <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
+                                Message <span className="text-red-500">*</span>
+                                <span className="text-gray-400 text-xs font-normal ml-2">
+                                    ({formData.message.length}/2000 characters)
+                                </span>
+                            </label>
+                            <div className="relative">
+                                <div className="absolute top-3 left-4 flex items-start pointer-events-none">
+                                    <MessageSquare className="h-5 w-5 text-gray-400" />
+                                </div>
+                                <textarea
+                                    id="message"
+                                    name="message"
+                                    rows={6}
+                                    required
+                                    value={formData.message}
+                                    onChange={handleInputChange}
+                                    maxLength={2000}
+                                    className={`block w-full pl-12 pr-4 py-3 border rounded-xl focus:outline-none focus:ring-2 transition-all duration-200 resize-none ${errors.message
+                                            ? 'border-red-500 focus:ring-red-500 focus:border-red-500'
+                                            : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                                        }`}
+                                    placeholder="Tell us more about your inquiry..."
+                                />
+                            </div>
+                            {errors.message && (
+                                <p className="mt-1 text-sm text-red-600">{errors.message}</p>
+                            )}
+                        </div>
+
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full flex items-center justify-center py-3 px-6 border border-transparent text-sm font-medium rounded-xl text-white bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl"
+                        >
+                            {loading ? (
+                                <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                            ) : (
+                                <>
+                                    <Send className="mr-2 h-4 w-4" />
+                                    Send Message
+                                </>
+                            )}
+                        </button>
+                    </form>
                 </div>
 
                 {/* Contact Information - Below Form */}

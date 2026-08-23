@@ -10,7 +10,7 @@ export const siteConfig = {
   seo: {
     title: "Pinkspot - Premium Jewelry & Accessories",
     description: "Discover our exclusive collection of premium jewelry, rings, necklaces, and accessories. Handcrafted with love and precision.",
-    keywords: "jewelry, rings, necklaces, accessories, premium jewelry, handcrafted jewelry, forpink",
+    keywords: "jewelry, rings, necklaces, accessories, premium jewelry, handcrafted jewelry, pinkspot",
     author: "Pinkspot Team",
     robots: "index, follow",
     language: "en",
@@ -22,8 +22,8 @@ export const siteConfig = {
   social: {
     twitter: {
       card: "summary_large_image",
-      site: "@forpink",
-      creator: "@forpink",
+      site: "@pinkspot",
+      creator: "@pinkspot",
     },
     facebook: {
       appId: "your-facebook-app-id",

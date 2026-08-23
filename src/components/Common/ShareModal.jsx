@@ -30,11 +30,11 @@ export default function ShareModal({ isOpen, onClose, url, title = 'Share Link' 
     if (!isOpen) return null
 
     return (
-        <div 
+        <div
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4"
             onClick={onClose}
         >
-            <div 
+            <div
                 className="bg-white rounded-lg shadow-xl max-w-lg w-full transform transition-all overflow-hidden"
                 onClick={(e) => e.stopPropagation()}
             >
@@ -65,11 +65,10 @@ export default function ShareModal({ isOpen, onClose, url, title = 'Share Link' 
                             />
                             <button
                                 onClick={handleCopy}
-                                className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white transition-colors cursor-pointer ${
-                                    copied
+                                className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white transition-colors cursor-pointer ${copied
                                         ? 'bg-green-600 hover:bg-green-700'
                                         : 'bg-pink-600 hover:bg-pink-700'
-                                }`}
+                                    }`}
                             >
                                 {copied ? (
                                     <>

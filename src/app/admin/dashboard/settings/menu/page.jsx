@@ -560,7 +560,7 @@ export default function MenuSettings() {
             // Using existing reorder API or updating them one by one.
             // Since categoryAPI.reorderCategories uses 'sortOrder', but we are modifying 'headerSortOrder', we might need to modify the backend or just call updateCategory in a loop.
             // Actually, we can use a Promise.all to update headerSortOrder for all changed categories.
-            const promises = updatedCategories.map((cat, i) => 
+            const promises = updatedCategories.map((cat, i) =>
                 categoryAPI.updateCategory(cat._id, { headerSortOrder: i })
             );
             await Promise.all(promises);
@@ -578,7 +578,7 @@ export default function MenuSettings() {
         const temp = sortedCats[index];
         sortedCats[index] = sortedCats[index - 1];
         sortedCats[index - 1] = temp;
-        
+
         sortedCats.forEach((cat, i) => cat.headerSortOrder = i);
         setCategories(sortedCats);
         saveCategoryOrder(sortedCats);
@@ -822,7 +822,7 @@ export default function MenuSettings() {
                             </div>
                         </div>
                     )}
-                    
+
                     <div className="bg-white shadow overflow-hidden sm:rounded-md">
                         <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
                             <h3 className="text-lg font-medium text-gray-900">Header Categories</h3>
@@ -831,96 +831,96 @@ export default function MenuSettings() {
                             </p>
                         </div>
                         <ul className="divide-y divide-gray-200">
-                        {[...categories].sort((a, b) => (a.headerSortOrder || 0) - (b.headerSortOrder || 0)).map((category, index) => {
-                            const isChild = !!category.parent;
-                            let parentName = '';
-                            if (isChild) {
-                                // parent might be populated object or just ID
-                                if (category.parent.name) {
-                                    parentName = category.parent.name;
-                                } else {
-                                    const parentDoc = categories.find(c => c._id === category.parent);
-                                    if (parentDoc) parentName = parentDoc.name;
+                            {[...categories].sort((a, b) => (a.headerSortOrder || 0) - (b.headerSortOrder || 0)).map((category, index) => {
+                                const isChild = !!category.parent;
+                                let parentName = '';
+                                if (isChild) {
+                                    // parent might be populated object or just ID
+                                    if (category.parent.name) {
+                                        parentName = category.parent.name;
+                                    } else {
+                                        const parentDoc = categories.find(c => c._id === category.parent);
+                                        if (parentDoc) parentName = parentDoc.name;
+                                    }
                                 }
-                            }
-                            
-                            return (
-                                <li key={category._id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50">
-                                    <div className="flex items-center">
-                                        <div className="flex-shrink-0 h-10 w-10 mr-4">
-                                            {category.image ? (
-                                                <img className="h-10 w-10 rounded-lg object-cover" src={category.image} alt={category.name} />
-                                            ) : (
-                                                <div className="h-10 w-10 rounded-lg bg-gray-200 flex items-center justify-center">
-                                                    <FolderOpen className="h-5 w-5 text-gray-400" />
+
+                                return (
+                                    <li key={category._id} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50">
+                                        <div className="flex items-center">
+                                            <div className="flex-shrink-0 h-10 w-10 mr-4">
+                                                {category.image ? (
+                                                    <img className="h-10 w-10 rounded-lg object-cover" src={category.image} alt={category.name} />
+                                                ) : (
+                                                    <div className="h-10 w-10 rounded-lg bg-gray-200 flex items-center justify-center">
+                                                        <FolderOpen className="h-5 w-5 text-gray-400" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <p className="text-sm font-medium text-gray-900">{category.name}</p>
+                                                    <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${isChild ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}`}>
+                                                        {isChild ? `Child of ${parentName || 'Unknown'}` : 'Parent'}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-gray-500">Slug: {category.slug}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center space-x-6">
+                                            {!isChild && (
+                                                <div className="flex flex-col items-center">
+                                                    <label className="text-xs text-gray-500 mb-1">Show Sub Menu</label>
+                                                    <label className="relative inline-flex items-center cursor-pointer">
+                                                        <input
+                                                            type="checkbox"
+                                                            className="sr-only peer"
+                                                            checked={category.showChildAsSubMenu || false}
+                                                            onChange={(e) => handleCategoryUpdate(category._id, 'showChildAsSubMenu', e.target.checked)}
+                                                        />
+                                                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-pink-600"></div>
+                                                    </label>
                                                 </div>
                                             )}
-                                        </div>
-                                        <div>
-                                            <div className="flex items-center gap-2">
-                                                <p className="text-sm font-medium text-gray-900">{category.name}</p>
-                                                <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${isChild ? 'bg-blue-100 text-blue-700' : 'bg-pink-100 text-pink-700'}`}>
-                                                    {isChild ? `Child of ${parentName || 'Unknown'}` : 'Parent'}
-                                                </span>
-                                            </div>
-                                            <p className="text-xs text-gray-500">Slug: {category.slug}</p>
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center space-x-6">
-                                        {!isChild && (
                                             <div className="flex flex-col items-center">
-                                                <label className="text-xs text-gray-500 mb-1">Show Sub Menu</label>
+                                                <label className="text-xs text-gray-500 mb-1">Header Sort Order</label>
+                                                <div className="flex items-center space-x-1">
+                                                    <button
+                                                        onClick={() => handleCategoryMoveUp(index)}
+                                                        className={`p-1 rounded-md ${index === 0 ? 'text-gray-300' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'}`}
+                                                        title="Move Up"
+                                                        disabled={index === 0}
+                                                    >
+                                                        <ArrowUp className="h-4 w-4" />
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleCategoryMoveDown(index)}
+                                                        className={`p-1 rounded-md ${index === categories.length - 1 ? 'text-gray-300' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'}`}
+                                                        title="Move Down"
+                                                        disabled={index === categories.length - 1}
+                                                    >
+                                                        <ArrowDown className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col items-center">
+                                                <label className="text-xs text-gray-500 mb-1">Show on Header</label>
                                                 <label className="relative inline-flex items-center cursor-pointer">
                                                     <input
                                                         type="checkbox"
                                                         className="sr-only peer"
-                                                        checked={category.showChildAsSubMenu || false}
-                                                        onChange={(e) => handleCategoryUpdate(category._id, 'showChildAsSubMenu', e.target.checked)}
+                                                        checked={category.showOnHeader || false}
+                                                        onChange={(e) => handleCategoryUpdate(category._id, 'showOnHeader', e.target.checked)}
                                                     />
                                                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-pink-600"></div>
                                                 </label>
                                             </div>
-                                        )}
-                                        <div className="flex flex-col items-center">
-                                            <label className="text-xs text-gray-500 mb-1">Header Sort Order</label>
-                                            <div className="flex items-center space-x-1">
-                                                <button
-                                                    onClick={() => handleCategoryMoveUp(index)}
-                                                    className={`p-1 rounded-md ${index === 0 ? 'text-gray-300' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'}`}
-                                                    title="Move Up"
-                                                    disabled={index === 0}
-                                                >
-                                                    <ArrowUp className="h-4 w-4" />
-                                                </button>
-                                                <button
-                                                    onClick={() => handleCategoryMoveDown(index)}
-                                                    className={`p-1 rounded-md ${index === categories.length - 1 ? 'text-gray-300' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-700'}`}
-                                                    title="Move Down"
-                                                    disabled={index === categories.length - 1}
-                                                >
-                                                    <ArrowDown className="h-4 w-4" />
-                                                </button>
-                                            </div>
                                         </div>
-                                        <div className="flex flex-col items-center">
-                                            <label className="text-xs text-gray-500 mb-1">Show on Header</label>
-                                            <label className="relative inline-flex items-center cursor-pointer">
-                                                <input
-                                                    type="checkbox"
-                                                    className="sr-only peer"
-                                                    checked={category.showOnHeader || false}
-                                                    onChange={(e) => handleCategoryUpdate(category._id, 'showOnHeader', e.target.checked)}
-                                                />
-                                                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-pink-600"></div>
-                                            </label>
-                                        </div>
-                                    </div>
-                                </li>
-                            )
-                        })}
-                    </ul>
+                                    </li>
+                                )
+                            })}
+                        </ul>
+                    </div>
                 </div>
-            </div>
             ) : activeTab === 'header' ? (
                 <div className="bg-white shadow overflow-hidden sm:rounded-md">
                     <ul className="divide-y divide-gray-200">
@@ -1242,7 +1242,7 @@ export default function MenuSettings() {
                                             email: e.target.value
                                         }))}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-pink-500 focus:border-pink-500 sm:text-sm"
-                                        placeholder="forpink@gmail.com"
+                                        placeholder="info@pinkspot.bd"
                                     />
                                 </div>
 

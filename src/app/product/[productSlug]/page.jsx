@@ -46,8 +46,57 @@ export const viewport = generateViewport();
 const page = async ({ params }) => {
     const { productSlug } = await params;
 
+    // Fetch product data server-side for JSON-LD Structured Data
+    let productData = null;
+    try {
+        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+        const response = await fetch(`${API_BASE_URL}/product/slug/${productSlug}`, {
+            next: { revalidate: 60 }
+        });
+        if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.data) {
+                productData = data.data;
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching product for structured data:', error);
+    }
+
+    // Generate JSON-LD Schema
+    let jsonLd = null;
+    if (productData) {
+        // Find correct price and stock based on DB schema
+        const currentPrice = productData.variants?.[0]?.currentPrice || productData.basePrice || 0;
+        const inStock = (productData.totalStock > 0) || (productData.variants && productData.variants.some(v => v.stockQuantity > 0));
+        const imageUrl = productData.featuredImage || (productData.gallery && productData.gallery[0]?.url) || "https://pinkspot.bd/images/logo.png";
+
+        jsonLd = {
+            "@context": "https://schema.org",
+            "@type": "Product",
+            "name": productData.title,
+            "image": imageUrl,
+            "description": productData.shortDescription || productData.description || `Premium ${productData.title} from Pinkspot`,
+            "sku": productData.slug,
+            "offers": {
+                "@type": "Offer",
+                "url": `https://pinkspot.bd/product/${productSlug}`,
+                "priceCurrency": "BDT",
+                "price": currentPrice,
+                "availability": inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+                "itemCondition": "https://schema.org/NewCondition"
+            }
+        };
+    }
+
     return (
         <div>
+            {jsonLd && (
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+                />
+            )}
             <ProductDetails productSlug={productSlug} />
             <Footer />
         </div>
