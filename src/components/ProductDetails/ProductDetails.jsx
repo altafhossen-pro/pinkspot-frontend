@@ -86,7 +86,7 @@ export default function ProductDetails({ productSlug }) {
                         variant.stockQuantity > 0 && variant.stockStatus !== 'out_of_stock'
                     );
                     const defaultVariantBase = stockInVariantGlobal || data.data.variants[0];
-                    
+
                     const baseSizeAttr = defaultVariantBase.attributes.find(attr => attr.name === 'Size');
                     const defaultSize = baseSizeAttr ? baseSizeAttr.value : "";
 
@@ -99,9 +99,9 @@ export default function ProductDetails({ productSlug }) {
                             return !sAttr;
                         }
                     });
-                    
+
                     const sortedVariantsForSize = variantsForDefaultSize.sort((a, b) => (a.sortOrder || 1) - (b.sortOrder || 1));
-                    
+
                     const stockInSize = sortedVariantsForSize.find(variant =>
                         variant.stockQuantity > 0 && variant.stockStatus !== 'out_of_stock'
                     );
@@ -111,10 +111,23 @@ export default function ProductDetails({ productSlug }) {
                     const colorAttr = defaultVariant.attributes.find(attr => attr.name === 'Color');
 
                     // Size is optional - set it if available
-                    if (sizeAttr) {
+                    if (sizeAttr && sizeAttr.value.trim() !== '') {
                         setSelectedSize(sizeAttr.value);
                     } else {
-                        setSelectedSize(""); // No size for this variant
+                        // Check if there are other variants with size to determine if we should use "No Size"
+                        let hasSize = false;
+                        let hasSizeLess = false;
+                        data.data.variants.forEach(v => {
+                            const sAttr = v.attributes.find(attr => attr.name === 'Size');
+                            if (sAttr && sAttr.value && sAttr.value.trim() !== '') hasSize = true;
+                            else hasSizeLess = true;
+                        });
+                        
+                        if (hasSize && hasSizeLess) {
+                            setSelectedSize("No Size");
+                        } else {
+                            setSelectedSize(""); // No size for this variant, and no other sizes exist
+                        }
                     }
 
                     // Color is optional - set if variant has color
@@ -149,11 +162,23 @@ export default function ProductDetails({ productSlug }) {
     // Get unique sizes from variants (mandatory)
     const getUniqueSizes = () => {
         if (!product?.variants) return [];
-        const sizes = product.variants
-            .map(variant => variant.attributes.find(attr => attr.name === 'Size'))
-            .filter(size => size)
-            .map(size => size.value);
-        return [...new Set(sizes)];
+        let hasSizeLessVariant = false;
+        const sizes = [];
+        
+        product.variants.forEach(variant => {
+            const sizeAttr = variant.attributes.find(attr => attr.name === 'Size');
+            if (sizeAttr && sizeAttr.value && sizeAttr.value.trim() !== '') {
+                sizes.push(sizeAttr.value);
+            } else {
+                hasSizeLessVariant = true;
+            }
+        });
+        
+        const unique = [...new Set(sizes)];
+        if (hasSizeLessVariant && unique.length > 0) {
+            unique.push("No Size");
+        }
+        return unique;
     };
 
     // Get unique colors from variants (optional - only if variants have color)
@@ -161,7 +186,7 @@ export default function ProductDetails({ productSlug }) {
         if (!product?.variants) return [];
         const colors = product.variants
             .map(variant => variant.attributes.find(attr => attr.name === 'Color'))
-            .filter(color => color) // Only include variants that have color
+            .filter(color => color && color.value && color.value.trim() !== '') // Only include variants that have non-empty color
             .map(color => ({ value: color.value, hexCode: color.hexCode }));
         return colors.filter((color, index, self) =>
             index === self.findIndex(c => c.value === color.value)
@@ -318,13 +343,17 @@ export default function ProductDetails({ productSlug }) {
 
     // Handle variant image selection (replaces color selection)
     const handleVariantImageChange = (variant) => {
-        // Set size if variant has size, otherwise clear it
+        // Set size if variant has size, otherwise clear it or set to "No Size"
         const sizeAttr = variant.attributes.find(attr => attr.name === 'Size');
-        if (sizeAttr) {
+        if (sizeAttr && sizeAttr.value.trim() !== '') {
             setSelectedSize(sizeAttr.value);
         } else {
-            // If variant has no size, clear selectedSize to match variants without size
-            setSelectedSize("");
+            const uniqueSizes = getUniqueSizes();
+            if (uniqueSizes.includes("No Size")) {
+                setSelectedSize("No Size");
+            } else {
+                setSelectedSize("");
+            }
         }
 
         // Set color if variant has color, otherwise clear it
@@ -347,10 +376,17 @@ export default function ProductDetails({ productSlug }) {
         if (!product?.variants) return [];
 
         if (size) {
-            // Filter variants by selected size
+            // Filter variants by selected size + include variants without size
             return product.variants.filter(variant => {
                 const sizeAttr = variant.attributes.find(attr => attr.name === 'Size');
-                return sizeAttr && sizeAttr.value === size;
+                const hasNoSize = !sizeAttr || (sizeAttr.value.trim() === '');
+                
+                if (size === "No Size") {
+                    return hasNoSize;
+                }
+                
+                // Show matching size PLUS variants that have NO size at all
+                return hasNoSize || (sizeAttr && sizeAttr.value === size);
             }).sort((a, b) => (a.sortOrder || 1) - (b.sortOrder || 1));
         } else {
             // If no size selected, show all variants (both with and without size)
@@ -368,7 +404,7 @@ export default function ProductDetails({ productSlug }) {
         // Calculate actual price with category discount if applicable
         let finalPrice = selectedVariant ? selectedVariant.currentPrice : (product.variants?.[0]?.currentPrice || product.basePrice || 0);
         let finalOriginalPrice = selectedVariant ? selectedVariant.originalPrice : (product.variants?.[0]?.originalPrice || null);
-        
+
         if (product?.category?.categoryDiscount?.isActive && product.category.categoryDiscount.percentage > 0 && !product.excludeFromCategoryDiscount) {
             finalOriginalPrice = finalPrice;
             finalPrice = finalPrice - (finalPrice * (product.category.categoryDiscount.percentage / 100));
@@ -388,8 +424,8 @@ export default function ProductDetails({ productSlug }) {
         } : null;
 
         // If no variant is selected, we should still pass the discounted price to product
-        const activeSubtitle = (product.isGlobalSubtitleOn && product.globalSubtitle) 
-            ? product.globalSubtitle 
+        const activeSubtitle = (product.isGlobalSubtitleOn && product.globalSubtitle)
+            ? product.globalSubtitle
             : (!product.isGlobalSubtitleOn && product.customSubtitle && !product.customSubtitle.startsWith('$'))
                 ? product.customSubtitle
                 : null;
@@ -416,7 +452,7 @@ export default function ProductDetails({ productSlug }) {
         // Calculate actual price with category discount if applicable
         let finalPrice = selectedVariant ? selectedVariant.currentPrice : (product.variants?.[0]?.currentPrice || product.basePrice || 0);
         let finalOriginalPrice = selectedVariant ? selectedVariant.originalPrice : (product.variants?.[0]?.originalPrice || null);
-        
+
         if (product?.category?.categoryDiscount?.isActive && product.category.categoryDiscount.percentage > 0 && !product.excludeFromCategoryDiscount) {
             finalOriginalPrice = finalPrice;
             finalPrice = finalPrice - (finalPrice * (product.category.categoryDiscount.percentage / 100));
@@ -436,8 +472,8 @@ export default function ProductDetails({ productSlug }) {
         } : null;
 
         // If no variant is selected, we should still pass the discounted price to product
-        const activeSubtitle = (product.isGlobalSubtitleOn && product.globalSubtitle) 
-            ? product.globalSubtitle 
+        const activeSubtitle = (product.isGlobalSubtitleOn && product.globalSubtitle)
+            ? product.globalSubtitle
             : (!product.isGlobalSubtitleOn && product.customSubtitle && !product.customSubtitle.startsWith('$'))
                 ? product.customSubtitle
                 : null;
@@ -596,18 +632,8 @@ export default function ProductDetails({ productSlug }) {
     return (
         <div className="min-h-screen px-4 lg:px-4 py-4">
             <div className="max-w-screen-2xl  mx-auto">
-                {/* Breadcrumb */}
-                <div className="mb-6">
-                    <nav className="flex text-sm text-gray-500">
-                        <a href="#" className="hover:text-pink-500">Home</a>
-                        <span className="mx-2">/</span>
-                        <a href="#" className="hover:text-pink-500">Products</a>
-                        <span className="mx-2">/</span>
-                        <span className="text-gray-900">{product.title}</span>
-                    </nav>
-                </div>
 
-                <div className="flex flex-col lg:flex-row gap-12 mb-12">
+                <div className="flex flex-col lg:flex-row lg:gap-12 gap-3 mb-12">
                     {/* Product Images - Left Panel */}
                     <div className="space-y-4 lg:w-[45%]">
                         {/* Main Image Container with space for magnify */}
@@ -745,7 +771,7 @@ export default function ProductDetails({ productSlug }) {
                     {/* Product Info - Right Panel */}
                     <div className="lg:w-[55%]  flex flex-col lg:flex-row justify-between gap-8">
                         {/* Left Part - Product Details */}
-                        <div className="space-y-3 lg:flex-1">
+                        <div className="space-y-2 sm:space-y-3 lg:flex-1">
                             {/* Product Title and Category Badge */}
                             <div className="flex flex-col gap-2">
                                 {categoryDiscountObj && (
@@ -764,40 +790,50 @@ export default function ProductDetails({ productSlug }) {
                                 </h1>
                             </div>
 
-                            {/* Reviews Count - Above Price */}
-                            <div className="flex items-center justify-between w-full">
-                                <div className="flex items-center gap-2">
-                                    <div className="flex items-center gap-1">
-                                        {[...Array(5)].map((_, i) => (
-                                            <Star
-                                                key={i}
-                                                className="w-5 h-5 fill-yellow-400 text-yellow-400"
-                                            />
-                                        ))}
+                            {/* Mobile: Price Left, Reviews Right | Desktop: Reviews Top, Price Bottom */}
+                            <div className="flex flex-col sm:gap-3 w-full">
+                                {/* Desktop Layout */}
+                                <div className="hidden sm:flex flex-col gap-3 w-full">
+                                    <div className="flex items-center justify-between w-full">
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-1">
+                                                {[...Array(5)].map((_, i) => (
+                                                    <Star key={i} className="w-5 h-5 fill-yellow-400 text-yellow-400" />
+                                                ))}
+                                            </div>
+                                            <span className="text-red-500 font-medium">{product.totalReviews || 0} Reviews</span>
+                                        </div>
                                     </div>
-                                    <span className="text-red-500 font-medium">{product.totalReviews || 0} Reviews</span>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-3xl font-bold text-pink-600">৳{currentPrice}</span>
+                                        {originalPrice && (
+                                            <span className="text-xl text-gray-500 line-through">৳{originalPrice}</span>
+                                        )}
+                                    </div>
                                 </div>
-                                
-                                {/* Mobile Share Button */}
-                                <button 
-                                    onClick={() => setIsShareModalOpen(true)}
-                                    className="sm:hidden flex items-center justify-center w-8 h-8 rounded-full bg-pink-50 text-pink-600 border border-pink-100 shadow-sm shrink-0"
-                                    aria-label="Share product"
-                                >
-                                    <Share2 className="w-4 h-4" />
-                                </button>
-                            </div>
 
-                            {/* Price */}
-                            <div className="flex items-center gap-3 ">
-                                <span className="text-3xl font-bold text-pink-600">
-                                    ৳{currentPrice}
-                                </span>
-                                {originalPrice && (
-                                    <span className="text-xl text-gray-500 line-through">
-                                        ৳{originalPrice}
-                                    </span>
-                                )}
+                                {/* Mobile Layout */}
+                                <div className="flex sm:hidden items-center justify-between w-full">
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-2xl font-bold text-pink-600">৳{currentPrice}</span>
+                                        {originalPrice && (
+                                            <span className="text-base text-gray-500 line-through">৳{originalPrice}</span>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-1 bg-yellow-50 px-2 py-1 rounded-md border border-yellow-100">
+                                            <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-500" />
+                                            <span className="text-xs font-semibold text-yellow-700">{product.totalReviews || 0} Rev</span>
+                                        </div>
+                                        <button
+                                            onClick={() => setIsShareModalOpen(true)}
+                                            className="flex items-center justify-center w-8 h-8 rounded-full bg-pink-50 text-pink-600 border border-pink-100 shadow-sm shrink-0"
+                                            aria-label="Share product"
+                                        >
+                                            <Share2 className="w-3.5 h-3.5" />
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Quantity */}
@@ -843,32 +879,29 @@ export default function ProductDetails({ productSlug }) {
                             </div>
 
                             {/* Size and Variant Image Selectors */}
-                            <div className="flex flex-col gap-4">
+                            <div className="flex flex-col gap-3 sm:gap-4">
                                 {/* Size Selector */}
                                 {uniqueSizes.length > 0 && (
                                     <div className="space-y-2">
-                                        <label className="block text-sm font-medium text-gray-700">Select Size</label>
-                                        <div className="flex gap-2">
-                                            {uniqueSizes.map((size) => {
-                                                const isSingleChar = size.length === 1;
-
-                                                return (
-                                                    <button
-                                                        key={size}
-                                                        onClick={() => handleSizeChange(size)}
-                                                        className={`rounded-md border-2 transition-all duration-200 flex items-center justify-center font-medium cursor-pointer
-        ${selectedSize === size
-                                                                ? 'bg-pink-500 text-white border-pink-500 shadow-sm'
-                                                                : 'border-gray-300 text-gray-700 hover:border-pink-400 hover:bg-pink-50'
-                                                            }
-        ${isSingleChar ? 'w-10 h-10 text-base md:text-lg' : 'px-3 py-2 text-sm'}
-      `}
-                                                    >
+                                        <label htmlFor="size-selector" className="block text-sm font-medium text-gray-700">Select Size</label>
+                                        <div className="relative w-[146px] lg:w-[146px]">
+                                            <select
+                                                id="size-selector"
+                                                value={selectedSize || ''}
+                                                onChange={(e) => handleSizeChange(e.target.value)}
+                                                className="block w-full lg:w-full p-2.5 text-gray-700 bg-white border border-gray-300 rounded-lg shadow-sm focus:border-pink-500 focus:ring-1 focus:ring-pink-500 focus:outline-none transition-all duration-200 cursor-pointer appearance-none pr-10"
+                                            >
+                                                {uniqueSizes.map((size) => (
+                                                    <option key={size} value={size}>
                                                         {size}
-                                                    </button>
-                                                );
-                                            })}
-
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-500">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                                                </svg>
+                                            </div>
                                         </div>
                                     </div>
                                 )}
@@ -904,7 +937,7 @@ export default function ProductDetails({ productSlug }) {
                                                         <button
                                                             key={variant.sku || variant._id}
                                                             onClick={() => handleVariantImageChange(variant)}
-                                                            className={`w-12 h-12 rounded-md border-2 transition-all duration-200 flex items-center justify-center cursor-pointer overflow-hidden ${isSelected
+                                                            className={`w-20 h-20 lg:w-16 lg:h-16 rounded-md border-2 transition-all duration-200 flex items-center justify-center cursor-pointer overflow-hidden ${isSelected
                                                                 ? 'border-pink-500 ring-2 ring-pink-200 shadow-sm'
                                                                 : 'border-gray-300 hover:border-pink-400 hover:shadow-sm'
                                                                 }`}
@@ -1164,7 +1197,7 @@ export default function ProductDetails({ productSlug }) {
                                 <div className="px-6 py-6 bg-white border-t border-gray-200">
                                     <div className="space-y-8">
                                         {/* Product Information Cards */}
-                                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                             {/* Brand Card */}
                                             <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-4 border border-gray-200">
                                                 <div className="flex items-center gap-3">
@@ -1227,18 +1260,7 @@ export default function ProductDetails({ productSlug }) {
                                                 </div>
                                             </div>
 
-                                            {/* Stock Quantity Card */}
-                                            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg p-4 border border-gray-200">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
-                                                        <Package className="w-5 h-5 text-purple-600" />
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Stock Quantity</p>
-                                                        <p className="text-sm font-semibold text-gray-900">{product?.isForceOutOfStock ? 0 : (selectedVariant?.stockQuantity || product.totalStock || 0)} units</p>
-                                                    </div>
-                                                </div>
-                                            </div>
+
                                         </div>
 
                                         {/* Specifications Section */}
@@ -1569,10 +1591,10 @@ export default function ProductDetails({ productSlug }) {
                     border: 1.5px solid #EF3D6A;
                 }
             `}</style>
-            
-            <ProductShareModal 
-                isOpen={isShareModalOpen} 
-                onClose={() => setIsShareModalOpen(false)} 
+
+            <ProductShareModal
+                isOpen={isShareModalOpen}
+                onClose={() => setIsShareModalOpen(false)}
                 url={`/product/${productSlug}`}
                 productName={product?.title || ''}
             />

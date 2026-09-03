@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Facebook, Twitter, Instagram, Linkedin, MapPin, Phone, Mail, MessageCircle } from 'lucide-react';
-import { menuAPI, settingsAPI } from '@/services/api';
+import { menuAPI } from '@/services/api';
+import { useAppContext } from '@/context/AppContext';
 
 // Fallback footer data
 const fallbackFooterData = {
@@ -39,8 +40,10 @@ const fallbackFooterData = {
 };
 
 export default function Footer() {
+  const { siteSettings } = useAppContext();
   const [footerData, setFooterData] = useState(fallbackFooterData);
-  const [logoUrl, setLogoUrl] = useState("/images/logo.svg");
+  // logoUrl — AppContext থেকে পাও, আলাদা API call নাই
+  const logoUrl = siteSettings?.logoUrl || "/images/logo.svg";
   const [loading, setLoading] = useState(true);
 
   // Fetch footer data from API
@@ -48,10 +51,8 @@ export default function Footer() {
     const fetchFooterData = async () => {
       try {
         setLoading(true);
-        const [menuResponse, settingsResponse] = await Promise.all([
-          menuAPI.getFooterMenus().catch(() => ({ success: false })),
-          settingsAPI.getSiteSettings().catch(() => ({ success: false }))
-        ]);
+        const menuResponse = await menuAPI.getFooterMenus().catch(() => ({ success: false }));
+        // ✅ getSiteSettings এখানে নেই — AppContext থেকে siteSettings আসছে
 
         if (menuResponse?.success && menuResponse?.data) {
           // Transform API data to match component format
@@ -67,13 +68,9 @@ export default function Footer() {
 
           setFooterData(transformedData);
         } else {
-          // Use fallback data if API fails
           setFooterData(fallbackFooterData);
         }
-
-        if (settingsResponse?.success && settingsResponse?.data?.logoUrl) {
-          setLogoUrl(settingsResponse.data.logoUrl);
-        }
+        // logoUrl এর জন্য আর সেট্টিংস ফেচ করতে হবে না — useAppContext siteSettings ব্যবহার হচ্ছে
       } catch (error) {
         console.error('Error fetching footer menus:', error);
         // Use fallback data on error

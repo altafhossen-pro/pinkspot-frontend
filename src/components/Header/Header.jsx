@@ -8,7 +8,7 @@ import Image from 'next/image';
 import { useAppContext } from '@/context/AppContext';
 import CartModal from '@/components/Cart/CartModal';
 import WishlistModal from '@/components/Wishlist/WishlistModal';
-import { menuAPI, categoryAPI, settingsAPI } from '@/services/api';
+import { menuAPI, categoryAPI } from '@/services/api';
 import CategoryMegamenu from './CategoryMegamenu';
 import SearchBar from './SearchBar';
 
@@ -22,12 +22,13 @@ const fallbackNavigationMenu = [
 ];
 
 function Header({ isTrackingShow = true, logoUrl }) {
-  const { user, cartCount, cartLoading, wishlistCount, isCartOpen, setIsCartOpen } = useAppContext();
+  const { user, cartCount, cartLoading, wishlistCount, isCartOpen, setIsCartOpen, siteSettings } = useAppContext();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [videoMenuData, setVideoMenuData] = useState(null);
+  // videoMenu comes from global siteSettings in AppContext — no extra API call
+  const videoMenuData = siteSettings?.videoMenu || null;
   const [isWishlistOpen, setIsWishlistOpen] = useState(false);
   const [navigationMenu, setNavigationMenu] = useState([]);
   const [utilityMenus, setUtilityMenus] = useState([]);
@@ -95,15 +96,13 @@ function Header({ isTrackingShow = true, logoUrl }) {
     const fetchHeaderData = async () => {
       try {
         setMenuLoading(true);
-        const [categoriesResponse, menusResponse, settingsResponse] = await Promise.all([
+        const [categoriesResponse, menusResponse] = await Promise.all([
           categoryAPI.getHeaderCategories(),
-          menuAPI.getHeaderMenus(),
-          settingsAPI.getSiteSettings()
+          menuAPI.getHeaderMenus()
+          // ✅ getSiteSettings এখানে নেই — AppContext থেকে siteSettings আসছে
         ]);
 
-        if (settingsResponse.success && settingsResponse.data && settingsResponse.data.videoMenu) {
-          setVideoMenuData(settingsResponse.data.videoMenu);
-        }
+        // videoMenu আর এখানে fetch করতে হবে না — useAppContext থেকে পাচ্ছি
 
         if (categoriesResponse.success && categoriesResponse.data) {
           const transformedCategories = categoriesResponse.data

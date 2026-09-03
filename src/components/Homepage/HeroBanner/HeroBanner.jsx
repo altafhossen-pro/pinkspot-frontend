@@ -1,7 +1,6 @@
 'use client';
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { settingsAPI } from '@/services/api';
+import { useAppContext } from '@/context/AppContext';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Pagination, Autoplay } from 'swiper/modules';
 
@@ -10,26 +9,10 @@ import 'swiper/css';
 import 'swiper/css/pagination';
 
 export default function HeroBanner() {
-    const [bannerData, setBannerData] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const { siteSettings, siteSettingsLoading } = useAppContext();
+    const bannerData = siteSettings?.topHeroBanner || null;
 
-    useEffect(() => {
-        const fetchBanner = async () => {
-            try {
-                const res = await settingsAPI.getSiteSettings();
-                if (res.success && res.data?.topHeroBanner) {
-                    setBannerData(res.data.topHeroBanner);
-                }
-            } catch (error) {
-                console.error("Error fetching top hero banner", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchBanner();
-    }, []);
-
-    if (loading) {
+    if (siteSettingsLoading) {
         return (
             <div className="w-full aspect-[5/2] lg:aspect-[5/1] bg-gray-200 animate-pulse"></div>
         );
@@ -38,6 +21,7 @@ export default function HeroBanner() {
     if (!bannerData || !bannerData.isActive) {
         return null;
     }
+
 
     // Render Slider Mode
     if (bannerData.type === 'slider' && bannerData.slides && bannerData.slides.length > 0) {

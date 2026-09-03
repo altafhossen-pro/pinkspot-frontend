@@ -1,29 +1,12 @@
 'use client';
-import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { settingsAPI } from '@/services/api';
+import { useAppContext } from '@/context/AppContext';
 
 export default function HeroOffers() {
-    const [offersData, setOffersData] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const { siteSettings, siteSettingsLoading } = useAppContext();
+    const offersData = siteSettings?.heroOffers || null;
 
-    useEffect(() => {
-        const fetchSettings = async () => {
-            try {
-                const res = await settingsAPI.getSiteSettings();
-                if (res.success && res.data?.heroOffers) {
-                    setOffersData(res.data.heroOffers);
-                }
-            } catch (error) {
-                console.error("Error fetching hero offers", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchSettings();
-    }, []);
-
-    if (loading) {
+    if (siteSettingsLoading) {
         return (
             <div className="container mx-auto px-4 py-8">
                 <div className="w-full h-32 md:h-48 bg-gray-200 animate-pulse rounded-lg"></div>

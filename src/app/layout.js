@@ -31,8 +31,11 @@ export async function generateMetadata() {
 
 async function getSiteSettings() {
   try {
+    // Next.js automatically deduplicates fetch calls with the same URL + options
+    // within a single render pass (generateMetadata + RootLayout share the same cache)
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1'}/settings/site-settings`, {
-      next: { revalidate: 60 } // Cache for 60 seconds
+      next: { revalidate: 60 }, // Cache for 60 seconds
+      cache: 'force-cache'      // Ensures request deduplication across the same render
     });
     if (!res.ok) return null;
     const data = await res.json();

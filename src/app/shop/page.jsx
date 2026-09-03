@@ -62,6 +62,18 @@ function ShopPageContent() {
 
     // No URL update functionality - exactly like search page
 
+    // ✅ FIX 1: categorySlug change হলে সব state reset করো
+    // এটা না করলে navigate করার সময় পুরানো products দেখায়
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(() => {
+        setSearchResults([]);
+        setCurrentPage(1);
+        setCategoriesLoaded(false);
+        setSelectedCategories([]);
+        setSelectedBraceletSizes([]);
+        setSelectedRingSizes([]);
+    }, [categorySlug]);
+
     // Sorting options
     const sortingOptions = [
         { value: 'popular', label: 'Popular', icon: Flame, color: 'bg-[#EF3D6A]' },
@@ -78,7 +90,6 @@ function ShopPageContent() {
                 const response = await categoryAPI.getMainCategories();
                 if (response.success) {
                     setCategories(response.data || []);
-                    setCategoriesLoaded(true);
 
                     // If category slug is provided in URL, automatically select that category
                     if (categorySlug) {
@@ -97,8 +108,9 @@ function ShopPageContent() {
                         }
 
                         if (category) {
+                            // ✅ selectedCategories আগে set করো, তারপর categoriesLoaded=true
+                            // এতে React 18 দুটো update batch করবে — products fetch একবারই হবে
                             setSelectedCategories([category._id]);
-                            // Fetch available sizes for the selected category
                             fetchAvailableSizes([category._id]);
                         } else {
                             // Slug was provided but not found, just fetch all sizes
@@ -108,14 +120,19 @@ function ShopPageContent() {
                         // No slug provided, fetch all sizes
                         fetchAvailableSizes([]);
                     }
-                } else {
+
+                    // ✅ সবার শেষে setCategoriesLoaded(true) — await এর পরে
+                    // এর আগে setCategoriesLoaded ছিল, যার ফলে empty category দিয়ে
+                    // একটা spurious products fetch হতো, তারপর আবার correct category দিয়ে fetch হতো
                     setCategoriesLoaded(true);
+                } else {
                     if (!categorySlug) fetchAvailableSizes([]);
+                    setCategoriesLoaded(true);
                 }
             } catch (error) {
                 console.error('Error fetching main categories:', error);
-                setCategoriesLoaded(true);
                 if (!categorySlug) fetchAvailableSizes([]);
+                setCategoriesLoaded(true);
             }
         };
         fetchCategories();
@@ -199,6 +216,7 @@ function ShopPageContent() {
                 }));
 
                 if (currentPage === 1) {
+                    // ✅ FIX 2: Explicitly replace — পুরানো products আর থাকবে না
                     setSearchResults(transformedProducts);
                 } else {
                     setSearchResults(prev => {
@@ -622,8 +640,33 @@ function ShopPageContent() {
                                 </div>
                             </div>
                             {loading && currentPage === 1 ? (
-                                <div className="flex justify-center items-center py-12">
-                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500"></div>
+                                // ✅ Product Card Skeleton — ProductCard এর exact layout মিলিয়ে
+                                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
+                                    {[...Array(12)].map((_, index) => (
+                                        <div
+                                            key={`skeleton-${index}`}
+                                            className="relative overflow-hidden rounded-xl shadow-sm border border-[#E7E7E7] bg-[#F6F6F6]"
+                                        >
+                                            {/* Image skeleton — same aspect ratio as ProductCard */}
+                                            <div className="relative w-full overflow-hidden bg-gray-200 animate-pulse"
+                                                style={{ aspectRatio: '4160 / 5536' }}
+                                            >
+                                                {/* Wishlist button skeleton */}
+                                                <div className="absolute top-3 right-3 w-8 h-8 rounded-full bg-gray-300 animate-pulse" />
+                                            </div>
+
+                                            {/* Info skeleton — same padding as ProductCard */}
+                                            <div className="p-3 sm:p-4 space-y-2">
+                                                {/* Title */}
+                                                <div className="h-4 bg-gray-200 rounded animate-pulse w-4/5" />
+                                                {/* Price */}
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <div className="h-4 bg-gray-200 rounded animate-pulse w-1/3" />
+                                                    <div className="h-3 bg-gray-100 rounded animate-pulse w-1/4" />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             ) : searchResults.length > 0 ? (
                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
@@ -654,11 +697,22 @@ function ShopPageContent() {
                                 </div>
                             )}
 
-                            {/* Infinite Scroll Skeleton Loader */}
+                            {/* Infinite Scroll Skeleton — page > 1 */}
                             {loading && currentPage > 1 && (
                                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6 mt-6">
                                     {[...Array(4)].map((_, index) => (
-                                        <div key={`skeleton-${index}`} className="bg-gray-100 rounded-xl aspect-[3/4] animate-pulse"></div>
+                                        <div
+                                            key={`inf-skeleton-${index}`}
+                                            className="relative overflow-hidden rounded-xl shadow-sm border border-[#E7E7E7] bg-[#F6F6F6]"
+                                        >
+                                            <div className="relative w-full bg-gray-200 animate-pulse"
+                                                style={{ aspectRatio: '4160 / 5536' }}
+                                            />
+                                            <div className="p-3 sm:p-4 space-y-2">
+                                                <div className="h-4 bg-gray-200 rounded animate-pulse w-4/5" />
+                                                <div className="h-4 bg-gray-200 rounded animate-pulse w-1/3" />
+                                            </div>
+                                        </div>
                                     ))}
                                 </div>
                             )}

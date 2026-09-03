@@ -1,34 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Menu, Home, ShoppingCart, User, Phone } from 'lucide-react';
-import { settingsAPI } from '@/services/api';
 import { useAppContext } from '@/context/AppContext';
 import CategorySidebar from './CategorySidebar';
 
 export default function MobileBottomNavigation() {
   const pathname = usePathname();
   const router = useRouter();
-  const { cartCount, user, isCartOpen, setIsCartOpen } = useAppContext();
+  const { cartCount, user, isCartOpen, setIsCartOpen, siteSettings } = useAppContext();
   const [isCategorySidebarOpen, setIsCategorySidebarOpen] = useState(false);
-  const [phoneNumber, setPhoneNumber] = useState('+8801519181818');
+  // Get phone from global siteSettings — no extra API call needed
+  const phoneNumber = siteSettings?.contact?.phone || '+8801519181818';
 
-  useEffect(() => {
-    const fetchSettings = async () => {
-      try {
-        const response = await settingsAPI.getSiteSettings();
-        if (response?.success && response?.data?.contact?.phone) {
-          setPhoneNumber(response.data.contact.phone);
-        }
-      } catch (error) {
-        console.error('Failed to load contact for mobile nav', error);
-      }
-    };
-    fetchSettings();
-  }, []);
-  
   // Routes that should not show bottom navigation
   const noNavRoutes = [
     '/admin',
@@ -36,10 +22,10 @@ export default function MobileBottomNavigation() {
     '/register',
     '/forgot-password'
   ];
-  
+
   // Check if current path should not show navigation
   const shouldHideNav = noNavRoutes.some(route => pathname.startsWith(route));
-  
+
   // Don't render navigation for these routes
   if (shouldHideNav) {
     return null;
@@ -93,11 +79,10 @@ export default function MobileBottomNavigation() {
         {/* Category Menu */}
         <button
           onClick={handleCategoryClick}
-          className={`flex flex-col items-center justify-center px-2 sm:px-4 py-2 rounded-lg transition-colors ${
-            isCategorySidebarOpen
+          className={`flex flex-col items-center justify-center px-2 sm:px-4 py-2 rounded-lg transition-colors ${isCategorySidebarOpen
               ? 'text-[#EF3D6A]'
               : 'text-gray-600 hover:text-[#EF3D6A]'
-          }`}
+            }`}
           aria-label="Categories"
         >
           <Menu className="w-5 h-5 mb-1" />
@@ -107,11 +92,10 @@ export default function MobileBottomNavigation() {
         {/* Home */}
         <Link
           href="/"
-          className={`flex flex-col items-center justify-center px-2 sm:px-4 py-2 rounded-lg transition-colors ${
-            isActive('/')
+          className={`flex flex-col items-center justify-center px-2 sm:px-4 py-2 rounded-lg transition-colors ${isActive('/')
               ? 'text-[#EF3D6A]'
               : 'text-gray-600 hover:text-[#EF3D6A]'
-          }`}
+            }`}
           aria-label="Home"
         >
           <Home className="w-5 h-5 mb-1" />
@@ -121,11 +105,10 @@ export default function MobileBottomNavigation() {
         {/* Cart */}
         <button
           onClick={handleCartClick}
-          className={`flex flex-col items-center justify-center px-2 sm:px-4 py-2 rounded-lg transition-colors relative ${
-            isCartOpen
+          className={`flex flex-col items-center justify-center px-2 sm:px-4 py-2 rounded-lg transition-colors relative ${isCartOpen
               ? 'text-[#EF3D6A]'
               : 'text-gray-600 hover:text-[#EF3D6A]'
-          }`}
+            }`}
           aria-label="Shopping Cart"
         >
           <div className="relative">
@@ -142,11 +125,10 @@ export default function MobileBottomNavigation() {
         {/* Profile */}
         <button
           onClick={handleProfileClick}
-          className={`flex flex-col items-center justify-center px-2 sm:px-4 py-2 rounded-lg transition-colors ${
-            isActive('/dashboard')
+          className={`flex flex-col items-center justify-center px-2 sm:px-4 py-2 rounded-lg transition-colors ${isActive('/dashboard')
               ? 'text-[#EF3D6A]'
               : 'text-gray-600 hover:text-[#EF3D6A]'
-          }`}
+            }`}
           aria-label={user ? 'Profile' : 'Login'}
         >
           <User className="w-5 h-5 mb-1" />
@@ -155,9 +137,9 @@ export default function MobileBottomNavigation() {
       </div>
 
       {/* Category Sidebar */}
-      <CategorySidebar 
-        isOpen={isCategorySidebarOpen} 
-        onClose={() => setIsCategorySidebarOpen(false)} 
+      <CategorySidebar
+        isOpen={isCategorySidebarOpen}
+        onClose={() => setIsCategorySidebarOpen(false)}
       />
     </nav>
   );

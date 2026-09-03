@@ -294,34 +294,61 @@ export default function VariantsTab({
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="space-y-2">
-                                                {variant.attributes.map((attr, aIndex) => (
-                                                    <div key={aIndex} className="flex items-center space-x-2">
-                                                        <span className="text-xs font-medium text-gray-500 w-12">{attr.name}:</span>
-                                                        {attr.name.toLowerCase() === 'color' ? (
+                                                {(() => {
+                                                    const attrs = variant.attributes || [];
+                                                    const sizeAttr = attrs.find(a => a.name.toLowerCase() === 'size') || { name: 'Size', value: '' };
+                                                    const colorAttr = attrs.find(a => a.name.toLowerCase() === 'color') || { name: 'Color', value: '', hexCode: '#000000' };
+                                                    
+                                                    const handleAttrChange = (attrName, field, value) => {
+                                                        const newAttrs = [...attrs];
+                                                        const idx = newAttrs.findIndex(a => a.name.toLowerCase() === attrName.toLowerCase());
+                                                        if (idx >= 0) {
+                                                            newAttrs[idx] = { ...newAttrs[idx], [field]: value, ...(field === 'value' ? { displayValue: value } : {}) };
+                                                        } else {
+                                                            const newA = { name: attrName, value: field === 'value' ? value : '', displayValue: field === 'value' ? value : '' };
+                                                            if (field === 'hexCode' || attrName.toLowerCase() === 'color') {
+                                                                newA.hexCode = field === 'hexCode' ? value : '#000000';
+                                                            }
+                                                            newAttrs.push(newA);
+                                                        }
+                                                        updateVariant(vIndex, 'attributes', newAttrs);
+                                                    };
+
+                                                    return (
+                                                        <>
                                                             <div className="flex items-center space-x-2">
-                                                                <input
-                                                                    type="color"
-                                                                    value={attr.hexCode || '#000000'}
-                                                                    onChange={(e) => updateVariantAttribute(vIndex, aIndex, 'hexCode', e.target.value)}
-                                                                    className="h-6 w-6 rounded cursor-pointer border border-gray-300"
-                                                                />
+                                                                <span className="text-xs font-medium text-gray-500 w-12">Size:</span>
                                                                 <input
                                                                     type="text"
-                                                                    value={attr.value}
-                                                                    onChange={(e) => updateVariantAttribute(vIndex, aIndex, 'value', e.target.value)}
-                                                                    className="text-sm px-2 py-1 border border-gray-300 rounded"
+                                                                    value={sizeAttr.value}
+                                                                    onChange={(e) => handleAttrChange('Size', 'value', e.target.value)}
+                                                                    className="text-sm px-2 py-1 border border-gray-300 rounded w-full max-w-[120px]"
+                                                                    placeholder="Size"
                                                                 />
                                                             </div>
-                                                        ) : (
-                                                            <input
-                                                                type="text"
-                                                                value={attr.value}
-                                                                onChange={(e) => updateVariantAttribute(vIndex, aIndex, 'value', e.target.value)}
-                                                                className="text-sm px-2 py-1 border border-gray-300 rounded"
-                                                            />
-                                                        )}
-                                                    </div>
-                                                ))}
+                                                            {hasColorVariants && (
+                                                                <div className="flex items-center space-x-2 mt-2">
+                                                                    <span className="text-xs font-medium text-gray-500 w-12">Color:</span>
+                                                                    <div className="flex items-center space-x-1">
+                                                                        <input
+                                                                            type="color"
+                                                                            value={colorAttr.hexCode || '#000000'}
+                                                                            onChange={(e) => handleAttrChange('Color', 'hexCode', e.target.value)}
+                                                                            className="h-6 w-6 rounded cursor-pointer border border-gray-300 shrink-0"
+                                                                        />
+                                                                        <input
+                                                                            type="text"
+                                                                            value={colorAttr.value}
+                                                                            onChange={(e) => handleAttrChange('Color', 'value', e.target.value)}
+                                                                            className="text-sm px-2 py-1 border border-gray-300 rounded w-full max-w-[90px]"
+                                                                            placeholder="Color"
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </>
+                                                    );
+                                                })()}
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">

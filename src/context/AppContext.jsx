@@ -59,6 +59,10 @@ export const AppProvider = ({ children }) => {
     const [deliveryChargeSettings, setDeliveryChargeSettings] = useState(null)
     const [deliverySettingsLoading, setDeliverySettingsLoading] = useState(true)
 
+    // Site settings state — globally loaded once, shared across all components
+    const [siteSettings, setSiteSettings] = useState(null)
+    const [siteSettingsLoading, setSiteSettingsLoading] = useState(true)
+
     // Affiliate code state
     const [affiliateCode, setAffiliateCode] = useState(null)
     const [affiliateCodeExpireTime, setAffiliateCodeExpireTime] = useState(null)
@@ -454,7 +458,6 @@ export const AppProvider = ({ children }) => {
             const data = await settingsAPI.getDeliveryChargeSettings()
 
             if (data.success) {
-                // Keep the delivery charge settings object as it comes from backend
                 setDeliveryChargeSettings(data.data)
             } else {
                 console.error('Failed to fetch delivery settings:', data.message)
@@ -463,6 +466,21 @@ export const AppProvider = ({ children }) => {
             console.error('Error fetching delivery settings:', error)
         } finally {
             setDeliverySettingsLoading(false)
+        }
+    }, [])
+
+    // Fetch site settings from backend — called once globally, shared via context
+    const fetchSiteSettings = useCallback(async () => {
+        try {
+            setSiteSettingsLoading(true)
+            const data = await settingsAPI.getSiteSettings()
+            if (data.success) {
+                setSiteSettings(data.data)
+            }
+        } catch (error) {
+            console.error('Error fetching site settings:', error)
+        } finally {
+            setSiteSettingsLoading(false)
         }
     }, [])
 
@@ -649,8 +667,11 @@ export const AppProvider = ({ children }) => {
             const savedCart = localStorage.getItem('cart')
             const savedWishlist = localStorage.getItem('wishlist')
 
-            // Fetch delivery charge settings first (no auth required)
-            await fetchDeliveryChargeSettings()
+            // Fetch delivery charge settings and site settings in parallel (no auth required)
+            await Promise.all([
+                fetchDeliveryChargeSettings(),
+                fetchSiteSettings()
+            ])
 
             if (savedToken) {
                 setToken(savedToken)
@@ -682,7 +703,7 @@ export const AppProvider = ({ children }) => {
         }
 
         initializeApp()
-    }, [fetchUserProfile, fetchDeliveryChargeSettings])
+    }, [fetchUserProfile, fetchDeliveryChargeSettings, fetchSiteSettings])
 
     // Save to localStorage when state changes
     useEffect(() => {
@@ -709,6 +730,11 @@ export const AppProvider = ({ children }) => {
         filters,
         deliveryChargeSettings,
         deliverySettingsLoading,
+
+        // Site settings — loaded once, shared everywhere
+        siteSettings,
+        siteSettingsLoading,
+
         permissions,
         roleDetails,
 
