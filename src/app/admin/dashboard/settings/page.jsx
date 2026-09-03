@@ -11,6 +11,7 @@ import {
   Users,
   Truck,
   Box,
+  ShieldAlert,
 } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import PermissionDenied from '@/components/Common/PermissionDenied';
@@ -117,6 +118,14 @@ export default function AdminSettingsPage() {
       icon: SettingsIcon,
       color: 'bg-yellow-100 text-yellow-600',
       href: '/admin/dashboard/settings/product-subtitle'
+    },
+    {
+      id: 'fraud-checker',
+      title: 'Fraud Checker Config',
+      description: 'Steadfast user cookies',
+      icon: ShieldAlert,
+      color: 'bg-red-100 text-red-600',
+      href: '/admin/dashboard/settings/fraud-checker'
     }
   ];
 

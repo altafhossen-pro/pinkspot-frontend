@@ -1679,6 +1679,32 @@ export const settingsAPI = {
             body: JSON.stringify(telegramData),
         });
     },
+
+    // Fraud Checker settings
+    getFraudCheckerSettings: (token) => {
+        return apiCall('/settings/fraud-checker', {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+    },
+    updateFraudCheckerSettings: (fraudData, token) => {
+        return apiCall('/settings/fraud-checker', {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(fraudData),
+        });
+    },
+    checkFraudStatus: (phone, token) => {
+        return apiCall(`/settings/fraud-checker/check/${phone}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+            },
+        });
+    },
 };
 
 // Address API functions

@@ -12,6 +12,7 @@ import { io } from 'socket.io-client';
 import PermissionDenied from '@/components/Common/PermissionDenied';
 import { useAppContext } from '@/context/AppContext';
 import DeleteConfirmationModal from '@/components/Common/DeleteConfirmationModal';
+import InlineFraudChecker from '@/components/Admin/Orders/InlineFraudChecker';
 
 export default function AdminOrdersPage() {
     const { hasPermission, loading: contextLoading } = useAppContext();
@@ -1254,12 +1255,17 @@ export default function AdminOrdersPage() {
                                                             {contactPhone && (
                                                                 <div className="flex items-center">
                                                                     <Phone className="h-3.5 w-3.5 text-emerald-500 mr-2 shrink-0" />
-                                                                    <Link
-                                                                        href={`/admin/dashboard/order-history/${encodeURIComponent(contactPhone)}`}
-                                                                        className="text-sm font-medium text-slate-800 hover:text-blue-600 hover:underline"
-                                                                    >
-                                                                        {contactPhone}
-                                                                    </Link>
+                                                                    <div className="flex flex-col">
+                                                                        <div className="flex items-center gap-1">
+                                                                            <Link
+                                                                                href={`/admin/dashboard/order-history/${encodeURIComponent(contactPhone)}`}
+                                                                                className="text-sm font-medium text-slate-800 hover:text-blue-600 hover:underline"
+                                                                            >
+                                                                                {contactPhone}
+                                                                            </Link>
+                                                                            <InlineFraudChecker phone={contactPhone} />
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
                                                             )}
                                                             {contactEmail && (
