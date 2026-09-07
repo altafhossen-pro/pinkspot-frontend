@@ -26,6 +26,23 @@ export default function LabelPrintPage() {
     // Variant Selection Modal State
     const [selectedProductForVariant, setSelectedProductForVariant] = useState(null);
 
+    // Image Zoom State
+    const [hoveredImage, setHoveredImage] = useState(null);
+    const [imagePosition, setImagePosition] = useState({ x: 0, y: 0 });
+
+    const handleImageMouseEnter = (e, imageSrc) => {
+        setHoveredImage(imageSrc);
+        setImagePosition({ x: e.clientX, y: e.clientY });
+    };
+
+    const handleImageMouseMove = (e) => {
+        setImagePosition({ x: e.clientX, y: e.clientY });
+    };
+
+    const handleImageMouseLeave = () => {
+        setHoveredImage(null);
+    };
+
     // Print Queue state
     const [printQueue, setPrintQueue] = useState([]);
     
@@ -87,20 +104,47 @@ export default function LabelPrintPage() {
         }
     };
 
-    // Filter products based on search (manual-order style)
+    // Debounce search and check for exact SKU match (manual-order style)
     useEffect(() => {
-        if (!searchTerm.trim()) {
-            setFilteredProducts([]);
-            return;
-        }
-        
-        const term = searchTerm.toLowerCase().trim();
-        const results = products.filter(p => {
-            const titleMatch = p.title?.toLowerCase().includes(term);
-            const skuMatch = p.variants?.some(v => v.sku?.toLowerCase().includes(term));
-            return titleMatch || skuMatch;
-        });
-        setFilteredProducts(results.slice(0, 20)); // Limit to top 20 results
+        const timeoutId = setTimeout(() => {
+            if (!searchTerm.trim()) {
+                setFilteredProducts([]);
+                return;
+            }
+            
+            const term = searchTerm.toLowerCase().trim();
+            
+            // Check for exact SKU match across all products first
+            let exactVariant = null;
+            let parentProduct = null;
+            
+            for (const product of products) {
+                if (product.variants && Array.isArray(product.variants)) {
+                    const match = product.variants.find(v => v.sku?.toLowerCase() === term);
+                    if (match) {
+                        exactVariant = match;
+                        parentProduct = product;
+                        break;
+                    }
+                }
+            }
+            
+            if (exactVariant && parentProduct) {
+                // Auto add exact SKU match
+                addToQueue(parentProduct, exactVariant);
+                return;
+            }
+            
+            // If no exact match, just filter
+            const results = products.filter(p => {
+                const titleMatch = p.title?.toLowerCase().includes(term);
+                const skuMatch = p.variants?.some(v => v.sku?.toLowerCase().includes(term));
+                return titleMatch || skuMatch;
+            });
+            setFilteredProducts(results.slice(0, 20)); // Limit to top 20 results
+        }, 300);
+
+        return () => clearTimeout(timeoutId);
     }, [searchTerm, products]);
 
     // Scanner / Quick Add (Enter key)
@@ -141,20 +185,25 @@ export default function LabelPrintPage() {
         const color = variant.attributes?.find(attr => attr.name === 'Color')?.value || variant.color;
         const colorHexCode = variant.attributes?.find(attr => attr.name === 'Color')?.hexCode || variant.hexCode;
         
+        const existingIndex = printQueue.findIndex(item => item.key === variantKey);
+        if (existingIndex >= 0) {
+            toast.success(`Increased quantity for ${variant.sku}`);
+        } else {
+            toast.success(`Added ${variant.sku} to queue`);
+        }
+
         setPrintQueue(prev => {
-            const existingIndex = prev.findIndex(item => item.key === variantKey);
-            if (existingIndex >= 0) {
+            const index = prev.findIndex(item => item.key === variantKey);
+            if (index >= 0) {
                 // Increment quantity if already in queue
                 const newQueue = [...prev];
-                newQueue[existingIndex] = {
-                    ...newQueue[existingIndex],
-                    quantity: newQueue[existingIndex].quantity + 1
+                newQueue[index] = {
+                    ...newQueue[index],
+                    quantity: newQueue[index].quantity + 1
                 };
-                toast.success(`Increased quantity for ${variant.sku}`);
                 return newQueue;
             } else {
                 // Add new item to queue
-                toast.success(`Added ${variant.sku} to queue`);
                 return [{
                     key: variantKey,
                     productId: product._id,
@@ -374,11 +423,38 @@ export default function LabelPrintPage() {
                                             onClick={() => addToQueue(selectedProductForVariant, variant)}
                                             className="flex items-center gap-4 p-4 border border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50/50 cursor-pointer transition-all group"
                                         >
-                                            <img 
-                                                src={variant.image || selectedProductForVariant.featuredImage || '/images/placeholder.png'} 
-                                                alt={variant.sku}
-                                                className="w-14 h-14 object-cover rounded-lg border border-gray-100 bg-white"
-                                            />
+                                            <div 
+                                                className="overflow-hidden rounded-lg shrink-0 w-14 h-14 border border-gray-100 bg-white relative cursor-zoom-in"
+                                                onMouseEnter={(e) => handleImageMouseEnter(e, variant.image || selectedProductForVariant.featuredImage || '/images/placeholder.png')}
+                                                onMouseMove={handleImageMouseMove}
+                                                onMouseLeave={handleImageMouseLeave}
+                                            >
+                                                <img 
+                                                    src={variant.image || selectedProductForVariant.featuredImage || '/images/placeholder.png'} 
+                                                    alt={variant.sku}
+                                                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                                                />
+                                                {/* Zoom Popup */}
+                                                {hoveredImage === (variant.image || selectedProductForVariant.featuredImage || '/images/placeholder.png') && (
+                                                    <div
+                                                        className="fixed z-[9999] bg-white border-2 border-gray-300 rounded-lg shadow-2xl overflow-hidden pointer-events-none"
+                                                        style={{
+                                                            width: '350px',
+                                                            height: '350px',
+                                                            left: `${imagePosition.x + 20}px`,
+                                                            top: `${imagePosition.y - 175}px`,
+                                                            maxWidth: 'calc(100vw - 40px)',
+                                                            maxHeight: 'calc(100vh - 40px)'
+                                                        }}
+                                                    >
+                                                        <img
+                                                            src={hoveredImage}
+                                                            alt={variant.sku}
+                                                            className="w-full h-full object-contain"
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-sm font-bold text-gray-900 bg-gray-100 px-2.5 py-1 rounded-md border border-gray-200">
@@ -457,7 +533,34 @@ export default function LabelPrintPage() {
                                                     setSearchFocused(false);
                                                 }}
                                             >
-                                                <img src={product.featuredImage || '/images/placeholder.png'} alt={product.title} className="w-12 h-12 rounded-lg object-cover border border-gray-200 shrink-0" />
+                                                <div 
+                                                    className="overflow-hidden rounded-lg shrink-0 w-12 h-12 border border-gray-200 relative cursor-zoom-in"
+                                                    onMouseEnter={(e) => handleImageMouseEnter(e, product.featuredImage || '/images/placeholder.png')}
+                                                    onMouseMove={handleImageMouseMove}
+                                                    onMouseLeave={handleImageMouseLeave}
+                                                >
+                                                    <img src={product.featuredImage || '/images/placeholder.png'} alt={product.title} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300" />
+                                                    {/* Zoom Popup */}
+                                                    {hoveredImage === (product.featuredImage || '/images/placeholder.png') && (
+                                                        <div
+                                                            className="fixed z-[9999] bg-white border-2 border-gray-300 rounded-lg shadow-2xl overflow-hidden pointer-events-none"
+                                                            style={{
+                                                                width: '350px',
+                                                                height: '350px',
+                                                                left: `${imagePosition.x + 20}px`,
+                                                                top: `${imagePosition.y - 175}px`,
+                                                                maxWidth: 'calc(100vw - 40px)',
+                                                                maxHeight: 'calc(100vh - 40px)'
+                                                            }}
+                                                        >
+                                                            <img
+                                                                src={hoveredImage}
+                                                                alt={product.title}
+                                                                className="w-full h-full object-contain"
+                                                            />
+                                                        </div>
+                                                    )}
+                                                </div>
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-sm font-semibold text-gray-900 truncate">{product.title}</p>
                                                     <p className="text-xs text-gray-500 mt-0.5">{product.variants?.length || 0} variants</p>
@@ -494,7 +597,34 @@ export default function LabelPrintPage() {
                             <div className="divide-y divide-gray-100 max-h-[600px] overflow-y-auto">
                                 {printQueue.map((item) => (
                                     <div key={item.key} className="p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6 hover:bg-gray-50/50 transition-colors">
-                                        <img src={item.image} alt={item.sku} className="w-16 h-16 rounded-lg object-cover border border-gray-200 shadow-sm shrink-0" />
+                                        <div 
+                                            className="overflow-hidden rounded-lg shrink-0 w-16 h-16 border border-gray-200 shadow-sm relative cursor-zoom-in"
+                                            onMouseEnter={(e) => handleImageMouseEnter(e, item.image)}
+                                            onMouseMove={handleImageMouseMove}
+                                            onMouseLeave={handleImageMouseLeave}
+                                        >
+                                            <img src={item.image} alt={item.sku} className="w-full h-full object-cover hover:scale-110 transition-transform duration-300" />
+                                            {/* Zoom Popup */}
+                                            {hoveredImage === item.image && (
+                                                <div
+                                                    className="fixed z-[9999] bg-white border-2 border-gray-300 rounded-lg shadow-2xl overflow-hidden pointer-events-none"
+                                                    style={{
+                                                        width: '350px',
+                                                        height: '350px',
+                                                        left: `${imagePosition.x + 20}px`,
+                                                        top: `${imagePosition.y - 175}px`,
+                                                        maxWidth: 'calc(100vw - 40px)',
+                                                        maxHeight: 'calc(100vh - 40px)'
+                                                    }}
+                                                >
+                                                    <img
+                                                        src={hoveredImage}
+                                                        alt={item.sku}
+                                                        className="w-full h-full object-contain"
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
                                         <div className="flex-1 min-w-0">
                                             <h3 className="text-base font-semibold text-gray-900 truncate pr-4">{item.productTitle}</h3>
                                             <div className="flex flex-wrap items-center gap-2 mt-2 mb-3">

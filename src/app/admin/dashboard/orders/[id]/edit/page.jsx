@@ -51,6 +51,7 @@ export default function OrderEditPage() {
     const [selectedVariant, setSelectedVariant] = useState(null);
     const [newItemQuantity, setNewItemQuantity] = useState(1);
     const [newItemPrice, setNewItemPrice] = useState(0);
+    const [isSearchingProducts, setIsSearchingProducts] = useState(false);
 
     // Form states
     const [formData, setFormData] = useState({
@@ -79,7 +80,6 @@ export default function OrderEditPage() {
 
     useEffect(() => {
         fetchOrderDetails();
-        fetchProducts();
     }, [orderId]);
 
     const fetchOrderDetails = async () => {
@@ -124,15 +124,99 @@ export default function OrderEditPage() {
         }
     };
 
-    const fetchProducts = async () => {
-        try {
-            const data = await productAPI.getProducts({ limit: 100 });
-            if (data.success) {
-                setProducts(data.data);
+    useEffect(() => {
+        if (!showProductSearch) return;
+
+        const timeoutId = setTimeout(async () => {
+            if (!searchTerm.trim()) {
+                setProducts([]);
+                return;
             }
-        } catch (error) {
-            console.error('Error fetching products:', error);
-        }
+            
+            try {
+                setIsSearchingProducts(true);
+                const term = searchTerm.toLowerCase().trim();
+                const response = await productAPI.getProducts({
+                    search: term,
+                    page: 1,
+                    limit: 20
+                });
+                
+                if (response.success && response.data) {
+                    const fetchedProducts = response.data;
+                    
+                    let exactVariant = null;
+                    let parentProduct = null;
+                    
+                    for (const product of fetchedProducts) {
+                        if (product.variants) {
+                            exactVariant = product.variants.find(v => v.sku?.toLowerCase() === term);
+                            if (exactVariant) {
+                                parentProduct = product;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    if (exactVariant && parentProduct) {
+                        autoAddItem(parentProduct, exactVariant);
+                        return;
+                    }
+                    
+                    setProducts(fetchedProducts);
+                }
+            } catch (error) {
+                console.error('Error searching products:', error);
+            } finally {
+                setIsSearchingProducts(false);
+            }
+        }, 500);
+        
+        return () => clearTimeout(timeoutId);
+    }, [searchTerm, showProductSearch]);
+
+    const autoAddItem = (product, variant) => {
+        const newItem = {
+            product: product._id,
+            name: product.title,
+            image: variant.image || product.featuredImage,
+            price: variant.currentPrice || product.priceRange?.min || 0,
+            quantity: 1,
+            subtotal: (variant.currentPrice || product.priceRange?.min || 0) * 1,
+            variant: {
+                size: variant.attributes?.find(attr => attr.name === 'Size')?.value || null,
+                color: variant.attributes?.find(attr => attr.name === 'Color')?.value || null,
+                colorHexCode: variant.attributes?.find(attr => attr.name === 'Color')?.hexCode || null,
+                sku: variant.sku,
+                stockQuantity: variant.stockQuantity,
+                stockStatus: variant.stockStatus
+            }
+        };
+
+        setFormData(prev => {
+            const existingItemIndex = prev.items.findIndex(item => {
+                const existingProductId = typeof item.product === 'object' ? item.product?._id : item.product;
+                const newProductId = typeof newItem.product === 'object' ? newItem.product?._id : newItem.product;
+                const existingSku = item.variant?.sku || '';
+                const newSku = newItem.variant?.sku || '';
+                
+                return String(existingProductId) === String(newProductId) && existingSku === newSku;
+            });
+
+            if (existingItemIndex >= 0) {
+                const newItems = [...prev.items];
+                newItems[existingItemIndex].quantity += 1;
+                newItems[existingItemIndex].subtotal = newItems[existingItemIndex].price * newItems[existingItemIndex].quantity;
+                toast.success(`Increased quantity for ${variant.sku}`);
+                return { ...prev, items: newItems };
+            } else {
+                toast.success(`Added ${variant.sku} to order`);
+                return { ...prev, items: [...prev.items, newItem] };
+            }
+        });
+
+        setSearchTerm('');
+        setShowProductSearch(false);
     };
 
     const handleInputChange = (field, value) => {
@@ -185,10 +269,29 @@ export default function OrderEditPage() {
             } : null
         };
 
-        setFormData(prev => ({
-            ...prev,
-            items: [...prev.items, newItem]
-        }));
+        setFormData(prev => {
+            const existingItemIndex = prev.items.findIndex(item => {
+                const existingProductId = typeof item.product === 'object' ? item.product?._id : item.product;
+                const newProductId = typeof newItem.product === 'object' ? newItem.product?._id : newItem.product;
+                const existingSku = item.variant?.sku || '';
+                const newSku = newItem.variant?.sku || '';
+                
+                return String(existingProductId) === String(newProductId) && existingSku === newSku;
+            });
+
+            if (existingItemIndex >= 0) {
+                const newItems = [...prev.items];
+                newItems[existingItemIndex].quantity += newItemQuantity;
+                // Don't update price to keep existing price, or we could update it. 
+                // We'll keep existing price but update subtotal based on new quantity
+                newItems[existingItemIndex].subtotal = newItems[existingItemIndex].price * newItems[existingItemIndex].quantity;
+                toast.success('Increased quantity for existing item');
+                return { ...prev, items: newItems };
+            } else {
+                toast.success('Item added to order');
+                return { ...prev, items: [...prev.items, newItem] };
+            }
+        });
 
         // Reset form
         setSelectedProduct(null);
@@ -198,7 +301,6 @@ export default function OrderEditPage() {
         setShowProductSearch(false);
         setSearchTerm('');
 
-        toast.success('Item added to order');
     };
 
     const removeItem = (index) => {
@@ -907,11 +1009,13 @@ export default function OrderEditPage() {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                            {products
-                                .filter(product =>
-                                    product.title.toLowerCase().includes(searchTerm.toLowerCase())
-                                )
-                                .map(product => (
+                            {isSearchingProducts ? (
+                                <div className="col-span-full py-8 text-center text-gray-500 flex flex-col items-center">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent mb-2"></div>
+                                    <p>Searching products...</p>
+                                </div>
+                            ) : products.length > 0 ? (
+                                products.map(product => (
                                     <div
                                         key={product._id}
                                         onClick={() => {
@@ -931,7 +1035,18 @@ export default function OrderEditPage() {
                                         <h4 className="font-medium text-gray-900">{product.title}</h4>
                                         <p className="text-sm text-gray-500">৳{product.priceRange?.min || 0}</p>
                                     </div>
-                                ))}
+                                ))
+                            ) : searchTerm.trim() ? (
+                                <div className="col-span-full py-8 text-center text-gray-500">
+                                    <Package className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                                    <p>No products found</p>
+                                </div>
+                            ) : (
+                                <div className="col-span-full py-8 text-center text-gray-500">
+                                    <Package className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                                    <p>Search by name or SKU to add products</p>
+                                </div>
+                            )}
                         </div>
 
                         {selectedProduct && (
