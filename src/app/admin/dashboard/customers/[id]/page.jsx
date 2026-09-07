@@ -596,9 +596,9 @@ export default function CustomerDetailPage() {
                                                             </div>
                                                         </td>
                                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                                                            <button className="text-blue-600 hover:text-blue-900">
+                                                            <Link href={`/admin/dashboard/orders/${order._id}`} className="text-blue-600 hover:text-blue-900 inline-block">
                                                                 <Eye className="h-4 w-4" />
-                                                            </button>
+                                                            </Link>
                                                         </td>
                                                     </tr>
                                                 ))}
