@@ -94,7 +94,7 @@ export default function CategorySlider() {
     return (
         <section className="py-4 md:py-8 px-2 md:px-4 bg-white">
             <div className="max-w-screen-2xl mx-auto">
-                <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-9 gap-2 md:gap-4 lg:gap-5">
+                <div className="grid grid-cols-3 sm:grid-cols-5 md:grid-cols-6 lg:grid-cols-8 xl:grid-cols-9 gap-2 md:gap-4 lg:gap-5">
                     {categories.map((category) => (
                         <CategoryCard
                             key={category._id}

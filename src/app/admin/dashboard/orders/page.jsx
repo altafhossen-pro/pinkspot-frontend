@@ -64,7 +64,7 @@ export default function AdminOrdersPage() {
         currentPage: 1,
         totalPages: 1,
         totalItems: 0,
-        itemsPerPage: 10,
+        itemsPerPage: 25,
         hasNextPage: false,
         hasPrevPage: false
     });
@@ -1219,9 +1219,9 @@ export default function AdminOrdersPage() {
                                                 {!order.isReadByAdmin && (
                                                     <span className="h-2 w-2 bg-pink-500 rounded-full" title="Unread Order"></span>
                                                 )}
-                                                <Link 
-                                                  href={`/admin/dashboard/orders/${order._id}`}
-                                                  className="text-sm font-medium text-blue-600 hover:text-pink-600 hover:underline transition-colors"
+                                                <Link
+                                                    href={`/admin/dashboard/orders/${order._id}`}
+                                                    className="text-sm font-medium text-blue-600 hover:text-pink-600 hover:underline transition-colors"
                                                 >
                                                     #{order.orderId || order._id.slice(-8).toUpperCase()}
                                                 </Link>

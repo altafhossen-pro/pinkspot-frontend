@@ -51,6 +51,8 @@ export default function OrderEditPage() {
     const [selectedVariant, setSelectedVariant] = useState(null);
     const [newItemQuantity, setNewItemQuantity] = useState(1);
     const [newItemPrice, setNewItemPrice] = useState(0);
+    const [selectedSize, setSelectedSize] = useState("");
+    const [selectedColor, setSelectedColor] = useState("");
     const [isSearchingProducts, setIsSearchingProducts] = useState(false);
 
     // Form states
@@ -145,37 +147,175 @@ export default function OrderEditPage() {
                 if (response.success && response.data) {
                     const fetchedProducts = response.data;
                     
-                    let exactVariant = null;
-                    let parentProduct = null;
-                    
-                    for (const product of fetchedProducts) {
-                        if (product.variants) {
-                            exactVariant = product.variants.find(v => v.sku?.toLowerCase() === term);
-                            if (exactVariant) {
-                                parentProduct = product;
-                                break;
-                            }
+            let skuVariant = null;
+            let skuProduct = null;
+            
+            for (const product of fetchedProducts) {
+                if (product.variants && product.variants.length > 0) {
+                    for (const variant of product.variants) {
+                        if (variant.sku && variant.sku.toLowerCase() === term) {
+                            skuVariant = variant;
+                            skuProduct = product;
+                            break;
                         }
                     }
-                    
-                    if (exactVariant && parentProduct) {
-                        autoAddItem(parentProduct, exactVariant);
-                        return;
-                    }
-                    
-                    setProducts(fetchedProducts);
+                    if (skuVariant) break;
                 }
-            } catch (error) {
-                console.error('Error searching products:', error);
-            } finally {
-                setIsSearchingProducts(false);
             }
-        }, 500);
-        
+
+            if (skuVariant && skuProduct) {
+                autoAddItem(skuProduct, skuVariant);
+            } else {
+                setProducts(fetchedProducts);
+            }
+        }
+    } catch (error) {
+        console.error('Error searching products:', error);
+        toast.error('Error searching products');
+    } finally {
+        setIsSearchingProducts(false);
+    }
+}, 500);
+
         return () => clearTimeout(timeoutId);
     }, [searchTerm, showProductSearch]);
 
+// Helper functions for new variant selection style
+const getUniqueSizes = () => {
+    if (!selectedProduct?.variants) return [];
+    const sizes = selectedProduct.variants
+        .map(variant => variant.attributes?.find(attr => attr.name === 'Size'))
+        .filter(size => size)
+        .map(size => size.value);
+    return [...new Set(sizes)];
+};
+
+const getUniqueColors = () => {
+    if (!selectedProduct?.variants) return [];
+    const colors = selectedProduct.variants
+        .map(variant => variant.attributes?.find(attr => attr.name === 'Color'))
+        .filter(color => color)
+        .map(color => ({ value: color.value, hexCode: color.hexCode }));
+    return colors.filter((color, index, self) =>
+        index === self.findIndex(c => c.value === color.value)
+    );
+};
+
+const getAvailableColorsForSize = (size) => {
+    if (!selectedProduct?.variants) return [];
+    if (size) {
+        return selectedProduct.variants
+            .filter(variant => {
+                const sizeAttr = variant.attributes?.find(attr => attr.name === 'Size');
+                return sizeAttr && sizeAttr.value === size;
+            })
+            .map(variant => {
+                const colorAttr = variant.attributes?.find(attr => attr.name === 'Color');
+                return colorAttr ? { value: colorAttr.value, hexCode: colorAttr.hexCode } : null;
+            })
+            .filter(color => color);
+    } else {
+        return selectedProduct.variants
+            .filter(variant => {
+                const sizeAttr = variant.attributes?.find(attr => attr.name === 'Size');
+                return !sizeAttr;
+            })
+            .map(variant => {
+                const colorAttr = variant.attributes?.find(attr => attr.name === 'Color');
+                return colorAttr ? { value: colorAttr.value, hexCode: colorAttr.hexCode } : null;
+            })
+            .filter(color => color)
+            .filter((color, index, self) =>
+                index === self.findIndex(c => c.value === color.value)
+            );
+    }
+};
+
+const getCalculatedVariant = () => {
+    if (!selectedProduct?.variants) return null;
+    return selectedProduct.variants.find(variant => {
+        const sizeAttr = variant.attributes?.find(attr => attr.name === 'Size');
+        const colorAttr = variant.attributes?.find(attr => attr.name === 'Color');
+
+        let sizeMatches = true;
+        if (selectedSize && sizeAttr) {
+            sizeMatches = sizeAttr.value === selectedSize;
+        } else if (selectedSize && !sizeAttr) {
+            sizeMatches = false;
+        } else if (!selectedSize && sizeAttr) {
+            sizeMatches = false;
+        }
+
+        let colorMatches = true;
+        if (colorAttr && selectedColor) {
+            colorMatches = colorAttr.value === selectedColor;
+        } else if (colorAttr && !selectedColor) {
+            colorMatches = false;
+        } else if (!colorAttr && selectedColor) {
+            colorMatches = false;
+        }
+
+        return sizeMatches && colorMatches;
+    });
+};
+
+useEffect(() => {
+    if (selectedProduct) {
+        const variant = getCalculatedVariant();
+        setSelectedVariant(variant || null);
+        if (variant) {
+            setNewItemPrice(variant.currentPrice || variant.price || 0);
+        }
+    }
+}, [selectedSize, selectedColor, selectedProduct]);
+
+const handleSizeChange = (size) => {
+    setSelectedSize(size);
+    const colorsForSize = getAvailableColorsForSize(size);
+    if (colorsForSize.length > 0) {
+        setSelectedColor(colorsForSize[0].value);
+    } else {
+        setSelectedColor("");
+    }
+};
+
+const getTrueAvailableStock = (variant) => {
+    if (!variant || !order) return 0;
+    const dbStock = variant.stockQuantity || 0;
+    
+    // Find how many are currently in formData.items
+    const currentQtyInUI = formData.items.reduce((total, item) => {
+        if (item.variant?.sku === variant.sku) {
+            return total + Number(item.quantity);
+        }
+        return total;
+    }, 0);
+
+    // Find how many were in original order.items
+    const originalQty = order.items.reduce((total, item) => {
+        if (item.variant?.sku === variant.sku) {
+            return total + Number(item.quantity);
+        }
+        return total;
+    }, 0);
+
+    const stockDeductedStatuses = ['confirmed', 'processing', 'shipped', 'delivered'];
+    const isWasDeducted = stockDeductedStatuses.includes(order.status);
+    
+    if (isWasDeducted) {
+        return Math.max(0, dbStock - (currentQtyInUI - originalQty));
+    } else {
+        return Math.max(0, dbStock - currentQtyInUI);
+    }
+};
+
     const autoAddItem = (product, variant) => {
+        const availableStock = getTrueAvailableStock(variant);
+        if (availableStock <= 0) {
+            toast.error(`Variant ${variant.sku} is out of stock or you reached the limit.`);
+            return;
+        }
+
         const newItem = {
             product: product._id,
             name: product.title,
@@ -252,6 +392,17 @@ export default function OrderEditPage() {
             return;
         }
 
+        const availableStock = selectedVariant ? getTrueAvailableStock(selectedVariant) : 0;
+        if (selectedVariant && availableStock <= 0) {
+            toast.error('Selected variant is out of stock or limit reached');
+            return;
+        }
+
+        if (newItemQuantity > availableStock) {
+            toast.error(`You can only add up to ${availableStock} more items.`);
+            return;
+        }
+
         const newItem = {
             product: selectedProduct._id,
             name: selectedProduct.title,
@@ -311,14 +462,43 @@ export default function OrderEditPage() {
         toast.success('Item removed from order');
     };
 
-    const updateItemQuantity = (index, quantity) => {
-        if (quantity < 1) return;
+    const updateItemQuantity = (index, value) => {
+        if (value === '') {
+            setFormData(prev => ({
+                ...prev,
+                items: prev.items.map((item, i) =>
+                    i === index
+                        ? { ...item, quantity: '', subtotal: 0 }
+                        : item
+                )
+            }));
+            return;
+        }
+
+        let newQuantity = parseInt(value);
+        if (isNaN(newQuantity)) return;
+
+        const itemToUpdate = formData.items[index];
+
+        if (itemToUpdate.variant) {
+            const variantForCheck = {
+                sku: itemToUpdate.variant.sku,
+                stockQuantity: itemToUpdate.variant.stockQuantity
+            };
+            
+            const maxAllowed = (Number(itemToUpdate.quantity) || 0) + getTrueAvailableStock(variantForCheck);
+            
+            if (newQuantity > maxAllowed) {
+                toast.error(`Stock limited to ${maxAllowed}`);
+                newQuantity = maxAllowed;
+            }
+        }
 
         setFormData(prev => ({
             ...prev,
             items: prev.items.map((item, i) =>
                 i === index
-                    ? { ...item, quantity, subtotal: item.price * quantity }
+                    ? { ...item, quantity: newQuantity, subtotal: item.price * newQuantity }
                     : item
             )
         }));
@@ -363,7 +543,7 @@ export default function OrderEditPage() {
             }
         } catch (error) {
             console.error('Error updating order:', error);
-            toast.error('Error updating order');
+            toast.error(error.message || 'Error updating order');
         } finally {
             setSaving(false);
         }
@@ -588,11 +768,21 @@ export default function OrderEditPage() {
                                                         </label>
                                                         <input
                                                             type="number"
-                                                            value={item.quantity}
-                                                            onChange={(e) => updateItemQuantity(index, parseInt(e.target.value) || 1)}
+                                                            value={item.quantity === '' ? '' : item.quantity}
+                                                            onChange={(e) => updateItemQuantity(index, e.target.value)}
+                                                            onBlur={() => {
+                                                                if (!item.quantity || item.quantity < 1) {
+                                                                    updateItemQuantity(index, "1");
+                                                                }
+                                                            }}
                                                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                                                             min="1"
                                                         />
+                                                        {item.variant && (
+                                                            <p className="text-xs mt-1 text-gray-500">
+                                                                Max: {(Number(item.quantity) || 0) + getTrueAvailableStock({ sku: item.variant.sku, stockQuantity: item.variant.stockQuantity })} available
+                                                            </p>
+                                                        )}
                                                     </div>
                                                     <div>
                                                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -988,7 +1178,7 @@ export default function OrderEditPage() {
             {showProductSearch && (
                 <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg p-6 w-full max-w-4xl mx-4 max-h-[80vh] overflow-y-auto">
-                        <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-medium text-gray-900">Add Product to Order</h3>
                             <button
                                 onClick={() => setShowProductSearch(false)}
@@ -998,56 +1188,73 @@ export default function OrderEditPage() {
                             </button>
                         </div>
 
-                        <div className="mb-4">
-                            <input
-                                type="text"
-                                placeholder="Search products..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            />
+                        <div className="mb-6 p-3 bg-blue-50 border border-blue-100 text-blue-800 rounded-md text-sm">
+                            <strong>নোট:</strong> স্টক তখনই কমবে যখন অর্ডারের স্ট্যাটাস <b>Confirmed, Processing, Shipped</b> বা <b>Delivered</b> হবে। <b>Pending, Cancelled</b> বা <b>Returned</b> অবস্থায় স্টক কাটবে না।
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                            {isSearchingProducts ? (
-                                <div className="col-span-full py-8 text-center text-gray-500 flex flex-col items-center">
-                                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent mb-2"></div>
-                                    <p>Searching products...</p>
+                        {!selectedProduct && (
+                            <>
+                                <div className="mb-4">
+                                    <input
+                                        type="text"
+                                        placeholder="Search products..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                                    />
                                 </div>
-                            ) : products.length > 0 ? (
-                                products.map(product => (
-                                    <div
-                                        key={product._id}
-                                        onClick={() => {
-                                            setSelectedProduct(product);
-                                            setNewItemPrice(product.priceRange?.min || 0);
-                                        }}
-                                        className={`p-4 border rounded-lg cursor-pointer transition-colors ${selectedProduct?._id === product._id
-                                                ? 'border-blue-500 bg-blue-50'
-                                                : 'border-gray-200 hover:border-gray-300'
-                                            }`}
-                                    >
-                                        <img
-                                            src={product.featuredImage}
-                                            alt={product.title}
-                                            className="w-full h-32 object-cover rounded-md mb-2"
-                                        />
-                                        <h4 className="font-medium text-gray-900">{product.title}</h4>
-                                        <p className="text-sm text-gray-500">৳{product.priceRange?.min || 0}</p>
-                                    </div>
-                                ))
-                            ) : searchTerm.trim() ? (
-                                <div className="col-span-full py-8 text-center text-gray-500">
-                                    <Package className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                                    <p>No products found</p>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                                    {isSearchingProducts ? (
+                                        <div className="col-span-full py-8 text-center text-gray-500 flex flex-col items-center">
+                                            <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-500 border-t-transparent mb-2"></div>
+                                            <p>Searching products...</p>
+                                        </div>
+                                    ) : products.length > 0 ? (
+                                        products.map(product => (
+                                            <div
+                                                key={product._id}
+                                                onClick={() => {
+                                                    setSelectedProduct(product);
+                                                    setNewItemPrice(product.priceRange?.min || 0);
+                                                    setSelectedSize("");
+                                                    setSelectedColor("");
+                                                    if (product.variants && product.variants.length > 0) {
+                                                        const firstVariant = product.variants[0];
+                                                        const sizeAttr = firstVariant.attributes?.find(attr => attr.name === 'Size');
+                                                        const colorAttr = firstVariant.attributes?.find(attr => attr.name === 'Color');
+                                                        if (sizeAttr) setSelectedSize(sizeAttr.value);
+                                                        if (colorAttr) setSelectedColor(colorAttr.value);
+                                                    }
+                                                }}
+                                                className={`p-4 border rounded-lg cursor-pointer transition-colors ${selectedProduct?._id === product._id
+                                                        ? 'border-blue-500 bg-blue-50'
+                                                        : 'border-gray-200 hover:border-gray-300'
+                                                    }`}
+                                            >
+                                                <img
+                                                    src={product.featuredImage}
+                                                    alt={product.title}
+                                                    className="w-full h-32 object-cover rounded-md mb-2"
+                                                />
+                                                <h4 className="font-medium text-gray-900">{product.title}</h4>
+                                                <p className="text-sm text-gray-500">৳{product.priceRange?.min || 0}</p>
+                                            </div>
+                                        ))
+                                    ) : searchTerm.trim() ? (
+                                        <div className="col-span-full py-8 text-center text-gray-500">
+                                            <Package className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                                            <p>No products found</p>
+                                        </div>
+                                    ) : (
+                                        <div className="col-span-full py-8 text-center text-gray-500">
+                                            <Package className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                                            <p>Search by name or SKU to add products</p>
+                                        </div>
+                                    )}
                                 </div>
-                            ) : (
-                                <div className="col-span-full py-8 text-center text-gray-500">
-                                    <Package className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                                    <p>Search by name or SKU to add products</p>
-                                </div>
-                            )}
-                        </div>
+                            </>
+                        )}
 
                         {selectedProduct && (
                             <div className="border-t pt-6">
@@ -1060,10 +1267,40 @@ export default function OrderEditPage() {
                                         <input
                                             type="number"
                                             value={newItemQuantity}
-                                            onChange={(e) => setNewItemQuantity(parseInt(e.target.value) || 1)}
+                                            onChange={(e) => {
+                                                const value = parseInt(e.target.value);
+                                                if (isNaN(value)) {
+                                                    setNewItemQuantity('');
+                                                    return;
+                                                }
+                                                const maxQuantity = selectedVariant ? getTrueAvailableStock(selectedVariant) : 999;
+                                                if (value > maxQuantity) {
+                                                    toast.error(`Stock limited to ${maxQuantity}`);
+                                                    setNewItemQuantity(maxQuantity);
+                                                } else {
+                                                    setNewItemQuantity(Math.max(1, value));
+                                                }
+                                            }}
+                                            onBlur={() => {
+                                                if (!newItemQuantity || newItemQuantity < 1) {
+                                                    setNewItemQuantity(1);
+                                                }
+                                            }}
                                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                             min="1"
+                                            max={selectedVariant ? getTrueAvailableStock(selectedVariant) : 999}
                                         />
+                                        {selectedVariant && (
+                                            <p className={`text-xs mt-1 ${getTrueAvailableStock(selectedVariant) <= 0
+                                                ? 'text-red-600 font-semibold'
+                                                : 'text-gray-500'
+                                                }`}>
+                                                {getTrueAvailableStock(selectedVariant) <= 0
+                                                    ? 'Stock Out / Limit Reached!'
+                                                    : `Max: ${getTrueAvailableStock(selectedVariant)} more can be added`
+                                                }
+                                            </p>
+                                        )}
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1081,43 +1318,79 @@ export default function OrderEditPage() {
                                 </div>
 
                                 {selectedProduct.variants && selectedProduct.variants.length > 0 && (
-                                    <div className="mb-4">
-                                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                                            Variant
-                                        </label>
-                                        <select
-                                            value={selectedVariant?._id || ''}
-                                            onChange={(e) => {
-                                                const variant = selectedProduct.variants.find(v => v._id === e.target.value);
-                                                setSelectedVariant(variant);
-                                                if (variant) {
-                                                    setNewItemPrice(variant.currentPrice || 0);
-                                                }
-                                            }}
-                                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                                        >
-                                            <option value="">Select variant</option>
-                                            {selectedProduct.variants.map(variant => (
-                                                <option key={variant._id} value={variant._id}>
-                                                    {variant.attributes?.map(attr => `${attr.name}: ${attr.value}`).join(', ')} - ৳{variant.currentPrice}
-                                                </option>
-                                            ))}
-                                        </select>
-                                    </div>
+                                    <>
+                                        {getUniqueSizes().length > 0 && (
+                                            <div className="mb-4">
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Size
+                                                </label>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {getUniqueSizes().map((size) => (
+                                                        <button
+                                                            key={size}
+                                                            onClick={() => handleSizeChange(size)}
+                                                            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors cursor-pointer ${selectedSize === size
+                                                                ? 'bg-blue-500 text-white'
+                                                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                                                                }`}
+                                                        >
+                                                            {size}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {getAvailableColorsForSize(selectedSize).length > 0 && (
+                                            <div className="mb-4">
+                                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                                    Color
+                                                </label>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {getAvailableColorsForSize(selectedSize).map((color) => (
+                                                        <button
+                                                            key={color.value}
+                                                            onClick={() => setSelectedColor(color.value)}
+                                                            className={`px-3 py-1 rounded-md text-sm font-medium transition-colors cursor-pointer ${selectedColor === color.value
+                                                                ? 'bg-blue-500 text-white'
+                                                                : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                                                                }`}
+                                                        >
+                                                            {color.value}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {selectedVariant && (getTrueAvailableStock(selectedVariant)) <= 0 && (
+                                            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-md">
+                                                <p className="text-sm text-red-800 font-medium">
+                                                    ⚠️ This variant is out of stock and cannot be added to the order.
+                                                </p>
+                                            </div>
+                                        )}
+                                    </>
                                 )}
 
                                 <div className="flex justify-end space-x-3">
                                     <button
-                                        onClick={() => setShowProductSearch(false)}
+                                        onClick={() => {
+                                            setSelectedProduct(null);
+                                            setSelectedVariant(null);
+                                            setSelectedSize("");
+                                            setSelectedColor("");
+                                        }}
                                         className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
                                     >
-                                        Cancel
+                                        Back to Search
                                     </button>
                                     <button
                                         onClick={addNewItem}
-                                        className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700"
+                                        disabled={selectedProduct?.variants?.length > 0 && (!selectedVariant || getTrueAvailableStock(selectedVariant) <= 0)}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed"
                                     >
-                                        Add to Order
+                                        {(selectedProduct?.variants?.length > 0 && selectedVariant && getTrueAvailableStock(selectedVariant) <= 0) ? 'Stock Out' : 'Add to Order'}
                                     </button>
                                 </div>
                             </div>
