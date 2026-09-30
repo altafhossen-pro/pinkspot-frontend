@@ -23,6 +23,7 @@ export default function ManualOrderCreation() {
     // Form states
     const [orderType, setOrderType] = useState('guest'); // 'existing' or 'guest'
     const [orderSource, setOrderSource] = useState('facebook'); // default to facebook
+    const [isDraftMode, setIsDraftMode] = useState(false);
 
     // Unified Customer State
     const [customerIdentifier, setCustomerIdentifier] = useState('');
@@ -713,6 +714,7 @@ export default function ManualOrderCreation() {
                 overrideBlock: customerInfo.isBlocked === true,
                 orderType: orderType,
                 orderSource: orderSource,
+                isDraftMode: isDraftMode,
                 items: orderItems.map(item => ({
                     productId: item.productId,
                     variantId: item.variantId,
@@ -762,6 +764,7 @@ export default function ManualOrderCreation() {
                 setCustomerStatus('idle');
                 setCustomerInfo({ name: '', phone: '', email: '', address: '', userId: null });
                 setOrderNotes('');
+                setIsDraftMode(false);
                 setDiscountAmount(0);
                 setDeliveryCharge(null);
                 setDeliveryAddress('');
@@ -1232,9 +1235,27 @@ export default function ManualOrderCreation() {
 
                 {/* Customer Info Card */}
                 <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-                    <div className="flex items-center mb-4 text-gray-900">
-                        <User className="w-5 h-5 mr-2 text-blue-600" />
-                        <h2 className="text-lg font-semibold">Customer Info</h2>
+                    <div className="flex items-center justify-between mb-4">
+                        <div className="flex items-center text-gray-900">
+                            <User className="w-5 h-5 mr-2 text-blue-600" />
+                            <h2 className="text-lg font-semibold">Customer Info</h2>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                            <span className="text-sm font-medium text-gray-700">Draft Mode</span>
+                            <button
+                                type="button"
+                                onClick={() => setIsDraftMode(!isDraftMode)}
+                                className={`relative inline-flex h-6 w-11 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${isDraftMode ? 'bg-orange-500' : 'bg-gray-200'}`}
+                                role="switch"
+                                aria-checked={isDraftMode}
+                            >
+                                <span className="sr-only">Toggle draft mode</span>
+                                <span
+                                    aria-hidden="true"
+                                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${isDraftMode ? 'translate-x-5' : 'translate-x-0'}`}
+                                />
+                            </button>
+                        </div>
                     </div>
 
                     {/* Order Source */}

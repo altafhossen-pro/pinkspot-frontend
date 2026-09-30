@@ -175,6 +175,12 @@ export default function AdminOrdersPage() {
                 params.append('endDate', filters.endDate);
             }
 
+            // Check if draft mode is requested from URL
+            const isDraftModeUrl = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('isDraftMode') === 'true';
+            if (isDraftModeUrl) {
+                params.append('isDraftMode', 'true');
+            }
+
             const data = await orderAPI.getAdminOrders(token, params.toString());
 
             if (data.success) {

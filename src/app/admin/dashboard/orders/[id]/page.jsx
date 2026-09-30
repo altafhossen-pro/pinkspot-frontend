@@ -37,7 +37,8 @@ import {
     Square,
     ScanBarcode,
     XCircle,
-    AlertTriangle
+    AlertTriangle,
+    Archive
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDateForTable } from '@/utils/formatDate';
@@ -107,6 +108,9 @@ export default function OrderDetailsPage() {
     const [apiError, setApiError] = useState(null);
     const [trackingHistory, setTrackingHistory] = useState([]);
     const [isNextStatusModalOpen, setIsNextStatusModalOpen] = useState(false);
+    const [isProceedShipModalOpen, setIsProceedShipModalOpen] = useState(false);
+    const [updatingDraftMode, setUpdatingDraftMode] = useState(false);
+    const [isDraftModalOpen, setIsDraftModalOpen] = useState(false);
 
     // Scan Barcode States
     const [scanInputValue, setScanInputValue] = useState('');
@@ -124,18 +128,18 @@ export default function OrderDetailsPage() {
     const handleScanInputChange = (e) => {
         const value = e.target.value;
         setScanInputValue(value);
-        
+
         if (value.trim().length > 0 && order && order.items) {
             const scan = value.trim().toLowerCase();
             const foundIndex = order.items.findIndex(item => {
-                return (item.variant && item.variant.sku && String(item.variant.sku).toLowerCase() === scan) || 
-                       (item.productInfo && item.productInfo.slug && String(item.productInfo.slug).toLowerCase() === scan) ||
-                       (item.sku && String(item.sku).toLowerCase() === scan);
+                return (item.variant && item.variant.sku && String(item.variant.sku).toLowerCase() === scan) ||
+                    (item.productInfo && item.productInfo.slug && String(item.productInfo.slug).toLowerCase() === scan) ||
+                    (item.sku && String(item.sku).toLowerCase() === scan);
             });
 
             if (foundIndex !== -1) {
                 const foundItem = order.items[foundIndex];
-                
+
                 // Auto-select for packing
                 setSelectedItems(prev => {
                     const newSet = new Set(prev);
@@ -150,7 +154,7 @@ export default function OrderDetailsPage() {
                     itemName: foundItem.name
                 });
                 setScanInputValue('');
-                
+
                 if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
                 scanTimeoutRef.current = setTimeout(() => {
                     setScanResult(null);
@@ -171,7 +175,7 @@ export default function OrderDetailsPage() {
                     sku: value
                 });
                 setScanInputValue('');
-                
+
                 if (scanTimeoutRef.current) clearTimeout(scanTimeoutRef.current);
                 scanTimeoutRef.current = setTimeout(() => {
                     setScanResult(null);
@@ -618,6 +622,32 @@ export default function OrderDetailsPage() {
         }
     };
 
+    const handleToggleDraftModeClick = () => {
+        setIsDraftModalOpen(true);
+    };
+
+    const confirmToggleDraftMode = async () => {
+        if (!order) return;
+        try {
+            setUpdatingDraftMode(true);
+            const token = getCookie('token');
+            const newDraftStatus = !order.isDraftMode;
+            const response = await orderAPI.updateOrderStatus(order._id, { isDraftMode: newDraftStatus }, token);
+            if (response.success) {
+                toast.success(`Order marked as ${newDraftStatus ? 'draft' : 'regular'}`);
+                setOrder(prev => ({ ...prev, isDraftMode: newDraftStatus }));
+                setIsDraftModalOpen(false);
+            } else {
+                toast.error(response.message || 'Failed to update draft mode');
+            }
+        } catch (error) {
+            console.error('Error updating draft mode:', error);
+            toast.error('Failed to update draft mode');
+        } finally {
+            setUpdatingDraftMode(false);
+        }
+    };
+
     const handleAddToSteadfast = async () => {
         try {
             setAddingToSteadfast(true);
@@ -774,22 +804,22 @@ export default function OrderDetailsPage() {
                                     {getStatusIcon(order.status)}
                                     <span className="ml-2">{order.status.charAt(0).toUpperCase() + order.status.slice(1)}</span>
                                 </span>
-                            
-                            {allActiveUsers.length > 0 && (
-                                <div className="flex items-center -space-x-2 mr-2 pl-2 border-l border-slate-300" title="Active Viewers">
-                                    {allActiveUsers.map((viewer, idx) => (
-                                        <div 
-                                            key={idx} 
-                                            className="h-8 w-8 rounded-full border-2 border-white flex items-center justify-center bg-blue-100 text-blue-700 text-xs font-bold relative group shadow-sm ring-1 ring-blue-200"
-                                        >
-                                            {viewer.name ? viewer.name.charAt(0).toUpperCase() : '?'}
-                                            <div className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-50 pointer-events-none transition-opacity">
-                                                {viewer.name}
+
+                                {allActiveUsers.length > 0 && (
+                                    <div className="flex items-center -space-x-2 mr-2 pl-2 border-l border-slate-300" title="Active Viewers">
+                                        {allActiveUsers.map((viewer, idx) => (
+                                            <div
+                                                key={idx}
+                                                className="h-8 w-8 rounded-full border-2 border-white flex items-center justify-center bg-blue-100 text-blue-700 text-xs font-bold relative group shadow-sm ring-1 ring-blue-200"
+                                            >
+                                                {viewer.name ? viewer.name.charAt(0).toUpperCase() : '?'}
+                                                <div className="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 bg-slate-800 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 whitespace-nowrap z-50 pointer-events-none transition-opacity">
+                                                    {viewer.name}
+                                                </div>
                                             </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                             <div className="flex flex-wrap items-center gap-2">
                                 {order.status === 'processing' && !order.isAddedIntoSteadfast && hasPermission('order', 'update') && (
@@ -834,6 +864,26 @@ export default function OrderDetailsPage() {
                                                 Edit Order
                                             </button>
                                         )}
+                                        <button
+                                            onClick={handleToggleDraftModeClick}
+                                            disabled={updatingDraftMode}
+                                            className={`inline-flex items-center px-4 py-2 ${order.isDraftMode ? 'bg-orange-500 hover:bg-orange-600' : 'bg-slate-500 hover:bg-slate-600'} text-white rounded-lg transition-colors text-sm font-medium disabled:opacity-50 cursor-pointer`}
+                                        >
+                                            {updatingDraftMode ? (
+                                                <>
+                                                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    </svg>
+                                                    Updating...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Archive className="h-4 w-4 mr-2" />
+                                                    {order.isDraftMode ? 'Remove from Draft' : 'Mark as Draft'}
+                                                </>
+                                            )}
+                                        </button>
                                         <button
                                             onClick={openStatusModal}
                                             className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
@@ -977,8 +1027,8 @@ export default function OrderDetailsPage() {
                                             autoFocus
                                         />
                                         <div className="relative flex h-3 w-3 ml-3 shrink-0">
-                                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                                          <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
+                                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                                            <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
                                         </div>
                                     </div>
                                     <div className="bg-slate-100 px-4 py-2 rounded-xl w-fit">
@@ -1043,7 +1093,7 @@ export default function OrderDetailsPage() {
                             <div className="space-y-6">
                                 {order.items.map((item, index) => {
                                     const isSelected = selectedItems.has(index);
-                                    
+
                                     // Determine if there is a variant image
                                     let variantImage = null;
                                     if (item.product && item.product.variants && item.variant?.sku) {
@@ -1081,25 +1131,25 @@ export default function OrderDetailsPage() {
                                                     </div>
 
                                                     <div className="flex flex-col items-center flex-shrink-0">
-                                                    <div
-                                                        className="relative"
-                                                        onMouseEnter={() => setHoveredImage(displayImage)}
-                                                        onMouseLeave={() => setHoveredImage(null)}
-                                                    >
-                                                        <img
-                                                            src={displayImage}
-                                                            alt={item.name}
-                                                            className="h-24 w-24 rounded-xl object-cover border-2 border-white shadow-lg cursor-zoom-in"
-                                                        />
-                                                        <div className={`absolute -top-2 -right-2 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center z-10 ${isSelected ? 'bg-emerald-600' : 'bg-blue-600'
-                                                            }`}>
-                                                            {item.quantity}
+                                                        <div
+                                                            className="relative"
+                                                            onMouseEnter={() => setHoveredImage(displayImage)}
+                                                            onMouseLeave={() => setHoveredImage(null)}
+                                                        >
+                                                            <img
+                                                                src={displayImage}
+                                                                alt={item.name}
+                                                                className="h-24 w-24 rounded-xl object-cover border-2 border-white shadow-lg cursor-zoom-in"
+                                                            />
+                                                            <div className={`absolute -top-2 -right-2 text-white text-xs font-bold rounded-full h-6 w-6 flex items-center justify-center z-10 ${isSelected ? 'bg-emerald-600' : 'bg-blue-600'
+                                                                }`}>
+                                                                {item.quantity}
+                                                            </div>
                                                         </div>
+                                                        <span className="mt-2 text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                                                            {imageType}
+                                                        </span>
                                                     </div>
-                                                    <span className="mt-2 text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
-                                                        {imageType}
-                                                    </span>
-                                                </div>
                                                 </div>
 
                                                 <div className="flex-1 min-w-0 w-full">
@@ -1391,8 +1441,11 @@ export default function OrderDetailsPage() {
                                         <div className="ml-4">
                                             <div className="space-y-1">
                                                 <p className="font-semibold text-slate-900">{order.shippingAddress?.street}</p>
-                                                <p className="text-slate-700 text-sm font-medium">{order.shippingAddress?.city}, {order.shippingAddress?.state}</p>
-                                                <p className="text-slate-600 text-sm">{order.shippingAddress?.country}</p>
+                                                {(order.shippingAddress?.city || order.shippingAddress?.state) && (
+                                                    <p className="text-slate-700 text-sm font-medium">
+                                                        {[order.shippingAddress?.city, order.shippingAddress?.state].filter(Boolean).join(', ')}
+                                                    </p>
+                                                )}
                                             </div>
                                             <p className="text-xs text-slate-500 font-medium mt-1">Delivery Address</p>
                                         </div>
@@ -1459,39 +1512,56 @@ export default function OrderDetailsPage() {
 
                         {/* Quick Actions */}
                         {order.status !== 'shipped' && (
-                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 lg:p-8">
-                            <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-4 sm:mb-6">Quick Actions</h2>
-                            <div className="grid grid-cols-1 gap-4">
-                                {hasPermission('order', 'update') && getNextStatus(order.status) && (
-                                    <>
-                                        <button
-                                            onClick={openNextStatusModal}
-                                            disabled={order.status === 'confirmed' && selectedItems.size !== order.items.length}
-                                            className={`group flex items-center justify-center px-6 py-3 rounded-xl transition-all duration-200 shadow-lg ${
-                                                order.status === 'confirmed' && selectedItems.size !== order.items.length
-                                                    ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                                                    : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 hover:shadow-xl cursor-pointer'
-                                            }`}
-                                        >
-                                            <CheckCircle className={`h-5 w-5 mr-3 ${order.status === 'confirmed' && selectedItems.size !== order.items.length ? '' : 'group-hover:scale-110 transition-transform'}`} />
-                                            <span className="font-semibold">
-                                                Move to Next Status ({getNextStatus(order.status).charAt(0).toUpperCase() + getNextStatus(order.status).slice(1)})
-                                            </span>
-                                        </button>
-                                        {order.status === 'confirmed' && selectedItems.size !== order.items.length && (
-                                            <p className="text-xs text-red-500 font-medium text-center mt-2">
-                                                Please pack all items ({selectedItems.size}/{order.items.length}) before processing the order.
-                                            </p>
-                                        )}
-                                    </>
-                                )}
-                                {hasPermission('order', 'update') && !getNextStatus(order.status) && (
-                                    <div className="text-center p-4 bg-gray-50 rounded-xl border border-gray-200 text-gray-500 text-sm">
-                                        No further status progression available.
-                                    </div>
-                                )}
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 lg:p-8">
+                                <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-4 sm:mb-6">Quick Actions</h2>
+                                <div className="grid grid-cols-1 gap-4">
+                                    {order.orderSource === 'website' || !order.orderSource ? (
+                                        <>
+                                            {hasPermission('order', 'update') && getNextStatus(order.status) && (
+                                                <>
+                                                    <button
+                                                        onClick={openNextStatusModal}
+                                                        disabled={order.status === 'confirmed' && selectedItems.size !== order.items.length}
+                                                        className={`group flex items-center justify-center px-6 py-3 rounded-xl transition-all duration-200 shadow-lg ${order.status === 'confirmed' && selectedItems.size !== order.items.length
+                                                                ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
+                                                                : 'bg-gradient-to-r from-blue-600 to-blue-700 text-white hover:from-blue-700 hover:to-blue-800 hover:shadow-xl cursor-pointer'
+                                                            }`}
+                                                    >
+                                                        <CheckCircle className={`h-5 w-5 mr-3 ${order.status === 'confirmed' && selectedItems.size !== order.items.length ? '' : 'group-hover:scale-110 transition-transform'}`} />
+                                                        <span className="font-semibold">
+                                                            Move to Next Status ({getNextStatus(order.status).charAt(0).toUpperCase() + getNextStatus(order.status).slice(1)})
+                                                        </span>
+                                                    </button>
+                                                    {order.status === 'confirmed' && selectedItems.size !== order.items.length && (
+                                                        <p className="text-xs text-red-500 font-medium text-center mt-2">
+                                                            Please pack all items ({selectedItems.size}/{order.items.length}) before processing the order.
+                                                        </p>
+                                                    )}
+                                                </>
+                                            )}
+                                            {hasPermission('order', 'update') && !getNextStatus(order.status) && (
+                                                <div className="text-center p-4 bg-gray-50 rounded-xl border border-gray-200 text-gray-500 text-sm">
+                                                    No further status progression available.
+                                                </div>
+                                            )}
+                                        </>
+                                    ) : (
+                                        <>
+                                            {hasPermission('order', 'update') && (
+                                                <button
+                                                    onClick={() => setIsProceedShipModalOpen(true)}
+                                                    className="group flex items-center justify-center px-6 py-3 rounded-xl transition-all duration-200 shadow-lg bg-gradient-to-r from-pink-600 to-pink-700 text-white hover:from-pink-700 hover:to-pink-800 hover:shadow-xl cursor-pointer"
+                                                >
+                                                    <Truck className="h-5 w-5 mr-3 group-hover:translate-x-1 transition-transform" />
+                                                    <span className="font-semibold">
+                                                        Proceed to Ship
+                                                    </span>
+                                                </button>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
                             </div>
-                        </div>
                         )}
                     </div>
                 </div>
@@ -2002,7 +2072,7 @@ export default function OrderDetailsPage() {
                                             <tr>
                                                 <td style={{ color: '#555', verticalAlign: 'top' }}>Address</td>
                                                 <td style={{ fontWeight: 'bold', lineHeight: '1.3', color: '#000' }}>
-                                                    {order.shippingAddress?.street}, {order.shippingAddress?.city}
+                                                    {[order.shippingAddress?.street, order.shippingAddress?.city].filter(Boolean).join(', ')}
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -2059,27 +2129,24 @@ export default function OrderDetailsPage() {
                     <div className="bg-white rounded-3xl shadow-2xl overflow-hidden max-w-md w-full transform scale-100 animate-in fade-in zoom-in duration-200">
                         <div className={`h-2 w-full ${scanResult.status === 'success' ? 'bg-emerald-500' : 'bg-red-500'}`}></div>
                         <div className="p-8 text-center">
-                            <div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full mb-6 shadow-inner ${
-                                scanResult.status === 'success' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'
-                            }`}>
+                            <div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full mb-6 shadow-inner ${scanResult.status === 'success' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'
+                                }`}>
                                 {scanResult.status === 'success' ? (
                                     <CheckCircle className="h-10 w-10" />
                                 ) : (
                                     <XCircle className="h-10 w-10" />
                                 )}
                             </div>
-                            <h3 className={`text-2xl font-bold mb-2 ${
-                                scanResult.status === 'success' ? 'text-emerald-600' : 'text-red-600'
-                            }`}>
+                            <h3 className={`text-2xl font-bold mb-2 ${scanResult.status === 'success' ? 'text-emerald-600' : 'text-red-600'
+                                }`}>
                                 {scanResult.message}
                             </h3>
                             <div className="bg-slate-50 rounded-2xl p-5 mt-6 border border-slate-100 shadow-sm text-left relative overflow-hidden">
-                                <div className={`absolute top-0 right-0 w-16 h-16 transform translate-x-8 -translate-y-8 rounded-full ${
-                                    scanResult.status === 'success' ? 'bg-emerald-100/50' : 'bg-red-100/50'
-                                }`}></div>
+                                <div className={`absolute top-0 right-0 w-16 h-16 transform translate-x-8 -translate-y-8 rounded-full ${scanResult.status === 'success' ? 'bg-emerald-100/50' : 'bg-red-100/50'
+                                    }`}></div>
                                 <p className="text-xs text-slate-400 font-bold mb-1 uppercase tracking-wider relative z-10">Scanned SKU / Barcode</p>
                                 <p className="text-xl font-mono font-bold text-slate-800 break-all relative z-10">{scanResult.sku}</p>
-                                
+
                                 {scanResult.itemName && (
                                     <div className="mt-4 pt-4 border-t border-slate-200 relative z-10">
                                         <p className="text-xs text-slate-400 font-bold mb-1 uppercase tracking-wider">Matched Item in Order</p>
@@ -2107,7 +2174,7 @@ export default function OrderDetailsPage() {
                                 </p>
                             </div>
                         </div>
-                        
+
                         <div className="bg-slate-50 rounded-xl p-4 mb-6 border border-slate-100">
                             <ul className="space-y-3">
                                 {otherActiveUsers.map((activeUser, idx) => (
@@ -2122,7 +2189,7 @@ export default function OrderDetailsPage() {
                                 Please coordinate to avoid conflicting updates!
                             </p>
                         </div>
-                        
+
                         <div className="flex justify-end">
                             <button
                                 onClick={() => setShowPresenceWarning(false)}
@@ -2130,6 +2197,87 @@ export default function OrderDetailsPage() {
                             >
                                 Close & View Anyway
                             </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Draft Mode Confirmation Modal */}
+            {isDraftModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl w-full max-w-md shadow-xl overflow-hidden" onClick={e => e.stopPropagation()}>
+                        <div className="p-6">
+                            <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center mb-4 mx-auto">
+                                <Archive className="h-6 w-6 text-orange-600" />
+                            </div>
+                            <h3 className="text-xl font-bold text-center text-slate-900 mb-2">
+                                {order.isDraftMode ? 'Remove from Draft?' : 'Mark as Draft?'}
+                            </h3>
+                            <p className="text-center text-slate-500 mb-6">
+                                {order.isDraftMode 
+                                    ? 'Are you sure you want to remove this order from draft mode?'
+                                    : 'Are you sure you want to mark this order as a draft?'}
+                            </p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => setIsDraftModalOpen(false)}
+                                    className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-medium hover:bg-slate-200 transition-colors cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={confirmToggleDraftMode}
+                                    disabled={updatingDraftMode}
+                                    className="flex-1 px-4 py-2 bg-orange-600 text-white rounded-xl font-medium hover:bg-orange-700 transition-colors disabled:opacity-50 flex items-center justify-center cursor-pointer"
+                                >
+                                    {updatingDraftMode ? (
+                                        <>
+                                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Confirming...
+                                        </>
+                                    ) : (
+                                        'Yes, Confirm'
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Proceed to Ship Confirmation Modal */}
+            {isProceedShipModalOpen && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+                        <div className="p-6">
+                            <div className="flex items-center justify-center w-12 h-12 rounded-full bg-pink-100 mb-4 mx-auto">
+                                <Truck className="h-6 w-6 text-pink-600" />
+                            </div>
+                            <h3 className="text-xl font-bold text-center text-gray-900 mb-2">Proceed to Ship</h3>
+                            <p className="text-center text-gray-600 mb-6">
+                                Are you sure you want to proceed to ship this order? This will create a courier booking and update the order status.
+                            </p>
+                            <div className="flex space-x-3">
+                                <button
+                                    onClick={() => setIsProceedShipModalOpen(false)}
+                                    className="flex-1 py-2 px-4 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none transition-colors cursor-pointer"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setIsProceedShipModalOpen(false);
+                                        handleAddToSteadfast();
+                                    }}
+                                    className="flex-1 py-2 px-4 bg-pink-600 text-white rounded-lg text-sm font-medium hover:bg-pink-700 focus:outline-none transition-colors cursor-pointer flex items-center justify-center"
+                                    disabled={addingToSteadfast}
+                                >
+                                    {addingToSteadfast ? 'Processing...' : 'Yes, Proceed'}
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
