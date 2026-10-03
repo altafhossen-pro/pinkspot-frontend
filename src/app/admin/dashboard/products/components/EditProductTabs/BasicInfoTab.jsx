@@ -32,6 +32,10 @@ export default function BasicInfoTab({
     const [showAnnouncementSuggestions, setShowAnnouncementSuggestions] = useState(false);
     const announcementSearchRef = useRef(null);
 
+    const [showCategoryDropdown, setShowCategoryDropdown] = useState(false);
+    const [categorySearchQuery, setCategorySearchQuery] = useState('');
+    const categoryDropdownRef = useRef(null);
+
     // Handle outside click to close suggestions
     useEffect(() => {
         function handleClickOutside(event) {
@@ -43,6 +47,9 @@ export default function BasicInfoTab({
             }
             if (announcementSearchRef.current && !announcementSearchRef.current.contains(event.target)) {
                 setShowAnnouncementSuggestions(false);
+            }
+            if (categoryDropdownRef.current && !categoryDropdownRef.current.contains(event.target)) {
+                setShowCategoryDropdown(false);
             }
         }
         document.addEventListener("mousedown", handleClickOutside);
@@ -265,20 +272,64 @@ export default function BasicInfoTab({
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                         Category *
                     </label>
-                    <select
-                        name="category"
-                        value={formData.category}
-                        onChange={handleInputChange}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        required
-                    >
-                        <option value="">Select Category</option>
-                        {categories.map(category => (
-                            <option key={category._id} value={category._id}>
-                                {category.name}
-                            </option>
-                        ))}
-                    </select>
+                    <div className="relative" ref={categoryDropdownRef}>
+                        <div
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus-within:ring-2 focus-within:ring-blue-500 focus-within:border-blue-500 bg-white flex items-center justify-between cursor-pointer"
+                            onClick={() => {
+                                setShowCategoryDropdown(!showCategoryDropdown);
+                            }}
+                        >
+                            <span className={formData.category ? "text-gray-900" : "text-gray-500"}>
+                                {formData.category 
+                                    ? categories.find(c => c._id === formData.category)?.name || 'Select Category'
+                                    : 'Select Category'}
+                            </span>
+                            <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
+                            </svg>
+                        </div>
+                        
+                        {showCategoryDropdown && (
+                            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
+                                <div className="p-2 border-b border-gray-200">
+                                    <input
+                                        type="text"
+                                        placeholder="Search categories..."
+                                        className="w-full px-3 py-1.5 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        value={categorySearchQuery}
+                                        onChange={(e) => setCategorySearchQuery(e.target.value)}
+                                        autoFocus
+                                    />
+                                </div>
+                                <ul className="max-h-60 overflow-y-auto py-1">
+                                    <li
+                                        className="px-3 py-2 hover:bg-blue-50 cursor-pointer text-gray-900"
+                                        onClick={() => {
+                                            handleInputChange({ target: { name: 'category', value: '' } });
+                                            setShowCategoryDropdown(false);
+                                            setCategorySearchQuery('');
+                                        }}
+                                    >
+                                        Select Category
+                                    </li>
+                                    {categories.filter(c => c.name.toLowerCase().includes(categorySearchQuery.toLowerCase())).map(category => (
+                                        <li
+                                            key={category._id}
+                                            className={`px-3 py-2 hover:bg-blue-50 cursor-pointer text-gray-900 ${formData.category === category._id ? 'bg-blue-50 font-medium' : ''}`}
+                                            onClick={() => {
+                                                handleInputChange({ target: { name: 'category', value: category._id } });
+                                                setShowCategoryDropdown(false);
+                                                setCategorySearchQuery('');
+                                            }}
+                                        >
+                                            {category.name}
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+                    </div>
+
                 </div>
 
                 <div>

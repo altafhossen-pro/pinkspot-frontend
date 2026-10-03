@@ -19,7 +19,7 @@ export default function RootLayout({ children }) {
                 router.push('/login')
                 return
             }
-            
+
             // Check if user is not admin
             if (user?.role !== 'admin') {
                 router.push('/')
@@ -81,7 +81,7 @@ export default function RootLayout({ children }) {
                                     </div>
                                 ))}
                             </div>
-                            
+
                             {/* Chart/Table Area */}
                             <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm h-96">
                                 <div className="h-6 bg-gray-200 rounded w-1/4 mb-6 animate-pulse"></div>
@@ -114,7 +114,7 @@ export default function RootLayout({ children }) {
             {isMobileMenuOpen && (
                 <>
                     {/* Backdrop */}
-                    <div 
+                    <div
                         className="md:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
                         onClick={() => setIsMobileMenuOpen(false)}
                     />

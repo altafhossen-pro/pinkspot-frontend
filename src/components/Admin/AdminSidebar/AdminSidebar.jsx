@@ -134,6 +134,14 @@ const navigation = [
             { name: 'Label Print', href: '/admin/dashboard/settings/label-print', icon: Printer },
         ]
     },
+    {
+        name: 'Analytics',
+        icon: BarChart3,
+        type: 'group',
+        children: [
+            { name: 'Sales Analytics', href: '/admin/dashboard/analytics/sales-analytics', icon: TrendingUp },
+        ]
+    }
 ]
 
 export default function AdminSidebar({ onMobileMenuClose }) {
@@ -175,6 +183,9 @@ export default function AdminSidebar({ onMobileMenuClose }) {
         }
         if (child.href === '/admin/dashboard/inventory/stock-adjustment') {
             return pathname === '/admin/dashboard/inventory/stock-adjustment' || pathname.startsWith('/admin/dashboard/inventory/stock-adjustment/')
+        }
+        if (child.href === '/admin/dashboard/analytics/sales-analytics') {
+            return pathname === '/admin/dashboard/analytics/sales-analytics' || pathname.startsWith('/admin/dashboard/analytics/sales-analytics/')
         }
         // For other routes, use exact match or startsWith for sub-routes
         return pathname === child.href || pathname.startsWith(child.href + '/')
@@ -219,6 +230,9 @@ export default function AdminSidebar({ onMobileMenuClose }) {
                     }
                     if (child.href === '/admin/dashboard/inventory/stock-adjustment') {
                         return pathname === '/admin/dashboard/inventory/stock-adjustment' || pathname.startsWith('/admin/dashboard/inventory/stock-adjustment/')
+                    }
+                    if (child.href === '/admin/dashboard/analytics/sales-analytics') {
+                        return pathname === '/admin/dashboard/analytics/sales-analytics' || pathname.startsWith('/admin/dashboard/analytics/sales-analytics/')
                     }
                     return pathname === child.href || pathname.startsWith(child.href + '/')
                 })

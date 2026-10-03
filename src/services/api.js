@@ -281,6 +281,18 @@ export const categoryAPI = {
         return apiCall(`/category/homepage?limit=${limit}`);
     },
 
+    // Admin: Bulk update category discounts
+    bulkUpdateDiscounts: (actionData, token) => {
+        return apiCall('/category/bulk/discount', {
+            method: 'PUT',
+            body: JSON.stringify(actionData),
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+    },
+
     // Get categories for header dynamic menu
     getHeaderCategories: () => {
         return apiCall('/category/header');
@@ -1095,6 +1107,105 @@ export const analyticsAPI = {
             },
         });
     },
+
+    // Get advanced top products
+    getAdvancedTopProducts: (timeframe = 'today', token) => {
+        return apiCall(`/admin/analytics/advanced/top-products?timeframe=${timeframe}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+
+    // Get orders by day of week
+    getOrdersByDayOfWeek: (token) => {
+        return apiCall('/admin/analytics/advanced/orders-by-day', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+
+    // Get category performance
+    getCategoryPerformance: (params = {}, token) => {
+        const queryString = new URLSearchParams(params).toString();
+        return apiCall(`/admin/analytics/advanced/category-performance?${queryString}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+
+    // Get inventory movement
+    getInventoryMovement: (token) => {
+        return apiCall('/admin/analytics/advanced/inventory-movement', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+
+    // Get customer retention
+    getCustomerRetention: (timeframe = 'month', token) => {
+        return apiCall(`/admin/analytics/advanced/customer-retention?timeframe=${timeframe}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+
+    // Get sales by time of day
+    getSalesByTimeOfDay: (timeframe = 'all', token) => {
+        return apiCall(`/admin/analytics/advanced/sales-by-time?timeframe=${timeframe}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+
+    // Get geographic distribution
+    getGeographicDistribution: (token) => {
+        return apiCall('/admin/analytics/advanced/geographic', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+
+    // Get coupon analytics
+    getCouponAnalytics: (token) => {
+        return apiCall('/admin/analytics/advanced/coupons', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+
+    // Get order status report
+    getOrderStatusReport: (timeframe = 'month', token) => {
+        return apiCall(`/admin/analytics/advanced/order-status?timeframe=${timeframe}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+
+    // Get order source report
+    getOrderSourceReport: (timeframe = 'month', token) => {
+        return apiCall(`/admin/analytics/advanced/order-source?timeframe=${timeframe}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+
+    // Get AOV Trend
+    getAovTrend: (timeframe = 'year', token) => {
+        return apiCall(`/admin/analytics/advanced/aov?timeframe=${timeframe}`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+
+    // Get top customers
+    getTopCustomers: (token) => {
+        return apiCall('/admin/analytics/advanced/top-customers', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+
+    // Get return analytics
+    getReturnAnalytics: (token) => {
+        return apiCall('/admin/analytics/advanced/return-analytics', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    },
+
+    // Get recent activity
+    getRecentActivity: (token) => {
+        return apiCall('/admin/analytics/advanced/recent-activity', {
+            headers: { 'Authorization': `Bearer ${token}` }
+        });
+    }
 };
 
 // Menu API functions

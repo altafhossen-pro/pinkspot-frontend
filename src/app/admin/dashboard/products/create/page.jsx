@@ -99,7 +99,7 @@ export default function CreateProductPage() {
 
     const fetchCategories = async () => {
         try {
-            const data = await categoryAPI.getCategories()
+            const data = await categoryAPI.getCategories({ limit: 1000 })
             if (data.success) {
                 setCategories(data.data)
             }

@@ -38,7 +38,9 @@ import {
     ScanBarcode,
     XCircle,
     AlertTriangle,
-    Archive
+    Archive,
+    Calculator,
+    X
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDateForTable } from '@/utils/formatDate';
@@ -111,6 +113,7 @@ export default function OrderDetailsPage() {
     const [isProceedShipModalOpen, setIsProceedShipModalOpen] = useState(false);
     const [updatingDraftMode, setUpdatingDraftMode] = useState(false);
     const [isDraftModalOpen, setIsDraftModalOpen] = useState(false);
+    const [showCalcLogModal, setShowCalcLogModal] = useState(false);
 
     // Scan Barcode States
     const [scanInputValue, setScanInputValue] = useState('');
@@ -1244,10 +1247,21 @@ export default function OrderDetailsPage() {
                     <div className="space-y-8 xl:col-span-2">
                         {/* Order Summary */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 lg:p-8">
-                            <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-4 sm:mb-6 flex items-center">
-                                <DollarSign className="h-6 w-6 mr-3 text-emerald-600" />
-                                Order Summary
-                            </h2>
+                            <div className="flex justify-between items-center mb-4 sm:mb-6">
+                                <h2 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center">
+                                    <DollarSign className="h-6 w-6 mr-3 text-emerald-600" />
+                                    Order Summary
+                                </h2>
+                                {order.calculationLog && order.calculationLog.length > 0 && (
+                                    <button 
+                                        onClick={() => setShowCalcLogModal(true)}
+                                        className="text-xs font-medium text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-1.5 rounded-lg flex items-center transition-colors"
+                                    >
+                                        <Calculator className="h-4 w-4 mr-1.5" />
+                                        Log
+                                    </button>
+                                )}
+                            </div>
                             <div className="space-y-3 sm:space-y-4">
                                 <div className="flex justify-between items-center py-3 border-b border-slate-100">
                                     <span className="text-slate-600 font-medium">Subtotal</span>
@@ -2052,27 +2066,35 @@ export default function OrderDetailsPage() {
                                             <tr>
                                                 <td style={{ width: '50px', color: '#555', verticalAlign: 'top', paddingBottom: '3px' }}>Name</td>
                                                 <td style={{ fontWeight: 'bold', paddingBottom: '3px', color: '#000' }}>
-                                                    {order.isGuestOrder && order.guestInfo?.name
-                                                        ? order.guestInfo.name
-                                                        : order.orderType === 'manual' && order.manualOrderInfo?.name
-                                                            ? order.manualOrderInfo.name
-                                                            : order.user ? (order.user.name || 'Registered User') : 'Guest User'}
+                                                    {order.shippingAddress?.name 
+                                                        ? order.shippingAddress.name 
+                                                        : order.user?.name 
+                                                            ? order.user.name 
+                                                            : order.guestInfo?.name 
+                                                                ? order.guestInfo.name 
+                                                                : order.manualOrderInfo?.name 
+                                                                    ? order.manualOrderInfo.name 
+                                                                    : 'Guest User'}
                                                 </td>
                                             </tr>
                                             <tr>
                                                 <td style={{ color: '#555', verticalAlign: 'top', paddingBottom: '3px' }}>Phone</td>
                                                 <td style={{ fontWeight: 'bold', paddingBottom: '3px', color: '#000' }}>
-                                                    {order.isGuestOrder && order.guestInfo?.phone
-                                                        ? order.guestInfo.phone
-                                                        : order.orderType === 'manual' && order.manualOrderInfo?.phone
-                                                            ? order.manualOrderInfo.phone
-                                                            : order.user?.phone || 'N/A'}
+                                                    {order.shippingAddress?.phone 
+                                                        ? order.shippingAddress.phone 
+                                                        : order.user?.phone 
+                                                            ? order.user.phone 
+                                                            : order.guestInfo?.phone 
+                                                                ? order.guestInfo.phone 
+                                                                : order.manualOrderInfo?.phone 
+                                                                    ? order.manualOrderInfo.phone 
+                                                                    : 'N/A'}
                                                 </td>
                                             </tr>
                                             <tr>
                                                 <td style={{ color: '#555', verticalAlign: 'top' }}>Address</td>
                                                 <td style={{ fontWeight: 'bold', lineHeight: '1.3', color: '#000' }}>
-                                                    {[order.shippingAddress?.street, order.shippingAddress?.city].filter(Boolean).join(', ')}
+                                                    {[order.shippingAddress?.street, order.shippingAddress?.area, order.shippingAddress?.upazila, order.shippingAddress?.district, order.shippingAddress?.division, order.shippingAddress?.postalCode].filter(Boolean).join(', ') || order.guestInfo?.address || order.manualOrderInfo?.address || 'N/A'}
                                                 </td>
                                             </tr>
                                         </tbody>
@@ -2278,6 +2300,45 @@ export default function OrderDetailsPage() {
                                     {addingToSteadfast ? 'Processing...' : 'Yes, Proceed'}
                                 </button>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Calculation Log Modal */}
+            {showCalcLogModal && order.calculationLog && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-hidden flex flex-col">
+                        <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
+                            <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                                <Calculator className="h-5 w-5 text-emerald-600" />
+                                Discount & Price Log
+                            </h3>
+                            <button onClick={() => setShowCalcLogModal(false)} className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-500 transition-colors">
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-6 overflow-y-auto space-y-4">
+                            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-4">
+                                {order.calculationLog.map((log, idx) => (
+                                    <div key={idx} className={`flex justify-between items-start text-sm ${log.step === 'total' ? 'pt-4 border-t border-slate-300 font-bold mt-2' : ''}`}>
+                                        <div className="flex-1 pr-4">
+                                            <span className={`capitalize ${log.step === 'total' ? 'text-slate-900 text-base' : 'text-slate-700 font-medium'}`}>{log.step.replace('_', ' ')}</span>
+                                            <p className="text-[11.5px] leading-relaxed text-slate-500 mt-1 break-words">{log.description}</p>
+                                        </div>
+                                        <span className={`font-mono font-medium whitespace-nowrap mt-0.5 ${log.amount < 0 ? 'text-red-500' : (log.step === 'total' ? 'text-emerald-600 text-lg' : 'text-slate-900')}`}>
+                                            {log.amount < 0 ? '-' : ''}৳{Math.abs(log.amount)}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="p-4 border-t border-slate-200 bg-slate-50 text-right">
+                            <button 
+                                onClick={() => setShowCalcLogModal(false)}
+                                className="px-5 py-2 bg-white border border-slate-300 rounded-xl text-slate-700 font-medium hover:bg-slate-50 transition-colors"
+                            >
+                                Close
+                            </button>
                         </div>
                     </div>
                 </div>
