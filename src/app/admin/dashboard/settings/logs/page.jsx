@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { getCookie } from 'cookies-next';
 import { settingsAPI } from '@/services/api';
@@ -32,7 +32,7 @@ import { toast } from 'react-hot-toast';
 import { useAppContext } from '@/context/AppContext';
 import PermissionDenied from '@/components/Common/PermissionDenied';
 
-export default function LogsManagementPage() {
+function LogsManagementContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { hasPermission, contextLoading } = useAppContext();
@@ -864,6 +864,14 @@ export default function LogsManagementPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function LogsManagementPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-slate-500">Loading logs...</div>}>
+      <LogsManagementContent />
+    </Suspense>
   );
 }
 

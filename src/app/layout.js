@@ -119,7 +119,9 @@ export default async function RootLayout({ children }) {
           />
         </noscript>
         <AppProvider>
-          <VisitorTracker />
+          <Suspense fallback={null}>
+            <VisitorTracker />
+          </Suspense>
           <Suspense fallback={null}>
             <AffiliateTracker />
           </Suspense>

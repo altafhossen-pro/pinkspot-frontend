@@ -39,7 +39,7 @@ function GoogleAuthSuccessContent() {
             login(user, token);
             toast.success('Google login successful!');
 
-            // Redirect based on role (use setTimeout to ensure state updates complete)
+            // Redirect based on role
             setTimeout(() => {
                 if (role === 'admin') {
                     router.push('/admin/dashboard');
@@ -56,7 +56,7 @@ function GoogleAuthSuccessContent() {
             }, 100);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []); // Empty dependency array - only run once on mount
+    }, []);
 
     return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -82,4 +82,3 @@ export default function GoogleAuthSuccessPage() {
         </Suspense>
     );
 }
-

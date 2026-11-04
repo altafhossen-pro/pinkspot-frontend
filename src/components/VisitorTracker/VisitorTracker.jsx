@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, Suspense } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { io } from 'socket.io-client';
 import { getCookie, setCookie } from 'cookies-next';
@@ -12,7 +12,7 @@ export function getVisitorSocketInstance() {
     return globalSocket;
 }
 
-export default function VisitorTracker() {
+function VisitorTrackerCore() {
     const pathname = usePathname();
     const searchParams = useSearchParams();
     const { cart, cartTotal, user } = useAppContext();
@@ -126,4 +126,12 @@ export default function VisitorTracker() {
     };
 
     return null;
+}
+
+export default function VisitorTracker() {
+    return (
+        <Suspense fallback={null}>
+            <VisitorTrackerCore />
+        </Suspense>
+    );
 }
