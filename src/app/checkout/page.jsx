@@ -7,6 +7,8 @@ import { orderAPI, productAPI, loyaltyAPI, couponAPI, addressAPI, upsellAPI, set
 import toast from 'react-hot-toast';
 import { useRouter } from 'next/navigation';
 import { getCookie, setCookie, deleteCookie } from 'cookies-next';
+import { trackFacebookEvent } from '@/utils/facebookCapi';
+import { identifyVisitorProfile } from '@/utils/visitorTracker';
 
 
 export default function Checkout() {
@@ -146,9 +148,24 @@ export default function Checkout() {
     // Check stock availability when cart changes
     useEffect(() => {
         if (cart.length > 0) {
+            // Trigger Facebook CAPI InitiateCheckout
+            const firstBrand = cart[0]?.brand || cart[0]?.product?.brand || 'ForPink';
+            trackFacebookEvent('InitiateCheckout', {
+                content_ids: cart.map(item => item.slug || item.product?.slug || item._id),
+                contents: cart.map(item => ({
+                    id: item.slug || item.product?.slug || item._id,
+                    quantity: item.quantity || 1,
+                    item_price: item.price || item.currentPrice || 0
+                })),
+                num_items: cart.reduce((sum, item) => sum + (item.quantity || 1), 0),
+                value: cartTotal || 0,
+                currency: 'BDT',
+                brand: firstBrand
+            });
+
             checkStockAvailability();
             calculateUpsellDiscount();
-            
+
             // If cart now has a category discount, remove conflicting benefits
             const hasCatDiscount = cart.some(item => item.categoryDiscountApplied);
             if (hasCatDiscount) {
@@ -708,7 +725,7 @@ export default function Checkout() {
     const hasCategoryDiscount = cart.some(item => item.categoryDiscountApplied);
     const freeShippingThreshold = deliveryChargeSettings?.shippingFreeRequiredAmount || 1500;
     const excludedCategories = excludedCategoriesForFreeShipping;
-    
+
     // Calculate total of products that are eligible to contribute to free shipping threshold
     // (i.e. NOT in excluded categories AND NO category discount applied)
     const eligibleSubtotal = cart.reduce((total, item) => {
@@ -717,7 +734,7 @@ export default function Checkout() {
         if (categoryData) {
             itemCategory = String(typeof categoryData === 'object' ? (categoryData.name || categoryData.slug || '') : categoryData).toLowerCase();
         }
-        
+
         const isExcludedCategory = excludedCategories.includes(itemCategory);
         const hasDiscount = item.categoryDiscountApplied;
 
@@ -727,7 +744,9 @@ export default function Checkout() {
         return total;
     }, 0);
 
-    const isEligibleForFreeShipping = eligibleSubtotal >= freeShippingThreshold;
+    const hasComboFreeDelivery = cart.some(item => item.isComboActive && item.comboDeliveryType === 'free');
+    const customDeliveryItem = cart.find(item => item.isComboActive && item.comboDeliveryType === 'custom' && typeof item.comboCustomDeliveryCharge === 'number');
+    const isEligibleForFreeShipping = (eligibleSubtotal >= freeShippingThreshold) || hasComboFreeDelivery;
 
     // Dynamic delivery charge calculation based on delivery type
     const calculateDeliveryCharge = () => {
@@ -740,6 +759,10 @@ export default function Checkout() {
         };
 
         if (!formData.deliveryType) return 0;
+
+        if (customDeliveryItem) {
+            return customDeliveryItem.comboCustomDeliveryCharge;
+        }
 
         // Check if cart meets all free shipping requirements
         if (isEligibleForFreeShipping) {
@@ -910,10 +933,14 @@ export default function Checkout() {
 
         if (name === 'mobileNumber') {
             let val = value.replace(/\D/g, '');
-            
+
             // Limit to 11 digits
             if (val.length > 11) {
                 val = val.substring(0, 11);
+            }
+
+            if (val.length === 11) {
+                identifyVisitorProfile({ phone: val, fullName: formData.fullName, address: formData.deliveryAddress });
             }
 
             setFormData(prev => ({ ...prev, [name]: val }));
@@ -1142,7 +1169,9 @@ export default function Checkout() {
                                 image: item.image,
                                 price: itemPrice,
                                 quantity: item.quantity,
-                                subtotal: itemPrice * item.quantity,
+                                subtotal: item.total || (itemPrice * item.quantity),
+                                comboId: item.comboId || undefined,
+                                isCombo: !!item.isComboActive,
                                 // Add variant information for admin
                                 variant: {
                                     size: item.size,
@@ -1423,7 +1452,11 @@ export default function Checkout() {
                                                     <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded">Free</span>
                                                 </>
                                             ) : (
-                                                <span>{deliveryChargeSettings ? `${deliveryChargeSettings.insideDhaka} ৳` : '80 ৳'}</span>
+                                                customDeliveryItem ? (
+                                                    <span>{customDeliveryItem.comboCustomDeliveryCharge} ৳ <span className="text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-bold">Combo Rate</span></span>
+                                                ) : (
+                                                    <span>{deliveryChargeSettings ? `${deliveryChargeSettings.insideDhaka} ৳` : '80 ৳'}</span>
+                                                )
                                             )}
                                         </div>
                                     </div>
@@ -1452,7 +1485,11 @@ export default function Checkout() {
                                                     <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded">Free</span>
                                                 </>
                                             ) : (
-                                                <span>{deliveryChargeSettings ? `${deliveryChargeSettings.subDhaka} ৳` : '120 ৳'}</span>
+                                                customDeliveryItem ? (
+                                                    <span>{customDeliveryItem.comboCustomDeliveryCharge} ৳ <span className="text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-bold">Combo Rate</span></span>
+                                                ) : (
+                                                    <span>{deliveryChargeSettings ? `${deliveryChargeSettings.subDhaka} ৳` : '120 ৳'}</span>
+                                                )
                                             )}
                                         </div>
                                     </div>
@@ -1481,7 +1518,11 @@ export default function Checkout() {
                                                     <span className="bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded">Free</span>
                                                 </>
                                             ) : (
-                                                <span>{deliveryChargeSettings ? `${deliveryChargeSettings.outsideDhaka} ৳` : '150 ৳'}</span>
+                                                customDeliveryItem ? (
+                                                    <span>{customDeliveryItem.comboCustomDeliveryCharge} ৳ <span className="text-[10px] bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded font-bold">Combo Rate</span></span>
+                                                ) : (
+                                                    <span>{deliveryChargeSettings ? `${deliveryChargeSettings.outsideDhaka} ৳` : '150 ৳'}</span>
+                                                )
                                             )}
                                         </div>
                                     </div>
@@ -1796,6 +1837,19 @@ export default function Checkout() {
 
                                                 <div className="flex-1 min-w-0">
                                                     <h3 className="font-medium text-gray-900 text-sm truncate">{item.name}</h3>
+                                                    {item.comboId && (
+                                                        <div className="my-1">
+                                                            {item.isComboActive ? (
+                                                                <span className="inline-flex items-center text-[10px] font-semibold text-pink-700 bg-pink-50 px-2 py-0.5 rounded border border-pink-200">
+                                                                    {item.comboStatusText || 'Combo discount applied'}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-flex items-center text-[10px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                                                    Combo broken: regular price applied
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    )}
                                                     {isOutOfStock && (
                                                         <div className="text-xs text-red-600 font-medium mb-1">
                                                             {stockData[item.id]?.reason === 'Insufficient stock'
@@ -1822,7 +1876,12 @@ export default function Checkout() {
                                                             ></div>
                                                         </div>
                                                     )}
-                                                    <p className="text-xs text-gray-600">Price: {item.price} ৳</p>
+                                                    <p className="text-xs text-gray-600">
+                                                        Price: <span className="font-semibold text-gray-900">{item.price} ৳</span>
+                                                        {item.isComboActive && item.regularPrice && item.regularPrice > item.price && (
+                                                            <span className="text-gray-400 line-through text-[11px] ml-1.5">{item.regularPrice} ৳</span>
+                                                        )}
+                                                    </p>
                                                 </div>
                                             </div>
 
@@ -1888,11 +1947,11 @@ export default function Checkout() {
                                     <div className="flex items-center space-x-2">
                                         <AlertTriangle className="h-3 w-3 text-yellow-600" />
                                         <span className="text-xs text-yellow-800">
-                                            {hasCategoryDiscount 
+                                            {hasCategoryDiscount
                                                 ? 'Coupons cannot be used with category-discounted products.'
                                                 : isGuestCheckout
-                                                ? 'Coupon feature is available for registered users only'
-                                                : 'Coupon cannot be used when paying with loyalty points'
+                                                    ? 'Coupon feature is available for registered users only'
+                                                    : 'Coupon cannot be used when paying with loyalty points'
                                             }
                                         </span>
                                     </div>
@@ -2090,7 +2149,7 @@ export default function Checkout() {
                     </div>
                 </div>
             </div>
-            
+
             {/* Block Modal */}
             {blockMessage && (
                 <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">

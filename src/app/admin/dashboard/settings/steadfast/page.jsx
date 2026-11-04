@@ -11,7 +11,8 @@ import {
   AlertCircle,
   Settings as SettingsIcon,
   Key,
-  Lock
+  Lock,
+  FileText
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { useAppContext } from '@/context/AppContext';
@@ -148,7 +149,17 @@ export default function SteadfastSettingsPage() {
             </div>
             <h1 className="text-3xl font-bold text-gray-900">Steadfast Configuration</h1>
           </div>
-          <p className="text-gray-600">Configure Steadfast Courier API credentials for order integration</p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-2">
+            <p className="text-gray-600">Configure Steadfast Courier API credentials for order integration</p>
+            <button
+              type="button"
+              onClick={() => router.push('/admin/dashboard/settings/logs?tab=steadfast')}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 rounded-lg font-medium text-xs transition-colors cursor-pointer self-start sm:self-auto"
+            >
+              <FileText className="w-3.5 h-3.5 text-orange-600" />
+              <span>View Steadfast Error Logs</span>
+            </button>
+          </div>
         </div>
 
         {/* Settings Card */}

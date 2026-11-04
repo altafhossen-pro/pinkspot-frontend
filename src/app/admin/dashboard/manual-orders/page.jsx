@@ -2,10 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { Plus, Minus, Search, User, UserPlus, ShoppingCart, Package, Trash2, Save, AlertTriangle, X, RefreshCw } from 'lucide-react';
-import { userAPI, productAPI, orderAPI } from '@/services/api';
+import { userAPI, productAPI, orderAPI, settingsAPI } from '@/services/api';
 import { toast } from 'react-hot-toast';
 import { getCookie } from 'cookies-next';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAppContext } from '@/context/AppContext';
 import PermissionDenied from '@/components/Common/PermissionDenied';
 
@@ -23,6 +24,26 @@ export default function ManualOrderCreation() {
     // Form states
     const [orderType, setOrderType] = useState('guest'); // 'existing' or 'guest'
     const [orderSource, setOrderSource] = useState('facebook'); // default to facebook
+    const [systemBrands, setSystemBrands] = useState([]);
+    const [selectedBrand, setSelectedBrand] = useState('ForPink');
+
+    // Fetch system brands and pre-select default brand
+    useEffect(() => {
+        const loadBrands = async () => {
+            try {
+                const res = await settingsAPI.getSystemBrands();
+                if (res.success && res.data) {
+                    const list = res.data.systemBrands || [];
+                    setSystemBrands(list);
+                    const def = res.data.defaultBrand || list.find(b => b.isDefault)?.name || list[0]?.name || 'ForPink';
+                    setSelectedBrand(def);
+                }
+            } catch (err) {
+                console.error('Failed to load brands for manual order:', err);
+            }
+        };
+        loadBrands();
+    }, []);
     const [isDraftMode, setIsDraftMode] = useState(false);
 
     // Unified Customer State
@@ -714,6 +735,7 @@ export default function ManualOrderCreation() {
                 overrideBlock: customerInfo.isBlocked === true,
                 orderType: orderType,
                 orderSource: orderSource,
+                brand: selectedBrand,
                 isDraftMode: isDraftMode,
                 items: orderItems.map(item => ({
                     productId: item.productId,
@@ -765,6 +787,8 @@ export default function ManualOrderCreation() {
                 setCustomerInfo({ name: '', phone: '', email: '', address: '', userId: null });
                 setOrderNotes('');
                 setIsDraftMode(false);
+                const defaultB = systemBrands.find(b => b.isDefault)?.name || systemBrands[0]?.name || 'ForPink';
+                setSelectedBrand(defaultB);
                 setDiscountAmount(0);
                 setDeliveryCharge(null);
                 setDeliveryAddress('');
@@ -1258,7 +1282,66 @@ export default function ManualOrderCreation() {
                         </div>
                     </div>
 
-                    {/* Order Source */}
+                    {/* Order Source and Brand */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-5">
+                        {/* Order Source */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">
+                                Order Source <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                                value={orderSource}
+                                onChange={(e) => setOrderSource(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                required
+                            >
+                                <option value="">Select order source</option>
+                                <option value="website">Website</option>
+                                <option value="facebook">Facebook</option>
+                                <option value="whatsapp">WhatsApp</option>
+                                <option value="phone">Phone Call</option>
+                                <option value="email">Email</option>
+                                <option value="walk-in">Walk-in</option>
+                                <option value="instagram">Instagram</option>
+                                <option value="manual">Manual</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+
+                        {/* Brand Name */}
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="block text-sm font-medium text-gray-700">
+                                    Brand <span className="text-red-500">*</span>
+                                </label>
+                                <Link
+                                    href="/admin/dashboard/settings/brands"
+                                    target="_blank"
+                                    className="text-[11px] text-blue-600 hover:text-blue-800 underline"
+                                    title="Manage brands in settings"
+                                >
+                                    Settings
+                                </Link>
+                            </div>
+                            <select
+                                value={selectedBrand}
+                                onChange={(e) => setSelectedBrand(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white font-medium"
+                                required
+                            >
+                                {systemBrands.length === 0 ? (
+                                    <option value="ForPink">ForPink (Default)</option>
+                                ) : (
+                                    systemBrands.filter(b => b.isActive !== false).map((b) => (
+                                        <option key={b.name} value={b.name}>
+                                            {b.name} {b.isDefault ? '★ (Default)' : ''}
+                                        </option>
+                                    ))
+                                )}
+                            </select>
+                        </div>
+                    </div>
+                    {false && (
                     <div className="mb-5">
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                             Order Source <span className="text-red-500">*</span>
@@ -1281,6 +1364,8 @@ export default function ManualOrderCreation() {
                             <option value="other">Other</option>
                         </select>
                     </div>
+
+                    )}
 
                     {/* Unified Customer Search */}
                     <div className="mb-6">

@@ -47,12 +47,14 @@ export default function AdminOrdersPage() {
     const [settings, setSettings] = useState(null);
     const [showColorModal, setShowColorModal] = useState(false);
     const [orderSourceColors, setOrderSourceColors] = useState({});
+    const [systemBrands, setSystemBrands] = useState([]);
     const [ordersPresence, setOrdersPresence] = useState({}); // orderId -> Array of active viewers
 
     // Filter states
     const [filters, setFilters] = useState({
         search: '', // Unified search for orderId, email, phone
         status: 'all',
+        brand: 'all',
         startDate: '', // Date range start
         endDate: '', // Date range end
         orderSource: 'all', // Order source filter
@@ -91,6 +93,9 @@ export default function AdminOrdersPage() {
                 setSettings(data.data);
                 if (data.data.orderSourceColors) {
                     setOrderSourceColors(data.data.orderSourceColors);
+                }
+                if (data.data.systemBrands) {
+                    setSystemBrands(data.data.systemBrands);
                 }
             }
         } catch (error) {
@@ -139,7 +144,7 @@ export default function AdminOrdersPage() {
         }, 500); // 500ms debounce
 
         return () => clearTimeout(timeoutId);
-    }, [filters.search, filters.status, filters.startDate, filters.endDate, filters.orderSource, pagination.currentPage, pagination.itemsPerPage, contextLoading, hasPermission]);
+    }, [filters.search, filters.status, filters.brand, filters.startDate, filters.endDate, filters.orderSource, pagination.currentPage, pagination.itemsPerPage, contextLoading, hasPermission]);
 
     const fetchOrders = async () => {
         try {
@@ -155,6 +160,11 @@ export default function AdminOrdersPage() {
             // Add status filter if not 'all'
             if (filters.status && filters.status !== 'all') {
                 params.append('status', filters.status);
+            }
+
+            // Add brand filter if not 'all'
+            if (filters.brand && filters.brand !== 'all') {
+                params.append('brand', filters.brand);
             }
 
             // Add order source filter if not 'all'
@@ -237,7 +247,7 @@ export default function AdminOrdersPage() {
         }));
 
         // If status or orderSource filter changes, reset to page 1 and refetch
-        if (key === 'status' || key === 'orderSource' || key === 'dateRange') {
+        if (key === 'status' || key === 'orderSource' || key === 'brand' || key === 'dateRange') {
             setPagination(prev => ({
                 ...prev,
                 currentPage: 1
@@ -303,6 +313,7 @@ export default function AdminOrdersPage() {
         setFilters({
             search: '',
             status: 'all',
+        brand: 'all',
             startDate: '',
             endDate: '',
             orderSource: 'all',
@@ -1025,7 +1036,7 @@ export default function AdminOrdersPage() {
 
                 {/* Filters */}
                 <div className="px-6 py-4 border-b border-gray-200 bg-gray-50">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
                         {/* Unified Search Filter */}
                         <div className="lg:col-span-1">
                             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1063,6 +1074,26 @@ export default function AdminOrdersPage() {
                                 <option value="instagram">Instagram</option>
                                 <option value="manual">Manual</option>
                                 <option value="other">Other</option>
+                            </select>
+                        </div>
+
+                        {/* Brand Filter */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Brand
+                            </label>
+                            <select
+                                value={filters.brand || 'all'}
+                                onChange={(e) => handleFilterChange('brand', e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                            >
+                                <option value="all">All Brands</option>
+                                {systemBrands.map((b) => (
+                                    <option key={b.name} value={b.name}>
+                                        {b.name} {b.isDefault ? '(Default)' : ''}
+                                    </option>
+                                ))}
+                                <option value="none">No Brand / Unassigned</option>
                             </select>
                         </div>
 
@@ -1366,6 +1397,13 @@ export default function AdminOrdersPage() {
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                                                 {getOrderSourceLabel(order.orderSource)}
+                                            </span>
+                                            {order.brand && (
+                                                <span className="block mt-1 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded w-fit">
+                                                    {order.brand}
+                                                </span>
+                                            )}
+                                            <span className="hidden">
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">

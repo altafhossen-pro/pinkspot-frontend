@@ -2,325 +2,449 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Plus, Edit, Trash2, Eye, Search, Filter, MoreVertical, Link2, Package, Users, ExternalLink } from 'lucide-react';
-import { upsellAPI, productAPI } from '@/services/api';
+import { useRouter } from 'next/navigation';
+import { 
+  Plus, 
+  Edit, 
+  Trash2, 
+  ExternalLink, 
+  Search, 
+  Layers, 
+  Tag, 
+  Eye, 
+  CheckCircle2, 
+  XCircle,
+  RefreshCw,
+  Package
+} from 'lucide-react';
+import { comboAPI } from '@/services/api';
 import toast from 'react-hot-toast';
 import { getCookie } from 'cookies-next';
 import DeleteConfirmationModal from '@/components/Common/DeleteConfirmationModal';
-import UpsellDetailsModal from '@/components/Admin/UpsellDetailsModal';
 
-export default function UpsellsPage() {
-    const [products, setProducts] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
-    const [productToDelete, setProductToDelete] = useState(null);
-    const [deleting, setDeleting] = useState(false);
-    const [showDetailsModal, setShowDetailsModal] = useState(false);
-    const [selectedProduct, setSelectedProduct] = useState(null);
-    const [pagination, setPagination] = useState({
-        total: 0,
-        page: 1,
-        limit: 10,
-        totalPages: 0
-    });
+export default function CombosAdminPage() {
+  const router = useRouter();
+  const [combos, setCombos] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [comboToDelete, setComboToDelete] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    limit: 10,
+    totalPages: 0,
+  });
 
-    // Get admin token
-    const getAdminToken = () => {
-        return getCookie('token');
-    };
+  const getAdminToken = () => getCookie('token');
 
-    // Fetch products with upsell count
-    const fetchProducts = async (page = 1) => {
-        try {
-            setLoading(true);
-            const params = new URLSearchParams({
-                page: page.toString(),
-                limit: '10'
-            });
+  const fetchCombos = async (page = 1) => {
+    try {
+      setLoading(true);
+      const token = getAdminToken();
+      const params = new URLSearchParams({
+        page: page.toString(),
+        limit: '10',
+      });
 
-            // Add search query if provided
-            if (searchQuery.trim()) {
-                params.append('search', searchQuery.trim());
-            }
+      if (searchQuery.trim()) {
+        params.append('search', searchQuery.trim());
+      }
+      if (statusFilter) {
+        params.append('status', statusFilter);
+      }
 
+      const response = await comboAPI.getAllCombos(params.toString(), token);
 
-            const token = getAdminToken();
-            const response = await productAPI.getProducts(params.toString(), token);
-            
-            if (response.success) {
-                // Get upsell count for each product using Promise.allSettled for better error handling
-                // This handles 404 (no upsells found) gracefully without treating them as errors
-                const productsWithUpsellCount = await Promise.allSettled(
-                    response.data.map(async (product) => {
-                        try {
-                            const upsellResponse = await upsellAPI.getUpsellsByMainProduct(product._id, token);
-                            
-                            // Handle both success and 404 responses
-                            if (upsellResponse.success && upsellResponse.data) {
-                                return {
-                                    ...product,
-                                    upsellCount: upsellResponse.data.linkedProducts?.length || 0
-                                };
-                            } else {
-                                // 404 or no upsells found - this is normal, not an error
-                                return {
-                                    ...product,
-                                    upsellCount: 0
-                                };
-                            }
-                        } catch (error) {
-                            // Network errors or other issues - default to 0
-                            // 404 errors from API are caught here too
-                            const is404 = error?.status === 404 || 
-                                         error?.response?.status === 404 ||
-                                         error?.message?.toLowerCase().includes('no upsells found');
-                            
-                            if (!is404) {
-                                // Only log non-404 errors
-                                console.warn(`Error fetching upsell for product ${product._id}:`, error.message);
-                            }
-                            
-                            return {
-                                ...product,
-                                upsellCount: 0
-                            };
-                        }
-                    })
-                );
-                
-                // Extract values from Promise.allSettled results
-                const finalProducts = productsWithUpsellCount.map((result) => {
-                    if (result.status === 'fulfilled') {
-                        return result.value;
-                    } else {
-                        // This shouldn't happen due to our try-catch, but handle it anyway
-                        const product = response.data.find(p => p._id === result.reason?.productId) || response.data[productsWithUpsellCount.indexOf(result)];
-                        return {
-                            ...product,
-                            upsellCount: 0
-                        };
-                    }
-                });
-                
-                setProducts(finalProducts);
-                setPagination(response.pagination);
-            } else {
-                toast.error(response.message || 'Failed to fetch products');
-            }
-        } catch (error) {
-            console.error('Error fetching products:', error);
-            toast.error('Failed to fetch products');
-        } finally {
-            setLoading(false);
+      if (response.success) {
+        setCombos(response.data || []);
+        if (response.pagination) {
+          setPagination(response.pagination);
         }
-    };
+      } else {
+        toast.error(response.message || 'Failed to fetch combos');
+      }
+    } catch (error) {
+      console.error('Error fetching combos:', error);
+      toast.error('Failed to load combos');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    // Handle view upsell details
-    const handleViewUpsellDetails = (product) => {
-        setSelectedProduct(product);
-        setShowDetailsModal(true);
-    };
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchCombos(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, statusFilter]);
 
-    // Handle modal close
-    const handleModalClose = () => {
-        setShowDetailsModal(false);
-        setSelectedProduct(null);
-        // Refresh the table data when modal is closed
-        fetchProducts(pagination.page);
-    };
+  const handleToggleStatus = async (comboId, currentActive) => {
+    try {
+      const token = getAdminToken();
+      const response = await comboAPI.toggleComboStatus(comboId, token);
+      if (response.success) {
+        toast.success(response.message || 'Status updated');
+        setCombos(prev =>
+          prev.map(c => (c._id === comboId ? { ...c, isActive: !currentActive } : c))
+        );
+      } else {
+        toast.error(response.message || 'Failed to update status');
+      }
+    } catch (error) {
+      console.error('Error toggling status:', error);
+      toast.error('Failed to toggle status');
+    }
+  };
 
-    // Handle successful upsell update (not used anymore)
-    const handleUpsellUpdated = () => {
-        // This function is kept for compatibility but not called
-    };
+  const openDeleteModal = (combo) => {
+    setComboToDelete(combo);
+    setShowDeleteModal(true);
+  };
 
-    // Handle search
-    const handleSearch = (e) => {
-        setSearchQuery(e.target.value);
-    };
+  const handleDeleteConfirm = async () => {
+    if (!comboToDelete) return;
+    try {
+      setDeleting(true);
+      const token = getAdminToken();
+      const response = await comboAPI.deleteCombo(comboToDelete._id, token);
 
-    // Debounced search effect
-    useEffect(() => {
-        const timeoutId = setTimeout(() => {
-            fetchProducts(1);
-        }, 500);
+      if (response.success) {
+        toast.success('Combo deleted successfully');
+        setShowDeleteModal(false);
+        setComboToDelete(null);
+        fetchCombos(pagination.page);
+      } else {
+        toast.error(response.message || 'Failed to delete combo');
+      }
+    } catch (error) {
+      console.error('Error deleting combo:', error);
+      toast.error('Failed to delete combo');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
-        return () => clearTimeout(timeoutId);
-    }, [searchQuery]);
-
-
-    // Handle page change
-    const handlePageChange = (newPage) => {
-        fetchProducts(newPage);
-    };
-
-    useEffect(() => {
-        fetchProducts();
-    }, []);
-
-    return (
-        <div className="p-6">
-            {/* Header */}
-            <div className="mb-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900 mb-2">Product Upsells</h1>
-                        <p className="text-gray-600">Manage upsell relationships for your products</p>
-                    </div>
-                </div>
+  return (
+    <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-6">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 bg-pink-100 rounded-xl">
+              <Layers className="h-6 w-6 text-pink-600" />
             </div>
-
-            {/* Search */}
-            <div className="mb-6">
-                <div className="relative max-w-md">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                    <input
-                        type="text"
-                        placeholder="Search products..."
-                        value={searchQuery}
-                        onChange={handleSearch}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-pink-500 focus:border-transparent"
-                    />
-                </div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Combo Products</h1>
+              <p className="text-xs sm:text-sm text-slate-500">
+                Create bundled packages where customers get curated sets with special discounts
+              </p>
             </div>
-
-            {/* Table */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-                {loading ? (
-                    <div className="p-8 text-center">
-                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-pink-500 mx-auto"></div>
-                        <p className="mt-2 text-gray-500">Loading products...</p>
-                    </div>
-                ) : products.length === 0 ? (
-                    <div className="p-8 text-center">
-                        <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No products found</h3>
-                        <p className="text-gray-500">No products available to manage upsells.</p>
-                    </div>
-                ) : (
-                    <div className="overflow-x-auto">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                                <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Product
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Upsell Count
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Status
-                                    </th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Price
-                                    </th>
-                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                                {products.map((product) => (
-                                    <tr key={product._id} className="hover:bg-gray-50">
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <div className="flex items-center">
-                                                <div className="flex-shrink-0 h-10 w-10">
-                                                    <img
-                                                        className="h-10 w-10 rounded-lg object-cover"
-                                                        src={product.featuredImage || '/images/placeholder.png'}
-                                                        alt={product.title}
-                                                    />
-                                                </div>
-                                                <div className="ml-4">
-                                                    <div className="text-sm font-medium text-gray-900">
-                                                        {product.title}
-                                                    </div>
-                                                    <div className="text-sm text-gray-500">
-                                                        {product.slug}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="flex items-center">
-                                                <Link2 className="w-4 h-4 text-gray-400 mr-2" />
-                                                <span className="text-sm text-gray-900">
-                                                    {product.upsellCount || 0} linked products
-                                                </span>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap">
-                                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                                                product.isActive
-                                                    ? 'bg-green-100 text-green-800'
-                                                    : 'bg-red-100 text-red-800'
-                                            }`}>
-                                                {product.isActive ? 'Active' : 'Inactive'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                            ৳{product.priceRange?.min || 0}
-                                            {product.priceRange?.max && product.priceRange.max !== product.priceRange.min && 
-                                                ` - ৳${product.priceRange.max}`
-                                            }
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                            <div className="flex items-center justify-end space-x-2">
-                                                <button
-                                                    onClick={() => handleViewUpsellDetails(product)}
-                                                    className="text-pink-600 hover:text-pink-900 p-1"
-                                                    title="View Upsell Details"
-                                                >
-                                                    <ExternalLink className="w-4 h-4" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
-            </div>
-
-            {/* Pagination */}
-            {pagination.totalPages > 1 && (
-                <div className="mt-6 flex items-center justify-between">
-                    <div className="text-sm text-gray-700">
-                        Showing {((pagination.page - 1) * pagination.limit) + 1} to {Math.min(pagination.page * pagination.limit, pagination.total)} of {pagination.total} results
-                    </div>
-                    <div className="flex space-x-2">
-                        <button
-                            onClick={() => handlePageChange(pagination.page - 1)}
-                            disabled={pagination.page === 1}
-                            className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            Previous
-                        </button>
-                        <span className="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-md">
-                            {pagination.page} of {pagination.totalPages}
-                        </span>
-                        <button
-                            onClick={() => handlePageChange(pagination.page + 1)}
-                            disabled={pagination.page === pagination.totalPages}
-                            className="px-3 py-2 text-sm font-medium text-gray-500 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            Next
-                        </button>
-                    </div>
-                </div>
-            )}
-
-            {/* Upsell Details Modal */}
-            {showDetailsModal && selectedProduct && (
-                <UpsellDetailsModal
-                    isOpen={showDetailsModal}
-                    onClose={handleModalClose}
-                    product={selectedProduct}
-                    onSuccess={handleUpsellUpdated}
-                />
-            )}
+          </div>
         </div>
-    );
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => fetchCombos(pagination.page)}
+            className="p-2.5 text-slate-600 hover:text-slate-900 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-colors shadow-xs cursor-pointer"
+            title="Refresh"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-pink-600' : ''}`} />
+          </button>
+          <Link
+            href="/admin/dashboard/upsells/create"
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-pink-600 hover:bg-pink-700 text-white rounded-xl font-semibold text-sm shadow-sm transition-all active:scale-98 cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Create New Combo</span>
+          </Link>
+        </div>
+      </div>
+
+      {/* Filter and Search Bar */}
+      <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div className="relative w-full sm:w-80">
+          <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search combos by title or slug..."
+            className="w-full pl-10 pr-4 py-2 text-sm border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:ring-2 focus:ring-pink-500 focus:border-pink-500 transition-all"
+          />
+        </div>
+
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full sm:w-auto px-3.5 py-2 text-xs md:text-sm border border-slate-200 rounded-xl bg-slate-50 text-slate-700 font-medium focus:ring-2 focus:ring-pink-500 cursor-pointer"
+          >
+            <option value="">All Statuses</option>
+            <option value="published">Published</option>
+            <option value="draft">Draft</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Combos Table */}
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-slate-50/80 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                <th className="py-3.5 px-4">Combo</th>
+                <th className="py-3.5 px-4">Included Products</th>
+                <th className="py-3.5 px-4">Pricing & Discount</th>
+                <th className="py-3.5 px-4">Status</th>
+                <th className="py-3.5 px-4 text-center">Active</th>
+                <th className="py-3.5 px-4 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-sm">
+              {loading ? (
+                <tr>
+                  <td colSpan="6" className="py-16 text-center text-slate-400">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <RefreshCw className="w-6 h-6 animate-spin text-pink-600" />
+                      <span>Loading combo products...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : combos.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="py-16 text-center text-slate-400">
+                    <div className="flex flex-col items-center justify-center gap-3 max-w-sm mx-auto">
+                      <div className="w-14 h-14 bg-pink-50 rounded-full flex items-center justify-center">
+                        <Package className="w-7 h-7 text-pink-500" />
+                      </div>
+                      <h3 className="font-semibold text-slate-800 text-base">No Combos Found</h3>
+                      <p className="text-xs text-slate-500 text-center">
+                        {searchQuery
+                          ? `No combos matched "${searchQuery}". Try different keywords.`
+                          : 'You haven’t created any combo deals yet. Start bundling products to boost sales!'}
+                      </p>
+                      <Link
+                        href="/admin/dashboard/upsells/create"
+                        className="mt-2 inline-flex items-center gap-1.5 px-4 py-2 bg-pink-600 text-white rounded-xl text-xs font-semibold hover:bg-pink-700 transition-colors shadow-xs"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>Create First Combo</span>
+                      </Link>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                combos.map((combo) => {
+                  const productsCount = combo.products?.length || 0;
+                  const discountSavings = Math.max(0, (combo.defaultTotalPrice || 0) - (combo.comboPrice || 0));
+                  const percentSavings = combo.defaultTotalPrice > 0
+                    ? Math.round((discountSavings / combo.defaultTotalPrice) * 100)
+                    : 0;
+
+                  return (
+                    <tr key={combo._id} className="hover:bg-slate-50/60 transition-colors">
+                      {/* Combo Info */}
+                      <td className="py-3.5 px-4">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={combo.featuredImage || '/images/placeholder.png'}
+                            alt={combo.title}
+                            className="w-14 h-14 object-cover rounded-xl border border-slate-200 shadow-xs shrink-0 bg-slate-100"
+                            onError={(e) => {
+                              e.currentTarget.src = 'https://images.unsplash.com/photo-1523381210434-271e8be1f52b?w=200&auto=format&fit=crop&q=60';
+                            }}
+                          />
+                          <div className="space-y-0.5">
+                            <p className="font-bold text-slate-900 line-clamp-1 hover:text-pink-600 transition-colors">
+                              {combo.title}
+                            </p>
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-mono text-xs text-slate-500">
+                                /combo/{combo.slug}
+                              </span>
+                              <a
+                                href={`/combo/${combo.slug}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-pink-600 hover:text-pink-700"
+                                title="Open public view"
+                              >
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Included Products */}
+                      <td className="py-3.5 px-4">
+                        <div className="space-y-1.5">
+                          <div className="flex items-center -space-x-2">
+                            {combo.products?.slice(0, 4).map((item, idx) => (
+                              <img
+                                key={idx}
+                                src={item.product?.featuredImage || '/images/placeholder.png'}
+                                alt={item.product?.title || 'Product'}
+                                title={item.product?.title || 'Product'}
+                                className="w-8 h-8 rounded-full border-2 border-white object-cover bg-slate-100 shadow-xs"
+                                onError={(e) => {
+                                  e.currentTarget.src = 'https://images.unsplash.com/photo-1521572267360-ee0c2909d518?w=100&auto=format&fit=crop&q=60';
+                                }}
+                              />
+                            ))}
+                            {productsCount > 4 && (
+                              <span className="w-8 h-8 rounded-full bg-slate-200 border-2 border-white flex items-center justify-center text-[10px] font-bold text-slate-600">
+                                +{productsCount - 4}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-500 font-medium">
+                            {productsCount} product{productsCount === 1 ? '' : 's'} assigned
+                          </p>
+                        </div>
+                      </td>
+
+                      {/* Pricing */}
+                      <td className="py-3.5 px-4">
+                        <div className="space-y-1">
+                          <div className="flex items-baseline gap-2">
+                            <span className="font-bold text-slate-900 text-base">
+                              ৳{combo.comboPrice?.toLocaleString() || 0}
+                            </span>
+                            {(combo.defaultTotalPrice > combo.comboPrice || combo.oldPrice > combo.comboPrice) && (
+                              <span className="text-xs text-slate-400 line-through">
+                                ৳{(combo.oldPrice || combo.defaultTotalPrice)?.toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+
+                          {discountSavings > 0 ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-700">
+                              <Tag className="w-3 h-3" />
+                              Save ৳{discountSavings} ({percentSavings}% OFF)
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-slate-400">Regular total</span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Status */}
+                      <td className="py-3.5 px-4">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${
+                            combo.status === 'published'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          }`}
+                        >
+                          {combo.status}
+                        </span>
+                      </td>
+
+                      {/* Active Toggle */}
+                      <td className="py-3.5 px-4 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleStatus(combo._id, combo.isActive)}
+                          className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                            combo.isActive ? 'bg-pink-600' : 'bg-slate-200'
+                          }`}
+                          title={combo.isActive ? 'Deactivate' : 'Activate'}
+                        >
+                          <span
+                            className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
+                              combo.isActive ? 'translate-x-5' : 'translate-x-0'
+                            }`}
+                          />
+                        </button>
+                      </td>
+
+                      {/* Actions */}
+                      <td className="py-3.5 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <a
+                            href={`/combo/${combo.slug}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                            title="View Public Page"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </a>
+
+                          <Link
+                            href={`/admin/dashboard/upsells/edit/${combo._id}`}
+                            className="p-1.5 text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                            title="Edit Combo"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </Link>
+
+                          <button
+                            type="button"
+                            onClick={() => openDeleteModal(combo)}
+                            className="p-1.5 text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            title="Delete Combo"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        {pagination.totalPages > 1 && (
+          <div className="p-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-600 bg-slate-50/50">
+            <span>
+              Showing {combos.length} of {pagination.total} combos
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={pagination.page <= 1}
+                onClick={() => fetchCombos(pagination.page - 1)}
+                className="px-3 py-1.5 border border-slate-200 rounded-lg bg-white disabled:opacity-40 hover:bg-slate-50 transition-colors cursor-pointer disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="font-semibold text-slate-800">
+                {pagination.page} / {pagination.totalPages}
+              </span>
+              <button
+                disabled={pagination.page >= pagination.totalPages}
+                onClick={() => fetchCombos(pagination.page + 1)}
+                className="px-3 py-1.5 border border-slate-200 rounded-lg bg-white disabled:opacity-40 hover:bg-slate-50 transition-colors cursor-pointer disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && comboToDelete && (
+        <DeleteConfirmationModal
+          isOpen={showDeleteModal}
+          onClose={() => {
+            setShowDeleteModal(false);
+            setComboToDelete(null);
+          }}
+          onConfirm={handleDeleteConfirm}
+          title="Delete Combo"
+          message={`Are you sure you want to delete "${comboToDelete.title}"? This combo offer will be permanently removed.`}
+          loading={deleting}
+        />
+      )}
+    </div>
+  );
 }

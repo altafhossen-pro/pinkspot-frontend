@@ -37,7 +37,10 @@ import {
     KeyRound,
     Printer,
     Presentation,
-    Archive
+    Archive,
+    Share2,
+    Activity,
+    Footprints
 } from 'lucide-react'
 
 const navigation = [
@@ -104,7 +107,7 @@ const navigation = [
         type: 'group',
         children: [
             { name: 'Coupons', href: '/admin/dashboard/coupons', icon: Ticket },
-            { name: 'Upsells', href: '/admin/dashboard/upsells', icon: Link2 },
+            { name: 'Combo Products', href: '/admin/dashboard/upsells', icon: Link2 },
             { name: 'Own Products Ads', href: '/admin/dashboard/own-ads', icon: Presentation },
             { name: 'Category Discount', href: '/admin/dashboard/category-discount', icon: Tag },
         ]
@@ -139,6 +142,8 @@ const navigation = [
         icon: BarChart3,
         type: 'group',
         children: [
+            { name: 'Live Shoppers', href: '/admin/dashboard/analytics/live-shoppers', icon: Activity },
+            { name: 'Visitor Footprint', href: '/admin/dashboard/analytics/visitor-footprint', icon: Footprints },
             { name: 'Sales Analytics', href: '/admin/dashboard/analytics/sales-analytics', icon: TrendingUp },
         ]
     }
@@ -147,7 +152,6 @@ const navigation = [
 export default function AdminSidebar({ onMobileMenuClose }) {
     const pathname = usePathname()
     const isChildActive = (child) => {
-        // Exact match for specific routes
         if (child.href === '/admin/dashboard/products') {
             return pathname === '/admin/dashboard/products' || pathname === '/admin/dashboard/products/'
         }
@@ -166,8 +170,11 @@ export default function AdminSidebar({ onMobileMenuClose }) {
         if (child.href === '/admin/dashboard/categories') {
             return pathname === '/admin/dashboard/categories' || pathname === '/admin/dashboard/categories/'
         }
+        if (child.href === '/admin/dashboard/settings/facebook-capi') {
+            return pathname === '/admin/dashboard/settings/facebook-capi' || pathname.startsWith('/admin/dashboard/settings/facebook-capi/')
+        }
         if (child.href === '/admin/dashboard/settings') {
-            return pathname === '/admin/dashboard/settings' || pathname.startsWith('/admin/dashboard/settings/')
+            return pathname === '/admin/dashboard/settings' || pathname === '/admin/dashboard/settings/'
         }
         if (child.href === '/admin/dashboard/settings/roles') {
             return pathname === '/admin/dashboard/settings/roles' || pathname.startsWith('/admin/dashboard/settings/roles/')
@@ -187,55 +194,14 @@ export default function AdminSidebar({ onMobileMenuClose }) {
         if (child.href === '/admin/dashboard/analytics/sales-analytics') {
             return pathname === '/admin/dashboard/analytics/sales-analytics' || pathname.startsWith('/admin/dashboard/analytics/sales-analytics/')
         }
-        // For other routes, use exact match or startsWith for sub-routes
         return pathname === child.href || pathname.startsWith(child.href + '/')
     }
 
     const [expandedItems, setExpandedItems] = useState(() => {
-        // Auto-expand groups that contain the current active page
         const initialExpanded = {}
         navigation.forEach(item => {
             if (item.type === 'group' && item.children) {
-                const hasActiveChild = item.children.some(child => {
-                    // Use the same logic as isChildActive function
-                    if (child.href === '/admin/dashboard/products') {
-                        return pathname === '/admin/dashboard/products' || pathname === '/admin/dashboard/products/'
-                    }
-                    if (child.href === '/admin/dashboard/products/create') {
-                        return pathname === '/admin/dashboard/products/create'
-                    }
-                    if (child.href === '/admin/dashboard/orders') {
-                        return pathname === '/admin/dashboard/orders' || pathname === '/admin/dashboard/orders/'
-                    }
-                    if (child.href === '/admin/dashboard/customers') {
-                        return pathname === '/admin/dashboard/customers' || pathname === '/admin/dashboard/customers/'
-                    }
-                    if (child.href === '/admin/dashboard/categories') {
-                        return pathname === '/admin/dashboard/categories' || pathname === '/admin/dashboard/categories/'
-                    }
-                    if (child.href === '/admin/dashboard/settings') {
-                        return pathname === '/admin/dashboard/settings' || pathname.startsWith('/admin/dashboard/settings/')
-                    }
-                    if (child.href === '/admin/dashboard/settings/roles') {
-                        return pathname === '/admin/dashboard/settings/roles' || pathname.startsWith('/admin/dashboard/settings/roles/')
-                    }
-                    if (child.href === '/admin/dashboard/settings/label-print') {
-                        return pathname === '/admin/dashboard/settings/label-print' || pathname.startsWith('/admin/dashboard/settings/label-print/')
-                    }
-                    if (child.href === '/admin/dashboard/own-ads') {
-                        return pathname === '/admin/dashboard/own-ads' || pathname.startsWith('/admin/dashboard/own-ads/')
-                    }
-                    if (child.href === '/admin/dashboard/inventory') {
-                        return pathname === '/admin/dashboard/inventory' || pathname === '/admin/dashboard/inventory/'
-                    }
-                    if (child.href === '/admin/dashboard/inventory/stock-adjustment') {
-                        return pathname === '/admin/dashboard/inventory/stock-adjustment' || pathname.startsWith('/admin/dashboard/inventory/stock-adjustment/')
-                    }
-                    if (child.href === '/admin/dashboard/analytics/sales-analytics') {
-                        return pathname === '/admin/dashboard/analytics/sales-analytics' || pathname.startsWith('/admin/dashboard/analytics/sales-analytics/')
-                    }
-                    return pathname === child.href || pathname.startsWith(child.href + '/')
-                })
+                const hasActiveChild = item.children.some(child => isChildActive(child))
                 if (hasActiveChild) {
                     initialExpanded[item.name] = true
                 }
@@ -246,14 +212,12 @@ export default function AdminSidebar({ onMobileMenuClose }) {
 
     const toggleExpanded = (itemName) => {
         setExpandedItems(prev => {
-            // If clicking on the same item, toggle it
             if (prev[itemName]) {
                 return {
                     ...prev,
                     [itemName]: false
                 }
             } else {
-                // If clicking on a different item, close all others and open this one
                 const newExpanded = {}
                 newExpanded[itemName] = true
                 return newExpanded
@@ -292,7 +256,6 @@ export default function AdminSidebar({ onMobileMenuClose }) {
                                 key={item.name}
                                 href={item.href}
                                 onClick={() => {
-                                    // Only update state if there are expanded menus
                                     if (Object.keys(expandedItems).length > 0) {
                                         setExpandedItems({})
                                     }

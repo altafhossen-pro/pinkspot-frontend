@@ -1,31 +1,23 @@
 import Footer from '@/components/Footer/Footer';
 import ProductDetails from '@/components/ProductDetails/ProductDetails';
-import { generateDynamicMetadata, generateViewport } from '@/utils/metadata';
+import { generateViewport } from '@/utils/metadata';
+import { buildProductMetadata, buildProductJsonLd } from '@/utils/productSeo';
 import React from 'react';
 
 // Generate dynamic metadata for product pages
 export async function generateMetadata({ params }) {
     try {
         const { productSlug } = await params;
-
-        // Create a server-side API call
         const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
+        
         const response = await fetch(`${API_BASE_URL}/product/slug/${productSlug}`, {
             next: { revalidate: 60 } // Cache for 60 seconds
         });
 
         if (response.ok) {
             const data = await response.json();
-
             if (data.success && data.data) {
-                const product = data.data;
-
-                return generateDynamicMetadata('product', {
-                    productName: product.title,
-                    productDescription: product.description || product.shortDescription || `Premium ${product.title} from Pinkspot`,
-                    image: product.featuredImage || product.images?.[0] || '/images/logo.png',
-                    path: `/product/${productSlug}`
-                });
+                return buildProductMetadata(data.data, productSlug);
             }
         }
     } catch (error) {
@@ -33,11 +25,11 @@ export async function generateMetadata({ params }) {
     }
 
     // Fallback metadata if product not found
-    return generateDynamicMetadata('product', {
-        productName: 'Product Not Found',
-        productDescription: 'This product may have been removed or does not exist.',
-        path: `/product/${params.productSlug}`
-    });
+    return {
+        title: 'Product Not Found | ForPink',
+        description: 'This product may have been removed or does not exist.',
+        robots: { index: false, follow: false }
+    };
 }
 
 // Generate viewport configuration
@@ -63,38 +55,21 @@ const page = async ({ params }) => {
         console.error('Error fetching product for structured data:', error);
     }
 
-    // Generate JSON-LD Schema
-    let jsonLd = null;
-    if (productData) {
-        // Find correct price and stock based on DB schema
-        const currentPrice = productData.variants?.[0]?.currentPrice || productData.basePrice || 0;
-        const inStock = (productData.totalStock > 0) || (productData.variants && productData.variants.some(v => v.stockQuantity > 0));
-        const imageUrl = productData.featuredImage || (productData.gallery && productData.gallery[0]?.url) || "https://pinkspot.bd/images/logo.png";
-
-        jsonLd = {
-            "@context": "https://schema.org",
-            "@type": "Product",
-            "name": productData.title,
-            "image": imageUrl,
-            "description": productData.shortDescription || productData.description || `Premium ${productData.title} from Pinkspot`,
-            "sku": productData.slug,
-            "offers": {
-                "@type": "Offer",
-                "url": `https://pinkspot.bd/product/${productSlug}`,
-                "priceCurrency": "BDT",
-                "price": currentPrice,
-                "availability": inStock ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
-                "itemCondition": "https://schema.org/NewCondition"
-            }
-        };
-    }
+    // Generate Google Merchant Listing & Breadcrumb JSON-LD Schemas
+    const schemas = productData ? buildProductJsonLd(productData, productSlug) : null;
 
     return (
         <div>
-            {jsonLd && (
+            {schemas?.productSchema && (
                 <script
                     type="application/ld+json"
-                    dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(schemas.productSchema) }}
+                />
+            )}
+            {schemas?.breadcrumbSchema && (
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(schemas.breadcrumbSchema) }}
                 />
             )}
             <ProductDetails productSlug={productSlug} />

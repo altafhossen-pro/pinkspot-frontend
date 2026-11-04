@@ -12,6 +12,9 @@ import {
   Truck,
   Box,
   ShieldAlert,
+  Terminal,
+  Tag,
+  Facebook,
 } from 'lucide-react';
 import { useAppContext } from '@/context/AppContext';
 import PermissionDenied from '@/components/Common/PermissionDenied';
@@ -96,6 +99,22 @@ export default function AdminSettingsPage() {
       href: '/admin/dashboard/settings/site-settings'
     },
     {
+      id: 'brands',
+      title: 'Brand Settings',
+      description: 'System brands & default brand',
+      icon: Tag,
+      color: 'bg-emerald-100 text-emerald-600',
+      href: '/admin/dashboard/settings/brands'
+    },
+    {
+      id: 'facebook-capi',
+      title: 'Facebook Pixel & CAPI',
+      description: 'Meta pixel, server events & brand pixels',
+      icon: Facebook,
+      color: 'bg-[#1877F2]/10 text-[#1877F2]',
+      href: '/admin/dashboard/settings/facebook-capi'
+    },
+    {
       id: 'store-features',
       title: 'Store Features',
       description: 'Homepage feature banner',
@@ -107,7 +126,7 @@ export default function AdminSettingsPage() {
       id: 'telegram',
       title: 'Telegram Settings',
       description: 'Bot configuration & alerts',
-      icon: Mail, // using Mail icon as telegram icon might not be imported, it's fine for now or I can add a different one. MessageCircle is good but not imported.
+      icon: Mail,
       color: 'bg-blue-100 text-blue-600',
       href: '/admin/dashboard/settings/telegram'
     },
@@ -126,6 +145,14 @@ export default function AdminSettingsPage() {
       icon: ShieldAlert,
       color: 'bg-red-100 text-red-600',
       href: '/admin/dashboard/settings/fraud-checker'
+    },
+    {
+      id: 'logs',
+      title: 'Steadfast & Server Logs',
+      description: 'Error logs, editor & realtime console',
+      icon: Terminal,
+      color: 'bg-rose-100 text-rose-600',
+      href: '/admin/dashboard/settings/logs'
     }
   ];
 
@@ -156,7 +183,7 @@ export default function AdminSettingsPage() {
 
   return (
     <div className="p-6">
-      <div className=" mx-auto">
+      <div className="mx-auto">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center space-x-3 mb-2">

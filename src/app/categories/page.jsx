@@ -6,6 +6,7 @@ import { categoryAPI } from '@/services/api';
 import { ChevronRight } from 'lucide-react';
 import Pagination from '@/components/Common/Pagination';
 import Footer from '@/components/Footer/Footer';
+import { buildCategoryJsonLd } from '@/utils/productSeo';
 
 export default function CategoriesPage() {
     const router = useRouter();
@@ -51,9 +52,24 @@ export default function CategoriesPage() {
         window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
+    const { collectionSchema, breadcrumbSchema } = buildCategoryJsonLd('Categories', 'categories');
     if (loading) {
-        return (
+
+
+    return (
             <div className="min-h-screen bg-gray-50">
+            {collectionSchema && (
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionSchema) }}
+                />
+            )}
+            {breadcrumbSchema && (
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+                />
+            )}
                 <div className="max-w-screen-2xl mx-auto px-4 py-8">
                     <div className="flex justify-center items-center py-12">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-500"></div>
@@ -63,8 +79,22 @@ export default function CategoriesPage() {
         );
     }
 
+
+
     return (
         <div className="min-h-screen bg-gray-50">
+            {collectionSchema && (
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionSchema) }}
+                />
+            )}
+            {breadcrumbSchema && (
+                <script
+                    type="application/ld+json"
+                    dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbSchema) }}
+                />
+            )}
             <div className="max-w-screen-2xl mx-auto px-4 py-8">
                 {/* Page Header */}
                 <div className="text-center mb-8">

@@ -77,7 +77,8 @@ export default function OrderEditPage() {
         statusUpdateReason: '',
         paymentUpdateReason: '',
         notesUpdateReason: '',
-        adminNotesUpdateReason: ''
+        adminNotesUpdateReason: '',
+        steadfastConsignmentId: ''
     });
 
     useEffect(() => {
@@ -111,7 +112,8 @@ export default function OrderEditPage() {
                     statusUpdateReason: '',
                     paymentUpdateReason: '',
                     notesUpdateReason: '',
-                    adminNotesUpdateReason: ''
+                    adminNotesUpdateReason: '',
+                    steadfastConsignmentId: data.data.steadfastConsignmentId || ''
                 });
             } else {
                 toast.error('Failed to fetch order details');
@@ -134,7 +136,7 @@ export default function OrderEditPage() {
                 setProducts([]);
                 return;
             }
-            
+
             try {
                 setIsSearchingProducts(true);
                 const term = searchTerm.toLowerCase().trim();
@@ -143,171 +145,171 @@ export default function OrderEditPage() {
                     page: 1,
                     limit: 20
                 });
-                
+
                 if (response.success && response.data) {
                     const fetchedProducts = response.data;
-                    
-            let skuVariant = null;
-            let skuProduct = null;
-            
-            for (const product of fetchedProducts) {
-                if (product.variants && product.variants.length > 0) {
-                    for (const variant of product.variants) {
-                        if (variant.sku && variant.sku.toLowerCase() === term) {
-                            skuVariant = variant;
-                            skuProduct = product;
-                            break;
+
+                    let skuVariant = null;
+                    let skuProduct = null;
+
+                    for (const product of fetchedProducts) {
+                        if (product.variants && product.variants.length > 0) {
+                            for (const variant of product.variants) {
+                                if (variant.sku && variant.sku.toLowerCase() === term) {
+                                    skuVariant = variant;
+                                    skuProduct = product;
+                                    break;
+                                }
+                            }
+                            if (skuVariant) break;
                         }
                     }
-                    if (skuVariant) break;
-                }
-            }
 
-            if (skuVariant && skuProduct) {
-                autoAddItem(skuProduct, skuVariant);
-            } else {
-                setProducts(fetchedProducts);
+                    if (skuVariant && skuProduct) {
+                        autoAddItem(skuProduct, skuVariant);
+                    } else {
+                        setProducts(fetchedProducts);
+                    }
+                }
+            } catch (error) {
+                console.error('Error searching products:', error);
+                toast.error('Error searching products');
+            } finally {
+                setIsSearchingProducts(false);
             }
-        }
-    } catch (error) {
-        console.error('Error searching products:', error);
-        toast.error('Error searching products');
-    } finally {
-        setIsSearchingProducts(false);
-    }
-}, 500);
+        }, 500);
 
         return () => clearTimeout(timeoutId);
     }, [searchTerm, showProductSearch]);
 
-// Helper functions for new variant selection style
-const getUniqueSizes = () => {
-    if (!selectedProduct?.variants) return [];
-    const sizes = selectedProduct.variants
-        .map(variant => variant.attributes?.find(attr => attr.name === 'Size'))
-        .filter(size => size)
-        .map(size => size.value);
-    return [...new Set(sizes)];
-};
+    // Helper functions for new variant selection style
+    const getUniqueSizes = () => {
+        if (!selectedProduct?.variants) return [];
+        const sizes = selectedProduct.variants
+            .map(variant => variant.attributes?.find(attr => attr.name === 'Size'))
+            .filter(size => size)
+            .map(size => size.value);
+        return [...new Set(sizes)];
+    };
 
-const getUniqueColors = () => {
-    if (!selectedProduct?.variants) return [];
-    const colors = selectedProduct.variants
-        .map(variant => variant.attributes?.find(attr => attr.name === 'Color'))
-        .filter(color => color)
-        .map(color => ({ value: color.value, hexCode: color.hexCode }));
-    return colors.filter((color, index, self) =>
-        index === self.findIndex(c => c.value === color.value)
-    );
-};
-
-const getAvailableColorsForSize = (size) => {
-    if (!selectedProduct?.variants) return [];
-    if (size) {
-        return selectedProduct.variants
-            .filter(variant => {
-                const sizeAttr = variant.attributes?.find(attr => attr.name === 'Size');
-                return sizeAttr && sizeAttr.value === size;
-            })
-            .map(variant => {
-                const colorAttr = variant.attributes?.find(attr => attr.name === 'Color');
-                return colorAttr ? { value: colorAttr.value, hexCode: colorAttr.hexCode } : null;
-            })
-            .filter(color => color);
-    } else {
-        return selectedProduct.variants
-            .filter(variant => {
-                const sizeAttr = variant.attributes?.find(attr => attr.name === 'Size');
-                return !sizeAttr;
-            })
-            .map(variant => {
-                const colorAttr = variant.attributes?.find(attr => attr.name === 'Color');
-                return colorAttr ? { value: colorAttr.value, hexCode: colorAttr.hexCode } : null;
-            })
+    const getUniqueColors = () => {
+        if (!selectedProduct?.variants) return [];
+        const colors = selectedProduct.variants
+            .map(variant => variant.attributes?.find(attr => attr.name === 'Color'))
             .filter(color => color)
-            .filter((color, index, self) =>
-                index === self.findIndex(c => c.value === color.value)
-            );
-    }
-};
+            .map(color => ({ value: color.value, hexCode: color.hexCode }));
+        return colors.filter((color, index, self) =>
+            index === self.findIndex(c => c.value === color.value)
+        );
+    };
 
-const getCalculatedVariant = () => {
-    if (!selectedProduct?.variants) return null;
-    return selectedProduct.variants.find(variant => {
-        const sizeAttr = variant.attributes?.find(attr => attr.name === 'Size');
-        const colorAttr = variant.attributes?.find(attr => attr.name === 'Color');
-
-        let sizeMatches = true;
-        if (selectedSize && sizeAttr) {
-            sizeMatches = sizeAttr.value === selectedSize;
-        } else if (selectedSize && !sizeAttr) {
-            sizeMatches = false;
-        } else if (!selectedSize && sizeAttr) {
-            sizeMatches = false;
+    const getAvailableColorsForSize = (size) => {
+        if (!selectedProduct?.variants) return [];
+        if (size) {
+            return selectedProduct.variants
+                .filter(variant => {
+                    const sizeAttr = variant.attributes?.find(attr => attr.name === 'Size');
+                    return sizeAttr && sizeAttr.value === size;
+                })
+                .map(variant => {
+                    const colorAttr = variant.attributes?.find(attr => attr.name === 'Color');
+                    return colorAttr ? { value: colorAttr.value, hexCode: colorAttr.hexCode } : null;
+                })
+                .filter(color => color);
+        } else {
+            return selectedProduct.variants
+                .filter(variant => {
+                    const sizeAttr = variant.attributes?.find(attr => attr.name === 'Size');
+                    return !sizeAttr;
+                })
+                .map(variant => {
+                    const colorAttr = variant.attributes?.find(attr => attr.name === 'Color');
+                    return colorAttr ? { value: colorAttr.value, hexCode: colorAttr.hexCode } : null;
+                })
+                .filter(color => color)
+                .filter((color, index, self) =>
+                    index === self.findIndex(c => c.value === color.value)
+                );
         }
+    };
 
-        let colorMatches = true;
-        if (colorAttr && selectedColor) {
-            colorMatches = colorAttr.value === selectedColor;
-        } else if (colorAttr && !selectedColor) {
-            colorMatches = false;
-        } else if (!colorAttr && selectedColor) {
-            colorMatches = false;
+    const getCalculatedVariant = () => {
+        if (!selectedProduct?.variants) return null;
+        return selectedProduct.variants.find(variant => {
+            const sizeAttr = variant.attributes?.find(attr => attr.name === 'Size');
+            const colorAttr = variant.attributes?.find(attr => attr.name === 'Color');
+
+            let sizeMatches = true;
+            if (selectedSize && sizeAttr) {
+                sizeMatches = sizeAttr.value === selectedSize;
+            } else if (selectedSize && !sizeAttr) {
+                sizeMatches = false;
+            } else if (!selectedSize && sizeAttr) {
+                sizeMatches = false;
+            }
+
+            let colorMatches = true;
+            if (colorAttr && selectedColor) {
+                colorMatches = colorAttr.value === selectedColor;
+            } else if (colorAttr && !selectedColor) {
+                colorMatches = false;
+            } else if (!colorAttr && selectedColor) {
+                colorMatches = false;
+            }
+
+            return sizeMatches && colorMatches;
+        });
+    };
+
+    useEffect(() => {
+        if (selectedProduct) {
+            const variant = getCalculatedVariant();
+            setSelectedVariant(variant || null);
+            if (variant) {
+                setNewItemPrice(variant.currentPrice || variant.price || 0);
+            }
         }
+    }, [selectedSize, selectedColor, selectedProduct]);
 
-        return sizeMatches && colorMatches;
-    });
-};
-
-useEffect(() => {
-    if (selectedProduct) {
-        const variant = getCalculatedVariant();
-        setSelectedVariant(variant || null);
-        if (variant) {
-            setNewItemPrice(variant.currentPrice || variant.price || 0);
+    const handleSizeChange = (size) => {
+        setSelectedSize(size);
+        const colorsForSize = getAvailableColorsForSize(size);
+        if (colorsForSize.length > 0) {
+            setSelectedColor(colorsForSize[0].value);
+        } else {
+            setSelectedColor("");
         }
-    }
-}, [selectedSize, selectedColor, selectedProduct]);
+    };
 
-const handleSizeChange = (size) => {
-    setSelectedSize(size);
-    const colorsForSize = getAvailableColorsForSize(size);
-    if (colorsForSize.length > 0) {
-        setSelectedColor(colorsForSize[0].value);
-    } else {
-        setSelectedColor("");
-    }
-};
+    const getTrueAvailableStock = (variant) => {
+        if (!variant || !order) return 0;
+        const dbStock = variant.stockQuantity || 0;
 
-const getTrueAvailableStock = (variant) => {
-    if (!variant || !order) return 0;
-    const dbStock = variant.stockQuantity || 0;
-    
-    // Find how many are currently in formData.items
-    const currentQtyInUI = formData.items.reduce((total, item) => {
-        if (item.variant?.sku === variant.sku) {
-            return total + Number(item.quantity);
+        // Find how many are currently in formData.items
+        const currentQtyInUI = formData.items.reduce((total, item) => {
+            if (item.variant?.sku === variant.sku) {
+                return total + Number(item.quantity);
+            }
+            return total;
+        }, 0);
+
+        // Find how many were in original order.items
+        const originalQty = order.items.reduce((total, item) => {
+            if (item.variant?.sku === variant.sku) {
+                return total + Number(item.quantity);
+            }
+            return total;
+        }, 0);
+
+        const stockDeductedStatuses = ['confirmed', 'processing', 'shipped', 'delivered'];
+        const isWasDeducted = stockDeductedStatuses.includes(order.status);
+
+        if (isWasDeducted) {
+            return Math.max(0, dbStock - (currentQtyInUI - originalQty));
+        } else {
+            return Math.max(0, dbStock - currentQtyInUI);
         }
-        return total;
-    }, 0);
-
-    // Find how many were in original order.items
-    const originalQty = order.items.reduce((total, item) => {
-        if (item.variant?.sku === variant.sku) {
-            return total + Number(item.quantity);
-        }
-        return total;
-    }, 0);
-
-    const stockDeductedStatuses = ['confirmed', 'processing', 'shipped', 'delivered'];
-    const isWasDeducted = stockDeductedStatuses.includes(order.status);
-    
-    if (isWasDeducted) {
-        return Math.max(0, dbStock - (currentQtyInUI - originalQty));
-    } else {
-        return Math.max(0, dbStock - currentQtyInUI);
-    }
-};
+    };
 
     const autoAddItem = (product, variant) => {
         const availableStock = getTrueAvailableStock(variant);
@@ -339,7 +341,7 @@ const getTrueAvailableStock = (variant) => {
                 const newProductId = typeof newItem.product === 'object' ? newItem.product?._id : newItem.product;
                 const existingSku = item.variant?.sku || '';
                 const newSku = newItem.variant?.sku || '';
-                
+
                 return String(existingProductId) === String(newProductId) && existingSku === newSku;
             });
 
@@ -426,7 +428,7 @@ const getTrueAvailableStock = (variant) => {
                 const newProductId = typeof newItem.product === 'object' ? newItem.product?._id : newItem.product;
                 const existingSku = item.variant?.sku || '';
                 const newSku = newItem.variant?.sku || '';
-                
+
                 return String(existingProductId) === String(newProductId) && existingSku === newSku;
             });
 
@@ -485,9 +487,9 @@ const getTrueAvailableStock = (variant) => {
                 sku: itemToUpdate.variant.sku,
                 stockQuantity: itemToUpdate.variant.stockQuantity
             };
-            
+
             const maxAllowed = (Number(itemToUpdate.quantity) || 0) + getTrueAvailableStock(variantForCheck);
-            
+
             if (newQuantity > maxAllowed) {
                 toast.error(`Stock limited to ${maxAllowed}`);
                 newQuantity = maxAllowed;
@@ -637,8 +639,8 @@ const getTrueAvailableStock = (variant) => {
                         <div className="flex items-center justify-between mb-2">
                             <span className="text-sm font-medium text-slate-600">Status:</span>
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${order.status === 'returned'
-                                    ? 'bg-pink-100 text-pink-800 border-pink-200'
-                                    : 'bg-red-100 text-red-800 border-red-200'
+                                ? 'bg-pink-100 text-pink-800 border-pink-200'
+                                : 'bg-red-100 text-red-800 border-red-200'
                                 }`}>
                                 {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                             </span>
@@ -707,8 +709,8 @@ const getTrueAvailableStock = (variant) => {
                                 onClick={handleSave}
                                 disabled={saving}
                                 className={`flex-1 sm:flex-none inline-flex items-center justify-center px-3 sm:px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors ${saving
-                                        ? 'bg-gray-400 cursor-not-allowed text-white'
-                                        : 'bg-blue-600 hover:bg-blue-700 text-white'
+                                    ? 'bg-gray-400 cursor-not-allowed text-white'
+                                    : 'bg-blue-600 hover:bg-blue-700 text-white'
                                     }`}
                             >
                                 <Save className="h-4 w-4 mr-1 sm:mr-2" />
@@ -750,6 +752,7 @@ const getTrueAvailableStock = (variant) => {
                                                     alt={item.name}
                                                     className="h-16 w-16 sm:h-20 sm:w-20 rounded-lg object-cover border border-gray-200"
                                                 />
+
                                                 <div className="absolute -top-2 -right-2 bg-blue-600 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
                                                     {item.quantity}
                                                 </div>
@@ -778,6 +781,7 @@ const getTrueAvailableStock = (variant) => {
                                                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                                                             min="1"
                                                         />
+
                                                         {item.variant && (
                                                             <p className="text-xs mt-1 text-gray-500">
                                                                 Max: {(Number(item.quantity) || 0) + getTrueAvailableStock({ sku: item.variant.sku, stockQuantity: item.variant.stockQuantity })} available
@@ -796,6 +800,7 @@ const getTrueAvailableStock = (variant) => {
                                                             min="0"
                                                             step="0.01"
                                                         />
+
                                                     </div>
                                                 </div>
 
@@ -879,6 +884,7 @@ const getTrueAvailableStock = (variant) => {
                                         rows="3"
                                         placeholder="Customer notes or special instructions..."
                                     />
+
                                     <input
                                         type="text"
                                         value={formData.notesUpdateReason}
@@ -886,6 +892,7 @@ const getTrueAvailableStock = (variant) => {
                                         className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="Reason for notes update (optional)"
                                     />
+
                                 </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -896,8 +903,9 @@ const getTrueAvailableStock = (variant) => {
                                         onChange={(e) => handleInputChange('adminNotes', e.target.value)}
                                         className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                         rows="3"
-                                        placeholder="Internal admin notes..."
+                                        placeholder="Write a new admin note (previous notes are saved in history timeline)..."
                                     />
+
                                     <input
                                         type="text"
                                         value={formData.adminNotesUpdateReason}
@@ -905,6 +913,38 @@ const getTrueAvailableStock = (variant) => {
                                         className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="Reason for admin notes update (optional)"
                                     />
+
+                                    {order?.adminNotesHistory && order.adminNotesHistory.length > 0 && (
+                                        <div className="mt-4 pt-4 border-t border-gray-100">
+                                            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                                                Previous Notes Timeline ({order.adminNotesHistory.length})
+                                            </p>
+                                            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                                                {[...order.adminNotesHistory].reverse().map((item, idx) => (
+                                                    <div key={idx} className="p-2.5 bg-gradient-to-r from-pink-50/50 to-slate-50 border border-pink-200/80 rounded-lg text-xs">
+                                                        <div className="flex justify-between items-center text-slate-500 mb-1">
+                                                            <span className="font-semibold text-slate-700">
+                                                                <span className="inline-block bg-pink-100 text-pink-700 font-bold px-1.5 py-0.5 rounded border border-pink-200 mr-1.5">#{order.adminNotesHistory.length - idx}</span>{item.addedByName || item.addedBy?.name || 'Admin'}
+                                                            </span>
+                                                            <span className="text-[11px]">
+                                                                {item.createdAt ? new Date(item.createdAt).toLocaleString('en-GB', {
+                                                                    timeZone: 'Asia/Dhaka',
+                                                                    day: '2-digit',
+                                                                    month: 'short',
+                                                                    year: 'numeric',
+                                                                    hour: '2-digit',
+                                                                    minute: '2-digit',
+                                                                    hour12: true
+                                                                }) : ''} (BDT)
+                                                            </span>
+                                                        </div>
+                                                        <p className="text-slate-800 whitespace-pre-wrap">{item.note}</p>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
                                 </div>
                             </div>
                         </div>
@@ -943,6 +983,7 @@ const getTrueAvailableStock = (variant) => {
                                         className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="Reason for status change (optional)"
                                     />
+
                                 </div>
 
                                 <div>
@@ -983,7 +1024,31 @@ const getTrueAvailableStock = (variant) => {
                                         className="w-full mt-2 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                         placeholder="Reason for payment change (optional)"
                                     />
+
                                 </div>
+                            </div>
+                        </div>
+
+                        {/* Courier Information */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 lg:p-8">
+                            <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-4 flex items-center">
+                                <Truck className="h-6 w-6 mr-3 text-indigo-600" />
+                                Courier Information
+                            </h2>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">
+                                    Courier Consignment ID
+                                </label>
+                                <input
+                                    type="text"
+                                    value={formData.steadfastConsignmentId || ''}
+                                    onChange={(e) => handleInputChange('steadfastConsignmentId', e.target.value)}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 font-mono text-sm"
+                                    placeholder="Enter Consignment ID (e.g. 1234567)"
+                                />
+                                <p className="text-xs text-gray-500 mt-1.5">
+                                    Set or update Steadfast / Courier Consignment ID manually for this order.
+                                </p>
                             </div>
                         </div>
 
@@ -1008,6 +1073,7 @@ const getTrueAvailableStock = (variant) => {
                                             min="0"
                                             step="0.01"
                                         />
+
                                     </div>
 
                                     <div>
@@ -1036,6 +1102,7 @@ const getTrueAvailableStock = (variant) => {
                                             min="0"
                                             step="0.01"
                                         />
+
                                     </div>
 
                                     <div>
@@ -1114,6 +1181,7 @@ const getTrueAvailableStock = (variant) => {
                                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
                                             placeholder="City"
                                         />
+
                                     </div>
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1228,8 +1296,8 @@ const getTrueAvailableStock = (variant) => {
                                                     }
                                                 }}
                                                 className={`p-4 border rounded-lg cursor-pointer transition-colors ${selectedProduct?._id === product._id
-                                                        ? 'border-blue-500 bg-blue-50'
-                                                        : 'border-gray-200 hover:border-gray-300'
+                                                    ? 'border-blue-500 bg-blue-50'
+                                                    : 'border-gray-200 hover:border-gray-300'
                                                     }`}
                                             >
                                                 <img
@@ -1288,8 +1356,9 @@ const getTrueAvailableStock = (variant) => {
                                             }}
                                             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                                             min="1"
-                                            max={selectedVariant ? getTrueAvailableStock(selectedVariant) : 999}
-                                        />
+                                            max={selectedVariant ? getTrueAvailableStock(selectedVariant) : 999} />
+
+
                                         {selectedVariant && (
                                             <p className={`text-xs mt-1 ${getTrueAvailableStock(selectedVariant) <= 0
                                                 ? 'text-red-600 font-semibold'

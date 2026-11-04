@@ -16,6 +16,7 @@ import { useRouter } from 'next/navigation';
 import { addProductToWishlist } from '@/utils/wishlistUtils';
 import ProductNotFound from '@/components/Common/ProductNotFound';
 import ProductShareModal from './ProductShareModal';
+import { trackFacebookEvent } from '@/utils/facebookCapi';
 
 
 
@@ -79,6 +80,16 @@ export default function ProductDetails({ productSlug }) {
 
             if (data.success) {
                 setProduct(data.data);
+                // Facebook CAPI ViewContent tracking
+                trackFacebookEvent('ViewContent', {
+                    content_name: data.data.title,
+                    content_category: data.data.category?.name || 'General',
+                    content_ids: [data.data.slug || String(data.data._id)],
+                    content_type: 'product',
+                    value: data.data.variants?.[0]?.currentPrice || data.data.basePrice || 0,
+                    currency: 'BDT',
+                    brand: data.data.brand || 'ForPink'
+                });
                 // Set default size and color if available
                 if (data.data.variants && data.data.variants.length > 0) {
                     // First determine the default size based on array order (with stock priority)
@@ -441,6 +452,18 @@ export default function ProductDetails({ productSlug }) {
         // Add to cart using context
         const q = quantity === '' || quantity < 1 ? 1 : quantity;
         addToCart(productToAdd, selectedVariantData, q);
+
+        // Facebook CAPI AddToCart tracking
+        trackFacebookEvent('AddToCart', {
+            content_name: product.title,
+            content_category: product.category?.name || 'General',
+            content_ids: [selectedVariant?.sku || product.slug || String(product._id)],
+            content_type: 'product',
+            value: Number((finalPrice * q).toFixed(2)),
+            currency: 'BDT',
+            num_items: q,
+            brand: product.brand || 'ForPink'
+        });
     };
 
     const handleBuyNow = () => {
@@ -489,6 +512,18 @@ export default function ProductDetails({ productSlug }) {
         // Add to cart using context
         const q = quantity === '' || quantity < 1 ? 1 : quantity;
         addToCart(productToAdd, selectedVariantData, q);
+
+        // Facebook CAPI AddToCart tracking
+        trackFacebookEvent('AddToCart', {
+            content_name: product.title,
+            content_category: product.category?.name || 'General',
+            content_ids: [selectedVariant?.sku || product.slug || String(product._id)],
+            content_type: 'product',
+            value: Number((finalPrice * q).toFixed(2)),
+            currency: 'BDT',
+            num_items: q,
+            brand: product.brand || 'ForPink'
+        });
 
         // Navigate to checkout page
         router.push('/checkout');

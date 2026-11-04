@@ -68,6 +68,120 @@ export const AppProvider = ({ children }) => {
     const [affiliateCodeExpireTime, setAffiliateCodeExpireTime] = useState(null)
     const [isAvailableAffiliateCode, setIsAvailableAffiliateCode] = useState(false)
 
+    // Helper to dynamically calculate combo bundle discounts across cart items
+    const recalculateCartPrices = (items) => {
+        if (!Array.isArray(items) || items.length === 0) return [];
+
+        // Group items by comboId
+        const comboGroups = {};
+        items.forEach(item => {
+            if (item.comboId && Array.isArray(item.comboRequiredItems) && item.comboRequiredItems.length > 0) {
+                if (!comboGroups[item.comboId]) {
+                    comboGroups[item.comboId] = [];
+                }
+                comboGroups[item.comboId].push(item);
+            }
+        });
+
+        // For each comboId, calculate valid complete bundles
+        const comboStats = {};
+        Object.keys(comboGroups).forEach(comboId => {
+            const groupItems = comboGroups[comboId];
+            const requiredKeys = groupItems[0].comboRequiredItems;
+
+            // Sum quantities for each required item in cart
+            const itemKeyQtyMap = {};
+            groupItems.forEach(item => {
+                const key = item.comboItemKey || item.variantKey || item.productId;
+                itemKeyQtyMap[key] = (itemKeyQtyMap[key] || 0) + (Number(item.quantity) || 0);
+            });
+
+            // A combo bundle is valid ONLY if all required items exist with qty >= 1
+            let validBundles = Infinity;
+            for (const reqKey of requiredKeys) {
+                const currentQty = itemKeyQtyMap[reqKey] || 0;
+                if (currentQty < validBundles) {
+                    validBundles = currentQty;
+                }
+            }
+            if (validBundles === Infinity || validBundles < 0) {
+                validBundles = 0;
+            }
+
+            comboStats[comboId] = {
+                validBundles,
+                requiredKeys,
+                isFullyValid: validBundles > 0
+            };
+        });
+
+        // Now recalculate each item's price, total, and status
+        return items.map(item => {
+            const qty = Number(item.quantity) || 1;
+            const regularPrice = Number(item.regularPrice) || Number(item.originalPrice) || Number(item.price) || 0;
+
+            if (!item.comboId || !comboStats[item.comboId]) {
+                const unitPrice = Number(item.price) || regularPrice;
+                return {
+                    ...item,
+                    price: unitPrice,
+                    total: unitPrice * qty,
+                    isComboActive: false,
+                    comboValidBundles: 0,
+                    comboDiscountedQty: 0,
+                    comboRegularQty: qty
+                };
+            }
+
+            const stats = comboStats[item.comboId];
+            const validBundles = stats.validBundles;
+            const comboDiscountedPrice = typeof item.comboDiscountedPrice === 'number'
+                ? item.comboDiscountedPrice
+                : regularPrice;
+
+            if (validBundles > 0) {
+                // Bundle units receive combo discount; extra units revert to regular price
+                const discountedQty = Math.min(qty, validBundles);
+                const regularQty = Math.max(0, qty - discountedQty);
+
+                const totalItemCost = (discountedQty * comboDiscountedPrice) + (regularQty * regularPrice);
+                const effectiveUnitPrice = qty > 0 ? Math.round(totalItemCost / qty) : comboDiscountedPrice;
+
+                return {
+                    ...item,
+                    price: effectiveUnitPrice,
+                    total: totalItemCost,
+                    isComboActive: true,
+                    comboValidBundles: validBundles,
+                    comboDiscountedQty: discountedQty,
+                    comboRegularQty: regularQty,
+                    comboStatusText: regularQty > 0
+                        ? `${discountedQty} in combo (৳${comboDiscountedPrice}), ${regularQty} regular (৳${regularPrice})`
+                        : `Combo discount applied (৳${comboDiscountedPrice})`,
+                    comboDeliveryType: item.originalComboDeliveryType || item.comboDeliveryType || 'default',
+                    comboCustomDeliveryCharge: typeof item.originalComboCustomDeliveryCharge === 'number'
+                        ? item.originalComboCustomDeliveryCharge
+                        : (item.comboCustomDeliveryCharge || 0)
+                };
+            } else {
+                // Combo broken: 0 complete bundles. All revert to regular price.
+                const totalItemCost = qty * regularPrice;
+                return {
+                    ...item,
+                    price: regularPrice,
+                    total: totalItemCost,
+                    isComboActive: false,
+                    comboValidBundles: 0,
+                    comboDiscountedQty: 0,
+                    comboRegularQty: qty,
+                    comboStatusText: 'Combo incomplete - regular price applied',
+                    comboDeliveryType: 'default',
+                    comboCustomDeliveryCharge: 0
+                };
+            }
+        });
+    };
+
     // Cart functions
     const addToCart = (product, selectedVariant, quantity = 1) => {
         if (product.isForceOutOfStock) {
@@ -76,8 +190,9 @@ export const AppProvider = ({ children }) => {
         }
 
         // Create variant key for unique identification (size is optional now)
+        const variantSku = selectedVariant?.sku;
         const variantKey = selectedVariant ?
-            `${product._id}-${selectedVariant.size || 'no-size'}-${selectedVariant.color || 'no-color'}` :
+            (variantSku ? `${product._id}-${variantSku}` : `${product._id}-${(selectedVariant.size || selectedVariant.attributes?.find(a => a.name?.toLowerCase() === 'size')?.value) || 'no-size'}-${(selectedVariant.color || selectedVariant.attributes?.find(a => a.name?.toLowerCase() === 'color')?.value) || 'no-color'}`) :
             product._id;
 
         // Create variant display string (size is optional now)
@@ -85,6 +200,10 @@ export const AppProvider = ({ children }) => {
             const parts = [];
             if (selectedVariant.size) parts.push(`Size: ${selectedVariant.size}`);
             if (selectedVariant.color) parts.push(`Color: ${selectedVariant.color}`);
+            if (parts.length === 0 && Array.isArray(selectedVariant.attributes)) {
+                const real = selectedVariant.attributes.filter(a => a.name?.toLowerCase() !== 'default' && a.value?.toLowerCase() !== 'standard');
+                if (real.length > 0) return real.map(a => `${a.name}: ${a.value}`).join(', ');
+            }
             return parts.length > 0 ? parts.join(', ') : 'Default';
         })() : 'Default';
 
@@ -148,7 +267,7 @@ export const AppProvider = ({ children }) => {
             
             currentItem.quantity = newQuantity;
             currentItem.total = currentItem.price * currentItem.quantity;
-            setCart(updatedCart);
+            setCart(recalculateCartPrices(updatedCart));
             toast.success(`Quantity updated! Total: ${currentItem.quantity}`);
         } else {
             // Add new item
@@ -156,7 +275,7 @@ export const AppProvider = ({ children }) => {
                 toast.error(`Cannot add. Only ${cartItem.stockQuantity} available.`);
                 return;
             }
-            setCart([...cart, cartItem]);
+            setCart(recalculateCartPrices([...cart, cartItem]));
             toast.success('Added to cart successfully!');
         }
 
@@ -177,16 +296,22 @@ export const AppProvider = ({ children }) => {
                 return;
             }
 
+            const variantSku = selectedVariant?.sku;
+            const comboTag = product.comboId ? `-combo-${product.comboId}-${product.comboItemKey || ''}` : '';
             const variantKey = selectedVariant ?
-                `${product._id}-${selectedVariant.size || 'no-size'}-${selectedVariant.color || 'no-color'}` :
-                product._id;
+                (variantSku ? `${product._id}-${variantSku}${comboTag}` : `${product._id}-${(selectedVariant.size || selectedVariant.attributes?.find(a => a.name?.toLowerCase() === 'size')?.value) || 'no-size'}-${(selectedVariant.color || selectedVariant.attributes?.find(a => a.name?.toLowerCase() === 'color')?.value) || 'no-color'}${comboTag}`) :
+                `${product._id}${comboTag}`;
 
             // Create variant display string (size is optional now)
             const variantDisplay = selectedVariant ? (() => {
                 const parts = [];
                 if (selectedVariant.size) parts.push(`Size: ${selectedVariant.size}`);
                 if (selectedVariant.color) parts.push(`Color: ${selectedVariant.color}`);
-                return parts.length > 0 ? parts.join(', ') : 'Default';
+                if (parts.length === 0 && Array.isArray(selectedVariant.attributes)) {
+                const real = selectedVariant.attributes.filter(a => a.name?.toLowerCase() !== 'default' && a.value?.toLowerCase() !== 'standard');
+                if (real.length > 0) return real.map(a => `${a.name}: ${a.value}`).join(', ');
+            }
+            return parts.length > 0 ? parts.join(', ') : 'Default';
             })() : 'Default';
 
             const batchActiveSubtitle = (product.isGlobalSubtitleOn && product.globalSubtitle)
@@ -208,17 +333,29 @@ export const AppProvider = ({ children }) => {
                 variantKey: variantKey,
                 name: product.name || (batchActiveSubtitle ? `${product.title} ${batchActiveSubtitle}` : product.title),
                 variant: variantDisplay,
-                price: selectedVariant?.currentPrice || product.basePrice || 0,
+                price: typeof product.comboDiscountedPrice === 'number' ? product.comboDiscountedPrice : (selectedVariant?.currentPrice || product.basePrice || 0),
+                regularPrice: Number(product.regularPrice || selectedVariant?.originalPrice || product.basePrice || 0),
+                comboDiscountedPrice: typeof product.comboDiscountedPrice === 'number' ? product.comboDiscountedPrice : (selectedVariant?.currentPrice || product.basePrice || 0),
+                comboId: product.comboId || null,
+                comboSlug: product.comboSlug || null,
+                comboTitle: product.comboTitle || null,
+                comboItemKey: product.comboItemKey || null,
+                comboRequiredItems: Array.isArray(product.comboRequiredItems) ? product.comboRequiredItems : [],
+                comboDeliveryType: product.comboDeliveryType || 'default',
+                comboCustomDeliveryCharge: Number(product.comboCustomDeliveryCharge) || 0,
+                originalComboDeliveryType: product.originalComboDeliveryType || product.comboDeliveryType || 'default',
+                originalComboCustomDeliveryCharge: Number(product.originalComboCustomDeliveryCharge) || Number(product.comboCustomDeliveryCharge) || 0,
+                isComboActive: !!product.isComboActive,
                 originalPrice: selectedVariant?.originalPrice || null,
                 categoryDiscountApplied: product.categoryDiscountApplied || false,
-                image: product.featuredImage || '/images/placeholder.png',
+                image: selectedVariant?.image || product.featuredImage || '/images/placeholder.png',
                 quantity,
                 total: (selectedVariant?.currentPrice || product.basePrice || 0) * quantity,
                 size: selectedVariant?.size || null,
                 color: selectedVariant?.color || null,
                 colorHexCode: selectedVariant?.hexCode || null,
                 sku: selectedVariant?.sku || product.slug,
-                stockQuantity: selectedVariant?.stockQuantity || product.totalStock || 0,
+                stockQuantity: typeof selectedVariant?.stockQuantity === 'number' ? selectedVariant.stockQuantity : (product.totalStock || 999),
                 stockStatus: selectedVariant?.stockStatus || 'in_stock',
                 // Add proper variant data for stock checking
                 variantData: selectedVariant ? {
@@ -239,7 +376,7 @@ export const AppProvider = ({ children }) => {
                 // Update quantity if same variant exists
                 const currentItem = updatedCart[existingItemIndex];
                 const newQuantity = currentItem.quantity + quantity;
-                if (newQuantity <= currentItem.stockQuantity) {
+                if (!currentItem.stockQuantity || newQuantity <= currentItem.stockQuantity) {
                     currentItem.quantity = newQuantity;
                     currentItem.total = currentItem.price * currentItem.quantity;
                 } else {
@@ -247,7 +384,7 @@ export const AppProvider = ({ children }) => {
                 }
             } else {
                 // Add new item
-                if (quantity <= cartItem.stockQuantity) {
+                if (!cartItem.stockQuantity || quantity <= cartItem.stockQuantity) {
                     newCartItems.push(cartItem);
                 } else {
                     toast.error(`Stock limit reached for ${cartItem.name}`);
@@ -256,7 +393,7 @@ export const AppProvider = ({ children }) => {
         });
 
         // Update cart with all new items at once
-        setCart([...updatedCart, ...newCartItems]);
+        setCart(recalculateCartPrices([...updatedCart, ...newCartItems]));
 
         // Show success message
         toast.success(`${items.length} product(s) added to cart`);
@@ -266,7 +403,7 @@ export const AppProvider = ({ children }) => {
     }
 
     const removeFromCart = (cartItemId) => {
-        setCart(cart.filter(item => item.id !== cartItemId));
+        setCart(recalculateCartPrices(cart.filter(item => item.id !== cartItemId)));
         toast.success('Item removed from cart');
     }
 
@@ -283,11 +420,12 @@ export const AppProvider = ({ children }) => {
             return;
         }
 
-        setCart(cart.map(item =>
+        const updatedItems = cart.map(item =>
             item.id === cartItemId
                 ? { ...item, quantity, total: item.price * quantity }
                 : item
-        ));
+        );
+        setCart(recalculateCartPrices(updatedItems));
     }
 
     const clearCart = () => {
@@ -569,13 +707,14 @@ export const AppProvider = ({ children }) => {
         const total = cart.reduce((sum, item) => {
             const price = Number(item.price) || 0
             const quantity = Number(item.quantity) || 0
-            return sum + (price * quantity)
+            const itemTotal = typeof item.total === 'number' ? item.total : (price * quantity)
+            return sum + itemTotal
         }, 0)
         const count = cart.reduce((sum, item) => {
             const quantity = Number(item.quantity) || 0
             return sum + quantity
         }, 0)
-        setCartTotal(total)
+        setCartTotal(Math.round(total))
         setCartCount(count)
     }
 
@@ -684,7 +823,7 @@ export const AppProvider = ({ children }) => {
             if (savedCart) {
                 try {
                     const parsedCart = JSON.parse(savedCart)
-                    setCart(Array.isArray(parsedCart) ? parsedCart : [])
+                    setCart(recalculateCartPrices(Array.isArray(parsedCart) ? parsedCart : []))
                 } catch (e) {
                     setCart([])
                 }

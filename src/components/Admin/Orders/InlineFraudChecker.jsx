@@ -34,21 +34,31 @@ export default function InlineFraudChecker({ phone }) {
   };
 
   if (result) {
+    const deliveryDisplay = result.delivery_ratio !== undefined && result.delivery_ratio !== null
+      ? `${result.delivery_ratio}%`
+      : (result.total_delivered || 0);
+
+    const cancelDisplay = result.cancellation_ratio !== undefined && result.cancellation_ratio !== null
+      ? `${result.cancellation_ratio}%`
+      : (result.total_cancelled || 0);
+
+    const fraudCount = result.total_reports !== undefined ? result.total_reports : (result.frauds || 0);
+
     return (
-      <div className="flex items-center gap-2 mt-1 px-1.5 py-0.5 rounded-md bg-gray-50 border border-gray-200 text-[10px] w-fit">
-        <span className="flex items-center text-green-600 font-medium" title="Delivered">
-          <CheckCircle className="h-3 w-3 mr-0.5" />
-          {result.total_delivered || 0}
+      <div className="flex items-center gap-1.5 mt-1 px-2 py-0.5 rounded-md bg-slate-50 border border-slate-200 text-[10px] w-fit shadow-xs font-mono">
+        <span className="flex items-center text-emerald-600 font-semibold" title={`Delivered: ${deliveryDisplay}`}>
+          <CheckCircle className="h-3 w-3 mr-0.5 text-emerald-500" />
+          {deliveryDisplay}
         </span>
-        <span className="text-gray-300">|</span>
-        <span className="flex items-center text-yellow-600 font-medium" title="Cancelled">
-          <XCircle className="h-3 w-3 mr-0.5" />
-          {result.total_cancelled || 0}
+        <span className="text-slate-300">|</span>
+        <span className="flex items-center text-amber-600 font-semibold" title={`Cancelled: ${cancelDisplay}`}>
+          <XCircle className="h-3 w-3 mr-0.5 text-amber-500" />
+          {cancelDisplay}
         </span>
-        <span className="text-gray-300">|</span>
-        <span className="flex items-center text-red-600 font-medium" title="Frauds">
-          <AlertTriangle className="h-3 w-3 mr-0.5" />
-          {result.frauds || 0}
+        <span className="text-slate-300">|</span>
+        <span className={`flex items-center font-semibold ${fraudCount > 0 ? 'text-rose-600' : 'text-slate-500'}`} title={`Fraud Reports: ${fraudCount}`}>
+          <AlertTriangle className={`h-3 w-3 mr-0.5 ${fraudCount > 0 ? 'text-rose-500' : 'text-slate-400'}`} />
+          {fraudCount}
         </span>
       </div>
     );

@@ -46,6 +46,9 @@ import toast from 'react-hot-toast';
 import { formatDateForTable } from '@/utils/formatDate';
 import { orderAPI } from '@/services/api';
 import OrderUpdateHistory from '@/components/Admin/OrderUpdateHistory';
+import AdminNotesTimeline from '@/components/Admin/AdminNotesTimeline';
+import CustomerFraudScoreCard from '@/components/Admin/CustomerFraudScoreCard';
+import SteadfastTimeline from '@/components/Admin/SteadfastTimeline';
 import PermissionDenied from '@/components/Common/PermissionDenied';
 import { useAppContext } from '@/context/AppContext';
 import { getCookie } from 'cookies-next';
@@ -1240,6 +1243,9 @@ export default function OrderDetailsPage() {
                         )}
 
                         {/* Order Update History */}
+                        {/* Admin Notes Timeline */}
+                        <AdminNotesTimeline order={order} />
+
                         <OrderUpdateHistory updateHistory={order.updateHistory} />
                     </div>
 
@@ -1379,6 +1385,12 @@ export default function OrderDetailsPage() {
                                 ) : null}
                             </div>
                         </div>
+
+                        {/* Steadfast Official Fraud & Delivery Score */}
+                        <CustomerFraudScoreCard 
+                            phone={order.shippingAddress?.phone || (order.isGuestOrder && order.guestInfo?.phone) || order.user?.phone || (order.orderType === 'manual' && order.manualOrderInfo?.phone)} 
+                            orderId={order._id}
+                        />
 
                         {/* Payment Information */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 lg:p-8">
@@ -1581,8 +1593,13 @@ export default function OrderDetailsPage() {
                 </div>
             </div>
 
-            {/* Tracking History (Full Width) */}
-            {trackingHistory.length > 0 && (
+            {/* Steadfast Courier Timeline (Full Width) */}
+            <div className="mt-8">
+                <SteadfastTimeline order={order} onOpenPrintModal={() => setIsPrintModalOpen(true)} />
+            </div>
+
+            {/* Tracking History (Fallback) */}
+            {!order?.steadfastConsignmentId && !order?.isAddedIntoSteadfast && trackingHistory.length > 0 && (
                 <div className="mt-8 bg-white rounded-2xl shadow-sm border border-slate-200 p-8">
                     <h2 className="text-xl font-bold text-slate-900 mb-6 flex items-center">
                         <Truck className="h-6 w-6 mr-3 text-blue-600" />

@@ -1604,6 +1604,27 @@ export const settingsAPI = {
         return apiCall('/settings');
     },
 
+    // System Brands
+    getSystemBrands: () => {
+        return apiCall('/settings/system-brands');
+    },
+
+    updateSystemBrands: (brandsData, token) => {
+        return apiCall('/settings/system-brands', {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(brandsData),
+        });
+    }, /*
+
+        return apiCall('/settings');
+    },
+
+    */
+
     // Update settings (Admin only)
     updateSettings: (settingsData, token) => {
         return apiCall('/settings', {
@@ -1718,6 +1739,40 @@ export const settingsAPI = {
     },
 
     // Get steadfast settings only
+    getFacebookCapiSettings: () => {
+        return apiCall('/settings/facebook-capi');
+    },
+
+    updateFacebookCapiSettings: (capiData, token) => {
+        return apiCall('/settings/facebook-capi', {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(capiData),
+        });
+    },
+
+    testFacebookCapiConnection: (testData, token) => {
+        return apiCall('/settings/facebook-capi/test', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(testData),
+        });
+    },
+
+    trackFacebookClientEvent: (eventData) => {
+        return apiCall('/settings/facebook-capi/event', {
+            method: 'POST',
+            body: JSON.stringify(eventData),
+        });
+    },
+
+    // Get steadfast settings only
     getSteadfastSettings: () => {
         return apiCall('/settings/steadfast');
     },
@@ -1809,6 +1864,47 @@ export const settingsAPI = {
             body: JSON.stringify(fraudData),
         });
     },
+    // Steadfast & Server Logs API
+    getSteadfastLogs: (token) => {
+        return apiCall('/settings/logs/steadfast', {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+    },
+    updateSteadfastLogs: (content, token) => {
+        return apiCall('/settings/logs/steadfast', {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ content })
+        });
+    },
+    clearSteadfastLogs: (token) => {
+        return apiCall('/settings/logs/steadfast', {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+    },
+    getServerLogs: (params = {}, token) => {
+        const queryParams = new URLSearchParams();
+        Object.entries(params).forEach(([key, val]) => {
+            if (val !== undefined && val !== null && val !== '') {
+                queryParams.append(key, val);
+            }
+        });
+        const queryStr = queryParams.toString();
+        return apiCall(`/settings/logs/server${queryStr ? `?${queryStr}` : ''}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+    },
+
     checkFraudStatus: (phone, token) => {
         return apiCall(`/settings/fraud-checker/check/${phone}`, {
             headers: {
@@ -2256,6 +2352,92 @@ export const inventoryAPI = {
         return apiCall(url, {
             headers: {
                 'Authorization': `Bearer ${token}`,
+            },
+        });
+    },
+};
+
+// Combo API functions
+export const comboAPI = {
+    // Get all combos (Admin)
+    getAllCombos: (params = '', token) => {
+        const query = typeof params === 'string' ? params : new URLSearchParams(params).toString();
+        return apiCall(`/combo?${query}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+    },
+
+    // Get combo by ID (Admin)
+    getComboById: (id, token) => {
+        return apiCall(`/combo/admin/${id}`, {
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+    },
+
+    // Get combo by slug (Public)
+    getComboBySlugPublic: (slug) => {
+        return apiCall(`/combo/public/${slug}`);
+    },
+
+    // Get combo by Product ID (Public)
+    getComboByProductId: (productId) => {
+        return apiCall(`/combo/by-product/${productId}`);
+    },
+
+    // Get active combos (Public)
+    getActiveCombosPublic: (params = {}) => {
+        const queryParams = typeof params === 'object' ? new URLSearchParams(params).toString() : `limit=${params}`;
+        return apiCall(`/combo/public?${queryParams}`);
+    },
+
+    // Create combo (Admin)
+    createCombo: (comboData, token) => {
+        return apiCall('/combo', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(comboData),
+        });
+    },
+
+    // Update combo (Admin)
+    updateCombo: (id, comboData, token) => {
+        return apiCall(`/combo/${id}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(comboData),
+        });
+    },
+
+    // Delete combo (Admin)
+    deleteCombo: (id, token) => {
+        return apiCall(`/combo/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+        });
+    },
+
+    // Toggle combo active status (Admin)
+    toggleComboStatus: (id, token) => {
+        return apiCall(`/combo/${id}/toggle`, {
+            method: 'PATCH',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
             },
         });
     },
@@ -2794,9 +2976,9 @@ export const blocklistAPI = {
     blockEntity: async (data, token) => {
         return apiCall('/blocklist/block', {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}` 
+                'Authorization': `Bearer ${token}`
             },
             body: JSON.stringify(data)
         });

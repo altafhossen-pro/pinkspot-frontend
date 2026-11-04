@@ -335,6 +335,19 @@ export default function CartModal({ isOpen, onClose }) {
                                         <h3 className="font-medium text-gray-800 text-sm mb-1 truncate">
                                             {item.name}
                                         </h3>
+                                        {item.comboId && (
+                                            <div className="mb-1">
+                                                {item.isComboActive ? (
+                                                    <span className="inline-flex items-center text-[10px] font-semibold text-pink-700 bg-pink-50 px-2 py-0.5 rounded border border-pink-200">
+                                                        {item.comboStatusText || 'Combo discount applied'}
+                                                    </span>
+                                                ) : (
+                                                    <span className="inline-flex items-center text-[10px] font-semibold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                                                        Combo broken: regular price applied
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
                                         
                                         {/* Out of Stock Message */}
                                         {outOfStock && (
@@ -372,6 +385,9 @@ export default function CartModal({ isOpen, onClose }) {
 
                                         <p className="text-sm text-gray-700 mb-1">
                                             Item Price: {item.price} ৳
+                                            {item.isComboActive && item.regularPrice && item.regularPrice > item.price && (
+                                                <span className="text-gray-400 line-through text-xs ml-1.5">{item.regularPrice} ৳</span>
+                                            )}
                                         </p>
 
                                         <div className='flex items-center justify-between'>

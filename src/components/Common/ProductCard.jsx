@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Heart, Star } from 'lucide-react';
 import Link from 'next/link';
 
-function ProductCard({ product, onWishlistToggle, onAddToCart, showWishlistOnHover = true }) {
+function ProductCard({ product, onWishlistToggle, onAddToCart, showWishlistOnHover = true, href }) {
     // Stock checking state
     const [stockData, setStockData] = useState(null);
 
@@ -140,7 +140,7 @@ function ProductCard({ product, onWishlistToggle, onAddToCart, showWishlistOnHov
 
     return (
         <Link
-            href={`/product/${product.slug}`}
+            href={href || (product.isCombo ? `/combo/${product.slug}` : `/product/${product.slug}`)}
             className="relative group overflow-hidden rounded-xl shadow-lg border border-[#E7E7E7] hover:shadow-lg transition-all bg-[#F6F6F6] duration-300 hover:ring-1 hover:ring-[#F7AABC]"
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}

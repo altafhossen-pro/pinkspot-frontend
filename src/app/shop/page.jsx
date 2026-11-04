@@ -14,6 +14,7 @@ import Pagination from '@/components/Common/Pagination';
 import toast from 'react-hot-toast';
 import Footer from '@/components/Footer/Footer';
 import OwnAds from '@/components/Common/OwnAds';
+import { trackFacebookEvent } from '@/utils/facebookCapi';
 
 function ShopPageContent() {
     const { addToCart, addToWishlist, removeFromWishlist, wishlist } = useAppContext();
@@ -112,6 +113,11 @@ function ShopPageContent() {
                             // এতে React 18 দুটো update batch করবে — products fetch একবারই হবে
                             setSelectedCategories([category._id]);
                             fetchAvailableSizes([category._id]);
+                            trackFacebookEvent('ViewCategory', {
+                                content_name: category.name,
+                                content_category: category.name,
+                                content_ids: [category.slug || String(category._id)]
+                            });
                         } else {
                             // Slug was provided but not found, just fetch all sizes
                             fetchAvailableSizes([]);
