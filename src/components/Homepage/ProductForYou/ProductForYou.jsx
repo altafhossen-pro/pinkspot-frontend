@@ -6,45 +6,13 @@ import { productAPI, transformProductData } from '@/services/api';
 import ProductCard from '@/components/Common/ProductCard';
 
 export default function ProductForYou() {
-    const [products, setProducts] = useState(() => {
-        if (typeof window !== 'undefined') {
-            const cached = sessionStorage.getItem('forYouProducts');
-            if (cached) return JSON.parse(cached);
-        }
-        return [];
-    });
-    const [page, setPage] = useState(() => {
-        if (typeof window !== 'undefined') {
-            const cached = sessionStorage.getItem('forYouPage');
-            if (cached) return parseInt(cached, 10);
-        }
-        return 1;
-    });
+    const [products, setProducts] = useState([]);
+    const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(false);
-    const [hasMore, setHasMore] = useState(() => {
-        if (typeof window !== 'undefined') {
-            const cached = sessionStorage.getItem('forYouHasMore');
-            if (cached === 'false') return false;
-        }
-        return true;
-    });
+    const [hasMore, setHasMore] = useState(true);
     const [error, setError] = useState(null);
-    const [initialLoad, setInitialLoad] = useState(() => {
-        if (typeof window !== 'undefined') {
-            if (sessionStorage.getItem('forYouProducts')) return false;
-        }
-        return true;
-    });
-    const [autoLoadLimit, setAutoLoadLimit] = useState(() => {
-        if (typeof window !== 'undefined') {
-            const cached = sessionStorage.getItem('forYouProducts');
-            if (cached) {
-                const parsed = JSON.parse(cached);
-                return Math.max(50, Math.ceil(parsed.length / 50) * 50);
-            }
-        }
-        return 50;
-    });
+    const [initialLoad, setInitialLoad] = useState(true);
+    const [autoLoadLimit, setAutoLoadLimit] = useState(50);
 
     // Set up intersection observer for infinite scrolling
     const { ref, inView } = useInView({
@@ -148,12 +116,26 @@ export default function ProductForYou() {
         }
     }, [initialLoad]);
 
-    // Initial load
+    // Initial load and session cache restore
     useEffect(() => {
-        if (products.length === 0 && initialLoad) {
-            fetchProducts(1);
-        }
-    }, [fetchProducts, products.length, initialLoad]);
+        try {
+            const cached = sessionStorage.getItem('forYouProducts');
+            if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    setProducts(parsed);
+                    setInitialLoad(false);
+                    const cachedPage = sessionStorage.getItem('forYouPage');
+                    if (cachedPage) setPage(parseInt(cachedPage, 10));
+                    const cachedHasMore = sessionStorage.getItem('forYouHasMore');
+                    if (cachedHasMore === 'false') setHasMore(false);
+                    setAutoLoadLimit(Math.max(50, Math.ceil(parsed.length / 50) * 50));
+                    return;
+                }
+            }
+        } catch (e) {}
+        fetchProducts(1);
+    }, [fetchProducts]);
 
     // Load more when user scrolls to bottom (inView becomes true)
     useEffect(() => {

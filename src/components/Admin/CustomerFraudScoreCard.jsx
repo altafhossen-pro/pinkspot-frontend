@@ -11,17 +11,21 @@ import steadfastAPI from '@/services/steadfastApi';
 export default function CustomerFraudScoreCard({ phone, orderId }) {
   const [loading, setLoading] = useState(false);
   const [fraudData, setFraudData] = useState(null);
+  const [isCached, setIsCached] = useState(false);
+  const [cachedAt, setCachedAt] = useState(null);
   const [error, setError] = useState(null);
 
-  const fetchScore = async () => {
+  const fetchScore = async (force = false) => {
     if (!phone) return;
     setLoading(true);
     setError(null);
     try {
       const token = getCookie('token') || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
-      const res = await steadfastAPI.getFraudScore(phone, token);
+      const res = await steadfastAPI.getFraudScore(phone, token, force);
       if (res && res.success && res.data) {
         setFraudData(res.data);
+        setIsCached(Boolean(res.isCached));
+        setCachedAt(res.cachedAt || null);
       } else {
         setError(res.message || 'No delivery history found');
       }
@@ -34,7 +38,7 @@ export default function CustomerFraudScoreCard({ phone, orderId }) {
 
   useEffect(() => {
     if (phone) {
-      fetchScore();
+      fetchScore(false);
     }
   }, [phone]);
 
@@ -81,6 +85,11 @@ export default function CustomerFraudScoreCard({ phone, orderId }) {
               <span className="text-[10px] font-extrabold px-1.5 py-0.2 rounded bg-pink-50 text-pink-700 border border-pink-200">
                 Official Steadfast
               </span>
+              {isCached && (
+                <span className="text-[9px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200" title={cachedAt ? `Cached at: ${new Date(cachedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Cached'}>
+                  Cached 24h
+                </span>
+              )}
             </h3>
             <p className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5 font-mono">
               <Phone className="w-3 h-3 text-slate-400" />
@@ -90,10 +99,10 @@ export default function CustomerFraudScoreCard({ phone, orderId }) {
         </div>
 
         <button
-          onClick={fetchScore}
+          onClick={() => fetchScore(true)}
           disabled={loading}
           className="p-1.5 rounded-lg text-slate-400 hover:text-pink-600 hover:bg-pink-50 transition-colors disabled:opacity-50"
-          title="Re-check Score"
+          title="Force Live Refresh (Bypass Cache)"
         >
           <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin text-pink-600' : ''}`} />
         </button>

@@ -1,15 +1,21 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { 
   Users, Activity, ShoppingCart, CreditCard, Clock, Globe,
   Smartphone, Monitor, Tablet, RefreshCw, ExternalLink, Eye,
-  Phone, User, MapPin, AlertCircle, Sparkles, ChevronRight, X
+  Phone, User, MapPin, AlertCircle, Sparkles, ChevronRight, X, Zap,
+  Footprints, Copy, Check, MoreVertical, ShoppingBag
 } from 'lucide-react';
 import { io } from 'socket.io-client';
 import { getCookie } from 'cookies-next';
 import visitorAPI from '@/services/visitorApi';
+import SendOfferModal from '@/components/Admin/Analytics/SendOfferModal';
+import ShopperCartModal from '@/components/Admin/Analytics/ShopperCartModal';
+import OrderAsCustomerModal from '@/components/Admin/Analytics/OrderAsCustomerModal';
 
 export default function LiveShoppersPage() {
   const [shoppers, setShoppers] = useState([]);
@@ -21,16 +27,138 @@ export default function LiveShoppersPage() {
   const [selectedJourneySession, setSelectedJourneySession] = useState(null);
   const [journeyEvents, setJourneyEvents] = useState([]);
   const [journeyLoading, setJourneyLoading] = useState(false);
+  const [token, setToken] = useState(null);
+  const [offerTargetShopper, setOfferTargetShopper] = useState(null);
+  const [isOfferModalOpen, setIsOfferModalOpen] = useState(false);
+  const [cartModalShopper, setCartModalShopper] = useState(null);
+  const [isCartModalOpen, setIsCartModalOpen] = useState(false);
+  const [copiedPhoneId, setCopiedPhoneId] = useState(null);
+  const [orderAsCustomerShopper, setOrderAsCustomerShopper] = useState(null);
+  const [isOrderAsCustomerModalOpen, setIsOrderAsCustomerModalOpen] = useState(false);
+
+  const router = useRouter();
+  const [openDropdownId, setOpenDropdownId] = useState(null);
+  const [dropdownPosition, setDropdownPosition] = useState({});
+  const buttonRefs = useRef({});
+  const [contextMenu, setContextMenu] = useState({ open: false, shopper: null, x: 0, y: 0 });
+
+  // Close menus on outside click, escape key, or scroll
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (openDropdownId && !e.target.closest('.shopper-actions-dropdown') && !e.target.closest('.shopper-actions-btn')) {
+        setOpenDropdownId(null);
+      }
+      if (contextMenu.open && !e.target.closest('.shopper-context-menu')) {
+        setContextMenu({ open: false, shopper: null, x: 0, y: 0 });
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        setOpenDropdownId(null);
+        setContextMenu({ open: false, shopper: null, x: 0, y: 0 });
+      }
+    };
+    const handleScroll = () => {
+      if (openDropdownId) setOpenDropdownId(null);
+      if (contextMenu.open) setContextMenu({ open: false, shopper: null, x: 0, y: 0 });
+    };
+
+    window.addEventListener('click', handleOutsideClick);
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('scroll', handleScroll, true);
+    return () => {
+      window.removeEventListener('click', handleOutsideClick);
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [openDropdownId, contextMenu.open]);
+
+  const calculateDropdownPosition = (visitorId) => {
+    const buttonElement = buttonRefs.current[visitorId];
+    if (!buttonElement) return { top: 0, left: 0, position: 'fixed' };
+
+    const rect = buttonElement.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const dropdownHeight = 175;
+    const dropdownWidth = 190;
+    const gap = 6;
+
+    let pos = { position: 'fixed', zIndex: 9999 };
+
+    const spaceBelow = viewportHeight - rect.bottom;
+    const spaceAbove = rect.top;
+
+    if (spaceBelow < dropdownHeight && spaceAbove > spaceBelow) {
+      pos.bottom = `${viewportHeight - rect.top + gap}px`;
+      pos.top = 'auto';
+    } else {
+      pos.top = `${rect.bottom + gap}px`;
+      pos.bottom = 'auto';
+    }
+
+    const spaceRight = viewportWidth - rect.right;
+    if (spaceRight < dropdownWidth) {
+      pos.left = `${Math.max(10, rect.left)}px`;
+      pos.right = 'auto';
+    } else {
+      pos.right = `${Math.max(10, viewportWidth - rect.right)}px`;
+      pos.left = 'auto';
+    }
+
+    return pos;
+  };
+
+  const handleDropdownToggle = (shopper) => {
+    const id = shopper.visitorId;
+    if (openDropdownId === id) {
+      setOpenDropdownId(null);
+    } else {
+      setOpenDropdownId(id);
+      setContextMenu({ open: false, shopper: null, x: 0, y: 0 });
+      setTimeout(() => {
+        setDropdownPosition(calculateDropdownPosition(id));
+      }, 0);
+    }
+  };
+
+  const handleContextMenu = (e, shopper) => {
+    e.preventDefault();
+    setOpenDropdownId(null);
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const menuWidth = 190;
+    const menuHeight = 175;
+
+    let x = e.clientX;
+    let y = e.clientY;
+
+    if (x + menuWidth > viewportWidth) {
+      x = viewportWidth - menuWidth - 10;
+    }
+    if (y + menuHeight > viewportHeight) {
+      y = viewportHeight - menuHeight - 10;
+    }
+
+    setContextMenu({
+      open: true,
+      shopper,
+      x: Math.max(10, x),
+      y: Math.max(10, y)
+    });
+  };
 
   const socketRef = useRef(null);
 
   // Initialize socket & fetch live shoppers snapshot
   useEffect(() => {
-    const token = getCookie('token') || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
+    const userToken = getCookie('token') || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
+    setToken(userToken);
 
     const fetchSnapshot = async () => {
       try {
-        const res = await visitorAPI.getLiveShoppers(token);
+        const activeToken = userToken || getCookie('token');
+        const res = await visitorAPI.getLiveShoppers(activeToken);
         if (res && res.success) {
           const list = Array.isArray(res.data) 
             ? res.data 
@@ -95,6 +223,22 @@ export default function LiveShoppersPage() {
       }, 10000);
     });
 
+    // High-priority alert when an order is placed
+    socket.on('order_placed_alert', (orderData) => {
+      setShoppers(prev => prev.map(s => {
+        if (s.visitorId === orderData.visitorId) {
+          return {
+            ...s,
+            isOrderPlaced: true,
+            placedOrderId: orderData.orderId,
+            placedOrderAmount: orderData.totalAmount,
+            hasCart: false
+          };
+        }
+        return s;
+      }));
+    });
+
     // Fallback polling interval every 15s to keep time sync
     const pollInterval = setInterval(() => {
       fetchSnapshot();
@@ -111,13 +255,14 @@ export default function LiveShoppersPage() {
 
   // View journey modal handler
   const handleViewJourney = async (shopper) => {
-    if (!shopper?.sessionId) return;
+    const targetId = shopper?.sessionId || shopper?.visitorId;
+    if (!targetId) return;
     setSelectedJourneySession(shopper);
     setJourneyLoading(true);
-    const token = getCookie('token') || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
+    const userToken = getCookie('token') || (typeof window !== 'undefined' ? localStorage.getItem('token') : null);
 
     try {
-      const res = await visitorAPI.getSessionJourney(shopper.sessionId, token);
+      const res = await visitorAPI.getSessionJourney(targetId, userToken);
       if (res && res.success) {
         const rawEvents = Array.isArray(res.data?.events) ? res.data.events : [];
         const sorted = [...rawEvents].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -353,7 +498,8 @@ export default function LiveShoppersPage() {
                   return (
                     <tr 
                       key={shopper.visitorId || idx}
-                      className={`hover:bg-pink-50/30 transition-colors ${
+                      onContextMenu={(e) => handleContextMenu(e, shopper)}
+                      className={`hover:bg-pink-50/30 transition-colors cursor-default ${
                         isCheckout ? 'bg-rose-50/20' : ''
                       }`}
                     >
@@ -385,13 +531,33 @@ export default function LiveShoppersPage() {
                               <span>{shopper.customerName || 'Identified Customer'}</span>
                             </div>
                             {shopper.customerPhone && (
-                              <a 
-                                href={`tel:${shopper.customerPhone}`}
-                                className="text-xs font-semibold text-pink-600 hover:underline flex items-center gap-1"
-                              >
-                                <Phone className="w-3 h-3 text-pink-500" />
-                                <span>{shopper.customerPhone}</span>
-                              </a>
+                              <div className="flex items-center gap-1.5">
+                                <a 
+                                  href={`tel:${shopper.customerPhone}`}
+                                  className="text-xs font-semibold text-pink-600 hover:underline flex items-center gap-1"
+                                >
+                                  <Phone className="w-3 h-3 text-pink-500" />
+                                  <span>{shopper.customerPhone}</span>
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (navigator?.clipboard?.writeText) {
+                                      navigator.clipboard.writeText(shopper.customerPhone);
+                                      setCopiedPhoneId(shopper.visitorId);
+                                      setTimeout(() => setCopiedPhoneId(null), 2000);
+                                    }
+                                  }}
+                                  className="p-1 rounded text-slate-400 hover:text-pink-600 hover:bg-pink-50 transition-colors"
+                                  title="Copy Phone Number"
+                                >
+                                  {copiedPhoneId === shopper.visitorId ? (
+                                    <Check className="w-3 h-3 text-emerald-600" />
+                                  ) : (
+                                    <Copy className="w-3 h-3" />
+                                  )}
+                                </button>
+                              </div>
                             )}
                             {shopper.customerAddress && (
                               <div className="text-[11px] text-slate-500 truncate max-w-[180px] flex items-center gap-1" title={shopper.customerAddress}>
@@ -407,13 +573,27 @@ export default function LiveShoppersPage() {
                         )}
                       </td>
 
-                      {/* Current Page */}
+                      {/* Current Page & Order Status */}
                       <td className="py-4 px-4 align-top">
                         <div className="space-y-1">
-                          <div className="flex items-center gap-1.5">
-                            {isCheckout ? (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {shopper.isOrderPlaced || shopper.placedOrderId ? (
+                              <a
+                                href={`/admin/dashboard/orders?search=${shopper.placedOrderId}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-100 hover:bg-emerald-200 text-emerald-800 flex items-center gap-1 transition-colors border border-emerald-200"
+                                title="Click to view placed order in orders panel"
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <span>Ordered #{shopper.placedOrderId}</span>
+                                {Number(shopper.placedOrderAmount) > 0 && (
+                                  <span className="font-extrabold text-emerald-900">(৳{Number(shopper.placedOrderAmount).toLocaleString()})</span>
+                                )}
+                              </a>
+                            ) : isCheckout ? (
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold bg-rose-100 text-rose-700 uppercase tracking-wide">
-                                Checkout
+                                In Checkout
                               </span>
                             ) : (
                               <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-100 text-slate-600">
@@ -424,14 +604,14 @@ export default function LiveShoppersPage() {
                               href={shopper.url || '/'}
                               target="_blank" 
                               rel="noreferrer"
-                              className="text-xs font-medium text-slate-700 hover:text-pink-600 hover:underline flex items-center gap-1 truncate max-w-[220px]"
+                              className="text-xs font-medium text-slate-700 hover:text-pink-600 hover:underline flex items-center gap-1 truncate max-w-[200px]"
                               title={shopper.url}
                             >
                               <span>{shopper.title || shopper.url || '/'}</span>
                               <ExternalLink className="w-3 h-3 text-slate-400 flex-shrink-0" />
                             </a>
                           </div>
-                          <div className="text-[11px] font-mono text-slate-400 truncate max-w-[220px]">
+                          <div className="text-[11px] font-mono text-slate-400 truncate max-w-[200px]">
                             {shopper.url}
                           </div>
                         </div>
@@ -462,6 +642,17 @@ export default function LiveShoppersPage() {
                                 </span>
                               )}
                             </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setCartModalShopper(shopper);
+                                setIsCartModalOpen(true);
+                              }}
+                              className="inline-flex items-center gap-1 text-[11px] font-bold text-pink-600 hover:text-pink-700 hover:underline pt-0.5"
+                            >
+                              <ShoppingCart className="w-3 h-3" />
+                              <span>View Cart</span>
+                            </button>
                           </div>
                         ) : (
                           <span className="text-xs text-slate-400">Empty</span>
@@ -497,13 +688,17 @@ export default function LiveShoppersPage() {
                       </td>
 
                       {/* Actions */}
-                      <td className="py-4 px-4 align-top text-right">
+                      <td className="py-4 px-4 align-top text-right whitespace-nowrap">
                         <button
-                          onClick={() => handleViewJourney(shopper)}
-                          className="inline-flex items-center gap-1 px-3 py-1 rounded-xl text-xs font-semibold bg-pink-50 text-pink-700 hover:bg-pink-100 transition-colors border border-pink-200 shadow-sm"
+                          ref={(el) => (buttonRefs.current[shopper.visitorId] = el)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDropdownToggle(shopper);
+                          }}
+                          className="shopper-actions-btn inline-flex items-center justify-center w-8 h-8 rounded-xl bg-slate-50 hover:bg-pink-50 text-slate-500 hover:text-pink-600 border border-slate-200 transition-colors shadow-2xs"
+                          title="Actions (or Right-Click row)"
                         >
-                          <Eye className="w-3.5 h-3.5" />
-                          <span>Journey</span>
+                          <MoreVertical className="w-4 h-4" />
                         </button>
                       </td>
                     </tr>
@@ -627,7 +822,16 @@ export default function LiveShoppersPage() {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+              {selectedJourneySession?.visitorId && (
+                <Link
+                  href={`/admin/dashboard/analytics/visitor-footprint?visitorId=${encodeURIComponent(selectedJourneySession.visitorId)}`}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-pink-50 text-pink-700 hover:bg-pink-100 transition-colors border border-pink-200"
+                >
+                  <Footprints className="w-3.5 h-3.5" />
+                  <span>View Footprint History</span>
+                </Link>
+              )}
               <button
                 onClick={() => setSelectedJourneySession(null)}
                 className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200 transition-colors"
@@ -637,6 +841,232 @@ export default function LiveShoppersPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Custom Offer Dispatch Modal */}
+      <SendOfferModal
+        isOpen={isOfferModalOpen}
+        onClose={() => {
+          setIsOfferModalOpen(false);
+          setOfferTargetShopper(null);
+        }}
+        targetVisitor={offerTargetShopper}
+        token={token}
+      />
+
+      {/* Shopper Cart Modal */}
+      <ShopperCartModal
+        isOpen={isCartModalOpen}
+        onClose={() => {
+          setIsCartModalOpen(false);
+          setCartModalShopper(null);
+        }}
+        shopper={cartModalShopper}
+      />
+
+      {/* 3-Dot Floating Actions Dropdown Menu (Portal) */}
+      {openDropdownId && typeof window !== 'undefined' && createPortal(
+        (() => {
+          const targetShopper = shoppers.find(s => s.visitorId === openDropdownId);
+          if (!targetShopper) return null;
+
+          return (
+            <div
+              className="shopper-actions-dropdown w-52 bg-white rounded-2xl shadow-xl border border-slate-200/90 overflow-hidden text-xs py-1.5 animate-in fade-in zoom-in-95 duration-100 z-[9999]"
+              style={dropdownPosition}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenDropdownId(null);
+                  setOrderAsCustomerShopper(targetShopper);
+                  setIsOrderAsCustomerModalOpen(true);
+                }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-pink-700 bg-pink-50/50 hover:bg-pink-100/70 transition-colors text-left font-bold"
+              >
+                <ShoppingBag className="w-4 h-4 text-pink-600" />
+                <span>Order as Customer</span>
+              </button>
+              {targetShopper.placedOrderId && (
+                <a
+                  href={`/admin/dashboard/orders?search=${targetShopper.placedOrderId}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  onClick={() => setOpenDropdownId(null)}
+                  className="w-full flex items-center gap-2.5 px-3.5 py-2 text-emerald-700 hover:bg-emerald-50 transition-colors text-left font-bold"
+                >
+                  <ExternalLink className="w-4 h-4 text-emerald-600" />
+                  <span>View Order #{targetShopper.placedOrderId}</span>
+                </a>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenDropdownId(null);
+                  setCartModalShopper(targetShopper);
+                  setIsCartModalOpen(true);
+                }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-slate-700 hover:bg-pink-50 hover:text-pink-700 transition-colors text-left font-medium"
+              >
+                <ShoppingCart className="w-4 h-4 text-emerald-600" />
+                <span>View Cart</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenDropdownId(null);
+                  setOfferTargetShopper(targetShopper);
+                  setIsOfferModalOpen(true);
+                }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-slate-700 hover:bg-pink-50 hover:text-pink-700 transition-colors text-left font-medium"
+              >
+                <Zap className="w-4 h-4 text-pink-600" />
+                <span>Send Offer</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenDropdownId(null);
+                  handleViewJourney(targetShopper);
+                }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-slate-700 hover:bg-pink-50 hover:text-pink-700 transition-colors text-left font-medium"
+              >
+                <Eye className="w-4 h-4 text-indigo-600" />
+                <span>Live Journey</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenDropdownId(null);
+                  router.push(`/admin/dashboard/analytics/visitor-footprint?visitorId=${encodeURIComponent(targetShopper.visitorId)}`);
+                }}
+                className="w-full flex items-center gap-2.5 px-3.5 py-2 text-slate-700 hover:bg-pink-50 hover:text-pink-700 transition-colors text-left font-medium"
+              >
+                <Footprints className="w-4 h-4 text-amber-600" />
+                <span>Footprint History</span>
+              </button>
+            </div>
+          );
+        })(),
+        document.body
+      )}
+
+      {/* Right-Click Context Menu (Portal) */}
+      {contextMenu.open && contextMenu.shopper && typeof window !== 'undefined' && createPortal(
+        <div
+          className="shopper-context-menu fixed w-48 bg-white rounded-2xl shadow-2xl border border-slate-200/90 overflow-hidden text-xs py-1.5 z-[9999] animate-in fade-in zoom-in-95 duration-100"
+          style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-3.5 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider border-b border-slate-100 mb-1">
+            Shopper #{contextMenu.shopper.dailySerial || 'Actions'}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              const s = contextMenu.shopper;
+              setContextMenu({ open: false, shopper: null, x: 0, y: 0 });
+              setOrderAsCustomerShopper(s);
+              setIsOrderAsCustomerModalOpen(true);
+            }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-pink-700 bg-pink-50/50 hover:bg-pink-100/70 transition-colors text-left font-bold"
+          >
+            <ShoppingBag className="w-4 h-4 text-pink-600" />
+            <span>Order as Customer</span>
+          </button>
+          {contextMenu.shopper.placedOrderId && (
+            <a
+              href={`/admin/dashboard/orders?search=${contextMenu.shopper.placedOrderId}`}
+              target="_blank"
+              rel="noreferrer"
+              onClick={() => setContextMenu({ open: false, shopper: null, x: 0, y: 0 })}
+              className="w-full flex items-center gap-2.5 px-3.5 py-2 text-emerald-700 hover:bg-emerald-50 transition-colors text-left font-bold"
+            >
+              <ExternalLink className="w-4 h-4 text-emerald-600" />
+              <span>View Order #{contextMenu.shopper.placedOrderId}</span>
+            </a>
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              const s = contextMenu.shopper;
+              setContextMenu({ open: false, shopper: null, x: 0, y: 0 });
+              setCartModalShopper(s);
+              setIsCartModalOpen(true);
+            }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-slate-700 hover:bg-pink-50 hover:text-pink-700 transition-colors text-left font-medium"
+          >
+            <ShoppingCart className="w-4 h-4 text-emerald-600" />
+            <span>View Cart</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const s = contextMenu.shopper;
+              setContextMenu({ open: false, shopper: null, x: 0, y: 0 });
+              setOfferTargetShopper(s);
+              setIsOfferModalOpen(true);
+            }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-slate-700 hover:bg-pink-50 hover:text-pink-700 transition-colors text-left font-medium"
+          >
+            <Zap className="w-4 h-4 text-pink-600" />
+            <span>Send Offer</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const s = contextMenu.shopper;
+              setContextMenu({ open: false, shopper: null, x: 0, y: 0 });
+              handleViewJourney(s);
+            }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-slate-700 hover:bg-pink-50 hover:text-pink-700 transition-colors text-left font-medium"
+          >
+            <Eye className="w-4 h-4 text-indigo-600" />
+            <span>Live Journey</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const s = contextMenu.shopper;
+              setContextMenu({ open: false, shopper: null, x: 0, y: 0 });
+              router.push(`/admin/dashboard/analytics/visitor-footprint?visitorId=${encodeURIComponent(s.visitorId)}`);
+            }}
+            className="w-full flex items-center gap-2.5 px-3.5 py-2 text-slate-700 hover:bg-pink-50 hover:text-pink-700 transition-colors text-left font-medium"
+          >
+            <Footprints className="w-4 h-4 text-amber-600" />
+            <span>Footprint History</span>
+          </button>
+        </div>,
+        document.body
+      )}
+
+      {/* Order as Customer Modal */}
+      {isOrderAsCustomerModalOpen && orderAsCustomerShopper && (
+        <OrderAsCustomerModal
+          shopper={orderAsCustomerShopper}
+          isOpen={isOrderAsCustomerModalOpen}
+          onClose={() => {
+            setIsOrderAsCustomerModalOpen(false);
+            setOrderAsCustomerShopper(null);
+          }}
+          onOrderCreated={(orderDoc) => {
+            // Immediately reflect placed order status on this shopper
+            const orderId = orderDoc.orderId || orderDoc._id;
+            setShoppers(prev => prev.map(s => {
+              if (s.visitorId === orderAsCustomerShopper.visitorId) {
+                return {
+                  ...s,
+                  isOrderPlaced: true,
+                  placedOrderId: orderId,
+                  placedOrderAmount: orderDoc.total || orderDoc.totalAmount,
+                  hasCart: false
+                };
+              }
+              return s;
+            }));
+          }}
+        />
       )}
     </div>
   );

@@ -40,7 +40,8 @@ import {
     Archive,
     Share2,
     Activity,
-    Footprints
+    Footprints,
+    Sparkles
 } from 'lucide-react'
 
 const navigation = [
@@ -144,6 +145,7 @@ const navigation = [
         children: [
             { name: 'Live Shoppers', href: '/admin/dashboard/analytics/live-shoppers', icon: Activity },
             { name: 'Visitor Footprint', href: '/admin/dashboard/analytics/visitor-footprint', icon: Footprints },
+            { name: 'Offer Templates', href: '/admin/dashboard/analytics/offer-templates', icon: Sparkles },
             { name: 'Sales Analytics', href: '/admin/dashboard/analytics/sales-analytics', icon: TrendingUp },
         ]
     }

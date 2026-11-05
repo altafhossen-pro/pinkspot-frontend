@@ -27,11 +27,12 @@ import {
     Minus,
     Trash2,
     History,
-    Eye
+    Eye,
+    Tag
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { formatDateForTable } from '@/utils/formatDate';
-import { orderAPI, productAPI } from '@/services/api';
+import { orderAPI, productAPI, settingsAPI } from '@/services/api';
 import { getCookie } from 'cookies-next';
 import { useAppContext } from '@/context/AppContext';
 
@@ -54,6 +55,7 @@ export default function OrderEditPage() {
     const [selectedSize, setSelectedSize] = useState("");
     const [selectedColor, setSelectedColor] = useState("");
     const [isSearchingProducts, setIsSearchingProducts] = useState(false);
+    const [systemBrands, setSystemBrands] = useState([]);
 
     // Form states
     const [formData, setFormData] = useState({
@@ -68,6 +70,7 @@ export default function OrderEditPage() {
         discount: 0,
         couponDiscount: 0,
         loyaltyDiscount: 0,
+        brand: '',
         orderNotes: '',
         adminNotes: '',
         // Update reasons
@@ -78,11 +81,27 @@ export default function OrderEditPage() {
         paymentUpdateReason: '',
         notesUpdateReason: '',
         adminNotesUpdateReason: '',
+        brandUpdateReason: '',
         steadfastConsignmentId: ''
     });
 
     useEffect(() => {
         fetchOrderDetails();
+    }, [orderId]);
+
+    // Fetch system brands from settings
+    useEffect(() => {
+        const loadBrands = async () => {
+            try {
+                const res = await settingsAPI.getSystemBrands();
+                if (res?.success && res.data) {
+                    setSystemBrands(res.data.systemBrands || []);
+                }
+            } catch (err) {
+                console.error('Failed to load system brands for order edit:', err);
+            }
+        };
+        loadBrands();
     }, [orderId]);
 
     const fetchOrderDetails = async () => {
@@ -104,6 +123,7 @@ export default function OrderEditPage() {
                     discount: data.data.discount || 0,
                     couponDiscount: data.data.couponDiscount || 0,
                     loyaltyDiscount: data.data.loyaltyDiscount || 0,
+                    brand: data.data.brand || '',
                     orderNotes: data.data.orderNotes || '',
                     adminNotes: data.data.adminNotes || '',
                     itemUpdateReason: '',
@@ -113,6 +133,7 @@ export default function OrderEditPage() {
                     paymentUpdateReason: '',
                     notesUpdateReason: '',
                     adminNotesUpdateReason: '',
+        brandUpdateReason: '',
                     steadfastConsignmentId: data.data.steadfastConsignmentId || ''
                 });
             } else {
@@ -952,6 +973,66 @@ export default function OrderEditPage() {
 
                     {/* Right Column - Order Details */}
                     <div className="space-y-8">
+                        {/* Order Brand */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 lg:p-8">
+                            <div className="flex items-center justify-between mb-4">
+                                <h2 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center">
+                                    <Tag className="h-6 w-6 mr-3 text-purple-600" />
+                                    Order Brand
+                                </h2>
+                                <Link
+                                    href="/admin/dashboard/settings/brands"
+                                    target="_blank"
+                                    className="text-xs text-blue-600 hover:text-blue-800 underline font-medium"
+                                    title="Manage system brands in settings"
+                                >
+                                    Manage Brands
+                                </Link>
+                            </div>
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                                        Assigned Brand <span className="text-red-500">*</span>
+                                    </label>
+                                    <select
+                                        value={formData.brand || ''}
+                                        onChange={(e) => handleInputChange('brand', e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white font-medium"
+                                        required
+                                    >
+                                        {systemBrands.length === 0 ? (
+                                            <option value={formData.brand || 'ForPink'}>
+                                                {formData.brand || 'ForPink'} (Default)
+                                            </option>
+                                        ) : (
+                                            <>
+                                                {formData.brand && !systemBrands.some(b => b.name?.toLowerCase() === formData.brand?.toLowerCase()) && (
+                                                    <option value={formData.brand}>{formData.brand} (Current)</option>
+                                                )}
+                                                {systemBrands.filter(b => b.isActive !== false).map((b) => (
+                                                    <option key={b.name} value={b.name}>
+                                                        {b.name} {b.isDefault ? '★ (Default)' : ''}
+                                                    </option>
+                                                ))}
+                                            </>
+                                        )}
+                                    </select>
+                                    <p className="text-xs text-gray-500 mt-1.5">
+                                        Change the brand assigned to this order from settings.
+                                    </p>
+                                </div>
+                                <div>
+                                    <input
+                                        type="text"
+                                        value={formData.brandUpdateReason || ''}
+                                        onChange={(e) => handleInputChange('brandUpdateReason', e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-xs"
+                                        placeholder="Reason for brand change (optional)"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
                         {/* Order Status & Payment */}
                         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 lg:p-8">
                             <h2 className="text-lg sm:text-xl font-bold text-slate-900 mb-4 sm:mb-6 flex items-center">

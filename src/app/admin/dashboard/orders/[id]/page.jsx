@@ -811,6 +811,12 @@ export default function OrderDetailsPage() {
                                     <span className="ml-2">{order.status.charAt(0).toUpperCase() + order.status.slice(1)}</span>
                                 </span>
 
+                                {order.brand && (
+                                    <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200 shadow-sm" title="Order Brand">
+                                        🏷️ {order.brand}
+                                    </span>
+                                )}
+
                                 {allActiveUsers.length > 0 && (
                                     <div className="flex items-center -space-x-2 mr-2 pl-2 border-l border-slate-300" title="Active Viewers">
                                         {allActiveUsers.map((viewer, idx) => (

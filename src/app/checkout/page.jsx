@@ -807,6 +807,55 @@ export default function Checkout() {
     }, [formData.deliveryType, subtotal, deliveryChargeSettings]);
 
     // Calculate coins needed for the order
+    // Real-time debounced tracking of checkout input (only valid 11-digit mobile numbers & debounced addresses)
+    useEffect(() => {
+        const rawDigits = (formData.mobileNumber || '').replace(/\D/g, '');
+        const isValid11DigitPhone = /^01[3-9]\d{8}$/.test(rawDigits);
+        const phone = isValid11DigitPhone ? rawDigits : null;
+
+        const name = formData.fullName?.trim() || '';
+        const notes = formData.orderNotes?.trim() || '';
+        const addressParts = [
+            formData.deliveryAddress,
+            formData.area,
+            formData.upazila,
+            formData.district,
+            formData.division
+        ].filter(Boolean);
+        const fullAddr = addressParts.join(', ').trim();
+
+        const hasValidName = name.length >= 2;
+        const hasValidAddr = fullAddr.length >= 6;
+
+        // Strictly require either a complete 11-digit phone number OR a meaningful name/address
+        if (isValid11DigitPhone || hasValidName || hasValidAddr) {
+            const timer = setTimeout(() => {
+                identifyVisitorProfile({
+                    phone: phone || null,
+                    fullName: hasValidName ? name : null,
+                    address: hasValidAddr ? fullAddr : null,
+                    notes: notes || null,
+                    customerNotes: notes || null,
+                    deliveryCharge: shippingCost || 0,
+                    cartTotal: totalCost > 0 ? totalCost : (subtotal || cartTotal || 0)
+                });
+            }, 2500); // 2.5 seconds debounce gives users plenty of time to type without double revisions
+
+            return () => clearTimeout(timer);
+        }
+    }, [
+        formData.mobileNumber,
+        formData.fullName,
+        formData.deliveryAddress,
+        formData.area,
+        formData.upazila,
+        formData.district,
+        formData.division,
+        formData.orderNotes,
+        shippingCost,
+        totalCost,
+        subtotal
+    ]);
     const calculateCoinsNeeded = () => {
         if (!loyaltyData) return 0;
         return Math.ceil(subtotal / loyaltyData.coinValue);

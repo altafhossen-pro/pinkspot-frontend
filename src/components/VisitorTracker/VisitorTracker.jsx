@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useRef, Suspense } from 'react';
+import { useEffect, useRef, useState, Suspense } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { io } from 'socket.io-client';
 import { getCookie, setCookie } from 'cookies-next';
 import { useAppContext } from '@/context/AppContext';
+import VisitorOfferModal from './VisitorOfferModal';
+import visitorAPI from '@/services/visitorApi';
 
 let globalSocket = null;
 
@@ -18,6 +20,58 @@ function VisitorTrackerCore() {
     const { cart, cartTotal, user } = useAppContext();
     const lastUrlRef = useRef('');
     const heartbeatRef = useRef(null);
+
+    // Dynamic refs to avoid stale closure in socket events and heartbeat
+    const cartRef = useRef(cart);
+    const cartTotalRef = useRef(cartTotal);
+    const userRef = useRef(user);
+
+    useEffect(() => {
+        cartRef.current = cart;
+        cartTotalRef.current = cartTotal;
+        userRef.current = user;
+    }, [cart, cartTotal, user]);
+
+    // Custom Screen Offer State
+    const [activeOffer, setActiveOffer] = useState(null);
+    const [showOfferModal, setShowOfferModal] = useState(false);
+    const offerTimerRef = useRef(null);
+    const processedOffersRef = useRef(new Set());
+
+    const triggerOfferDisplay = (offer) => {
+        if (!offer || !offer._id) return;
+        if (processedOffersRef.current.has(offer._id)) return;
+        processedOffersRef.current.add(offer._id);
+
+        if (offerTimerRef.current) clearTimeout(offerTimerRef.current);
+
+        const delayMs = Math.max(0, (Number(offer.delaySeconds) || 0) * 1000);
+        if (delayMs > 0) {
+            offerTimerRef.current = setTimeout(() => {
+                setActiveOffer(offer);
+                setShowOfferModal(true);
+            }, delayMs);
+        } else {
+            setActiveOffer(offer);
+            setShowOfferModal(true);
+        }
+    };
+
+    const handleOfferAction = (offerId) => {
+        setShowOfferModal(false);
+        if (globalSocket && globalSocket.connected) {
+            globalSocket.emit('visitor_offer_action', { offerId, action: 'clicked' });
+        }
+        visitorAPI.respondToOffer(offerId, 'clicked').catch(() => {});
+    };
+
+    const handleOfferClose = (offerId) => {
+        setShowOfferModal(false);
+        if (globalSocket && globalSocket.connected) {
+            globalSocket.emit('visitor_offer_action', { offerId, action: 'dismissed' });
+        }
+        visitorAPI.respondToOffer(offerId, 'dismissed').catch(() => {});
+    };
 
     useEffect(() => {
         // 1. Get or generate persistent visitor ID
@@ -49,23 +103,44 @@ function VisitorTrackerCore() {
             }
         });
 
+        // Listen for live instant custom offers dispatched by admin
+        socket.on('custom_visitor_offer', (offer) => {
+            if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/admin')) {
+                triggerOfferDisplay(offer);
+            }
+        });
+
+        // Check for pending offers (in case visitor was offline or reloaded page)
+        if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/admin')) {
+            visitorAPI.getPendingOffer(visitorId).then(res => {
+                if (res?.success && res?.data) {
+                    triggerOfferDisplay(res.data);
+                }
+            }).catch(() => {});
+        }
+
         // 3. Heartbeat timer (15 seconds)
         heartbeatRef.current = setInterval(() => {
             if (typeof document !== 'undefined' && document.hidden) return;
             if (socket.connected && !window.location.pathname.startsWith('/admin')) {
+                const curCart = cartRef.current || [];
+                const computed = curCart.reduce((sum, item) => sum + (Number(item.price || item.currentPrice || 0) * Number(item.quantity || 1)), 0);
+                const finalTotal = Number(cartTotalRef.current) > 0 ? Number(cartTotalRef.current) : computed;
+
                 socket.emit('visitor_heartbeat', {
                     visitorId,
                     url: window.location.pathname + window.location.search,
                     title: document.title,
-                    hasCart: Boolean(cart && cart.length > 0),
-                    cartTotal: cartTotal || 0,
-                    customerPhone: user?.phone || null,
-                    customerName: user?.name || null
+                    hasCart: Boolean(curCart.length > 0),
+                    cartTotal: finalTotal,
+                    customerPhone: userRef.current?.phone || null,
+                    customerName: userRef.current?.name || null
                 });
             }
         }, 15000);
 
         return () => {
+            if (offerTimerRef.current) clearTimeout(offerTimerRef.current);
             if (heartbeatRef.current) clearInterval(heartbeatRef.current);
             socket.disconnect();
             globalSocket = null;
@@ -98,34 +173,52 @@ function VisitorTrackerCore() {
         const visitorId = getCookie('visitor_id') || (typeof window !== 'undefined' ? localStorage.getItem('forpink_vid') : null);
         if (!visitorId || !globalSocket || !globalSocket.connected) return;
 
+        const curCart = cart || [];
+        const computed = curCart.reduce((sum, item) => sum + (Number(item.price || item.currentPrice || 0) * Number(item.quantity || 1)), 0);
+        const finalTotal = Number(cartTotal) > 0 ? Number(cartTotal) : computed;
+
         globalSocket.emit('visitor_cart_update', {
             visitorId,
             url: pathname + (searchParams?.toString() ? `?${searchParams.toString()}` : ''),
-            cart: cart || [],
-            cartTotal: cartTotal || 0
+            cart: curCart,
+            cartTotal: finalTotal
         });
-    }, [cart?.length, cartTotal]);
+    }, [cart, cartTotal]);
 
     // Helper to send activity payload
     const sendActivity = (socket, visitorId, url) => {
+        const curCart = cartRef.current || [];
+        const computed = curCart.reduce((sum, item) => sum + (Number(item.price || item.currentPrice || 0) * Number(item.quantity || 1)), 0);
+        const finalTotal = Number(cartTotalRef.current) > 0 ? Number(cartTotalRef.current) : computed;
+
         const payload = {
             visitorId,
             url,
             title: document.title || 'Storefront',
             referrer: document.referrer || '',
-            cart: cart || [],
-            cartTotal: cartTotal || 0,
-            hasCart: Boolean(cart && cart.length > 0),
+            cart: curCart,
+            cartTotal: finalTotal,
+            hasCart: Boolean(curCart.length > 0),
             visitedCheckout: url.includes('/checkout'),
-            customerPhone: user?.phone || null,
-            customerName: user?.name || null,
-            userId: user?._id || user?.id || null
+            customerPhone: userRef.current?.phone || null,
+            customerName: userRef.current?.name || null,
+            userId: userRef.current?._id || userRef.current?.id || null
         };
 
         socket.emit('visitor_activity', payload);
     };
 
-    return null;
+    return (
+        <>
+            {showOfferModal && activeOffer && !pathname?.startsWith('/admin') && (
+                <VisitorOfferModal
+                    offer={activeOffer}
+                    onClose={handleOfferClose}
+                    onAction={handleOfferAction}
+                />
+            )}
+        </>
+    );
 }
 
 export default function VisitorTracker() {

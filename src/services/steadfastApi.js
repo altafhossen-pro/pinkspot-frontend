@@ -36,9 +36,10 @@ const apiCall = async (endpoint, options = {}) => {
 };
 
 export const steadfastAPI = {
-    // Official customer fraud / courier delivery score check
-    getFraudScore: (phone, token) => {
-        return apiCall(`/steadfast/fraud-check/${encodeURIComponent(phone)}`, {
+    // Official customer fraud / courier delivery score check (supports 24h cache + force refresh)
+    getFraudScore: (phone, token, force = false) => {
+        const query = force ? '?force=true' : '';
+        return apiCall(`/steadfast/fraud-check/${encodeURIComponent(phone)}${query}`, {
             headers: token ? { 'Authorization': `Bearer ${token}` } : {}
         });
     },
